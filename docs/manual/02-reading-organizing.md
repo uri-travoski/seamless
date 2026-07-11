@@ -8,7 +8,7 @@ Switch between **Split** and **Table** view with the button above the list (or i
 
 Each row shows, left to right:
 
-- **Account color bar** — which connected account the mail belongs to.
+- **Account color dot** — a colored dot at the very start of the row showing which connected account the mail belongs to (see below).
 - **Checkbox** — select for bulk actions.
 - **Star** — click to flag; starred mail also appears under **Starred**.
 - **Sender**, then **subject** and a preview of the body.
@@ -19,6 +19,14 @@ Each row shows, left to right:
   - **Countdown** (orange `Nd`) — the retention sweep will move this to Trash in N days. Open it and keep it to cancel.
   - **Note icon** — a private note is attached.
 - **Date**.
+
+### Account color dots
+
+Each account you connect gets its own color, set in **Settings > Accounts** (the same dot appears next to the account in the sidebar). In the unified inbox — where every account's mail is merged together — the colored dot at the very start of each row tells you at a glance which account a message arrived on. Hover the dot to see the account's email address.
+
+![Blue and purple account color dots marking two accounts in the message list](/manual/account-color-dots.png)
+
+In this example, blue marks one account and purple another. Add more accounts and each gets its own distinct color.
 
 ## Bulk actions
 

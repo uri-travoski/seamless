@@ -244,8 +244,7 @@ svg { flex: 0 0 auto; vertical-align: middle; }
 .msg-row.selected { background: var(--md-selected); }
 .msg-row.checked { background: #fdf3d6; }
 .msg-row.checked:hover { background: #f8ebc4; }
-.msg-row .acct-bar { width: 3px; align-self: stretch; border-radius: 2px; flex: 0 0 auto; margin-bottom: 9px; transform: scaleY(0.8); }
-.msg-row.table .acct-bar { margin-bottom: 0; }
+.msg-row .acct-bar { width: 9px; height: 9px; border-radius: 50%; align-self: center; flex: 0 0 auto; }
 .msg-row .star-col { display: flex; flex-direction: column; align-items: center; gap: 3px; padding-top: 2px; }
 .msg-row .star { background: none; border: none; cursor: pointer; font-size: 15px; color: var(--md-border-strong); padding: 0; line-height: 1.3; }
 .msg-row .star.on { color: #f4b400; }
@@ -292,6 +291,7 @@ svg { flex: 0 0 auto; vertical-align: middle; }
 .chip-choice .muted { color: var(--md-text-faint); font-weight: 400; font-size: 11px; }
 .teach-actions { margin: 6px 0 0; padding-left: 18px; color: var(--md-text-soft); }
 .teach-actions li { margin: 2px 0; }
+.help-content img { max-width: 100%; height: auto; display: block; margin: 10px 0; border: 1px solid var(--md-border); border-radius: 6px; }
 .addr-suggest {
   position: absolute; top: 100%; left: 60px; right: 8px; z-index: 40;
   background: var(--md-bg, #fff); border: 1px solid var(--md-border); border-radius: 8px;
