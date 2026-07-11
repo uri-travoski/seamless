@@ -5,16 +5,22 @@ import LabelSettings from './LabelSettings.tsx';
 import FilterSettings from './FilterSettings.tsx';
 import AiSettings from './AiSettings.tsx';
 import UserSettings from './UserSettings.tsx';
+import RulesSettings from './RulesSettings.tsx';
+import AutomationSettings from './AutomationSettings.tsx';
+import LogsSettings from './LogsSettings.tsx';
 import { useSession } from '../../state/session.ts';
 import type { ComponentType } from 'react';
-import { SettingsIcon, AccountIcon, TagIcon, FilterIcon, SparkleIcon, UsersIcon, LogoutIcon, BackIcon } from '../../icons.tsx';
+import { SettingsIcon, AccountIcon, TagIcon, FilterIcon, SparkleIcon, UsersIcon, LogoutIcon, BackIcon, RulesIcon, ImportIcon, LogsIcon } from '../../icons.tsx';
 
 const TABS: { id: string; name: string; Icon: ComponentType<{ className?: string }> }[] = [
   { id: 'general', name: 'General', Icon: SettingsIcon },
   { id: 'accounts', name: 'Accounts', Icon: AccountIcon },
   { id: 'labels', name: 'Labels', Icon: TagIcon },
+  { id: 'rules', name: 'Rules', Icon: RulesIcon },
+  { id: 'automation', name: 'Import & Retention', Icon: ImportIcon },
   { id: 'filters', name: 'Filters', Icon: FilterIcon },
   { id: 'ai', name: 'AI', Icon: SparkleIcon },
+  { id: 'logs', name: 'Logs', Icon: LogsIcon },
   { id: 'users', name: 'Users', Icon: UsersIcon },
 ];
 
@@ -47,6 +53,9 @@ export default function Settings({ onClose }: { onClose: () => void }) {
           {tab === 'labels' && <LabelSettings />}
           {tab === 'filters' && <FilterSettings />}
           {tab === 'ai' && <AiSettings />}
+          {tab === 'rules' && <RulesSettings />}
+          {tab === 'automation' && <AutomationSettings />}
+          {tab === 'logs' && <LogsSettings />}
           {tab === 'users' && <UserSettings />}
         </div>
       </div>

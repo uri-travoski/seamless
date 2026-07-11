@@ -233,6 +233,12 @@ svg { flex: 0 0 auto; vertical-align: middle; }
   background: #eef3ee; color: var(--md-text-faint);
 }
 .open-badge.opened { background: #e3f2e6; color: var(--md-ok); }
+.ttl-badge {
+  display: inline-flex; align-items: center; gap: 3px; font-size: 11px; font-weight: 700;
+  border-radius: 8px; padding: 0 6px; line-height: 16px;
+  background: #fdf1e2; color: #b26a00;
+}
+.ttl-badge.due { background: #fdeaea; color: var(--md-danger, #c62828); }
 .msg-row .chips { display: flex; gap: 4px; margin-top: 3px; flex-wrap: wrap; }
 .chip {
   display: inline-flex; align-items: center; gap: 4px; font-size: 11px; font-weight: 600;

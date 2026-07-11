@@ -92,13 +92,20 @@ export async function ingestMessage(args: IngestArgs): Promise<IngestResult | nu
   const date = (parsed.date ?? args.internalDate ?? new Date()).getTime();
   const trackingToken = extractTrackingToken(args.raw.toString('utf8'));
 
+  // decisive raw headers for the classification cascade (DESIGN.md §3a)
+  const keyHeaders: Record<string, string> = {};
+  for (const h of ['list-id', 'list-unsubscribe', 'precedence', 'auto-submitted', 'x-auto-response-suppress']) {
+    const v = parsed.headers.get(h);
+    if (v !== undefined) keyHeaders[h] = typeof v === 'string' ? v : JSON.stringify(v);
+  }
+
   const rowId = await insertId(`
     INSERT INTO messages (
       user_id, account_id, mailbox_id, uid, message_id, in_reply_to, references_ids, thread_id,
       subject, snippet, from_name, from_addr, to_json, cc_json, reply_to_json, delivered_to,
       date, size, unread, flagged, answered, draft, has_attachments, attachments_json,
-      s3_key, tracking_token, created_at
-    ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+      s3_key, tracking_token, headers_json, created_at
+    ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
     ON CONFLICT (mailbox_id, uid) DO NOTHING
   `, [
     userId, args.accountId, args.mailboxId, args.uid, messageId, parsed.inReplyTo ?? null,
@@ -112,7 +119,7 @@ export async function ingestMessage(args: IngestArgs): Promise<IngestResult | nu
     args.flags.has('\\Answered'),
     args.flags.has('\\Draft') || mailbox.role === 'drafts',
     atts.some((a) => !a.inline),
-    JSON.stringify(atts), s3Key, trackingToken, Date.now(),
+    JSON.stringify(atts), s3Key, trackingToken, JSON.stringify(keyHeaders), Date.now(),
   ]);
   if (!rowId) return null; // concurrent sync already inserted this uid
 

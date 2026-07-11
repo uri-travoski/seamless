@@ -8,10 +8,22 @@ const LABEL_COLORS = [
   '#2f7ed8', '#7a5fd0', '#d05f8e', '#8a939c', '#5b6570',
 ];
 
+interface Editing {
+  id?: number; name: string; color: string; description: string;
+  retentionDays: number | null; keepDefault: boolean; protected: boolean; autoMarkRead: boolean;
+}
+
+function retentionSummary(l: { retentionDays?: number | null; keepDefault?: boolean; protected?: boolean; autoMarkRead?: boolean }): string {
+  if (l.protected) return 'protected';
+  if (l.keepDefault) return 'keep';
+  if (l.retentionDays) return `delete after ${l.retentionDays}d${l.autoMarkRead ? ', auto-read' : ''}`;
+  return '';
+}
+
 export default function LabelSettings() {
   const labels = useMail((s) => s.labels);
   const refreshLabels = useMail((s) => s.refreshLabels);
-  const [editing, setEditing] = useState<{ id?: number; name: string; color: string; description: string } | null>(null);
+  const [editing, setEditing] = useState<Editing | null>(null);
 
   const save = async () => {
     if (!editing?.name.trim()) return;
@@ -34,14 +46,21 @@ export default function LabelSettings() {
   return (
     <div>
       <h2>Labels</h2>
-      <p className="settings-desc">Colored labels work across all accounts. The description helps the AI categorizer pick the right one.</p>
+      <p className="settings-desc">
+        Colored labels work across all accounts, and each label carries its retention: protected labels are never
+        auto-deleted, keep-labels keep forever, and a delete-after sets the countdown the retention sweep enforces.
+      </p>
 
       {labels.map((l) => (
         <div key={l.id} className="cond-row">
           <span className="label-dot" style={{ background: l.color, width: 14, height: 14 }} />
-          <span style={{ width: 160, fontWeight: 600 }}>{l.name}</span>
+          <span style={{ width: 200, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={l.name}>{l.name}</span>
+          <span style={{ width: 150, color: 'var(--md-text-soft)', fontSize: 12 }}>{retentionSummary(l)}</span>
           <span style={{ flex: 1, color: 'var(--md-text-faint)', fontSize: 12.5, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{l.description}</span>
-          <button className="btn ghost" onClick={() => setEditing({ id: l.id, name: l.name, color: l.color, description: l.description })}>Edit</button>
+          <button className="btn ghost" onClick={() => setEditing({
+            id: l.id, name: l.name, color: l.color, description: l.description,
+            retentionDays: l.retentionDays ?? null, keepDefault: !!l.keepDefault, protected: !!l.protected, autoMarkRead: !!l.autoMarkRead,
+          })}>Edit</button>
           <button className="btn ghost danger" onClick={() => void remove(l.id)}>Delete</button>
         </div>
       ))}
@@ -61,6 +80,32 @@ export default function LabelSettings() {
               ))}
             </div>
           </div>
+          <div className="field"><label>Retention</label>
+            <div style={{ display: 'flex', gap: 16, alignItems: 'center', flexWrap: 'wrap', fontSize: 13 }}>
+              <label style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                <input type="checkbox" checked={editing.protected}
+                  onChange={(e) => setEditing({ ...editing, protected: e.target.checked })} />
+                Protected (never auto-deleted)
+              </label>
+              <label style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                <input type="checkbox" checked={editing.keepDefault}
+                  onChange={(e) => setEditing({ ...editing, keepDefault: e.target.checked })} />
+                Keep forever
+              </label>
+              <label style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                Delete after
+                <input className="text-input" type="number" min={0} style={{ width: 70 }}
+                  value={editing.retentionDays ?? ''} placeholder="—"
+                  onChange={(e) => setEditing({ ...editing, retentionDays: e.target.value === '' ? null : Number(e.target.value) })} />
+                days
+              </label>
+              <label style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                <input type="checkbox" checked={editing.autoMarkRead}
+                  onChange={(e) => setEditing({ ...editing, autoMarkRead: e.target.checked })} />
+                Mark read on arrival
+              </label>
+            </div>
+          </div>
           <div style={{ display: 'flex', gap: 8 }}>
             <button className="btn primary" onClick={() => void save()}>Save label</button>
             <button className="btn ghost" onClick={() => setEditing(null)}>Cancel</button>
@@ -68,7 +113,7 @@ export default function LabelSettings() {
         </div>
       ) : (
         <button className="btn primary" style={{ marginTop: 14 }}
-          onClick={() => setEditing({ name: '', color: LABEL_COLORS[0], description: '' })}>Add label</button>
+          onClick={() => setEditing({ name: '', color: LABEL_COLORS[0], description: '', retentionDays: null, keepDefault: false, protected: false, autoMarkRead: false })}>Add label</button>
       )}
     </div>
   );

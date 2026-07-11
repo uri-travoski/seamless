@@ -18,6 +18,10 @@ import { chatComplete, getProvider } from './ai/client.ts';
 import { handleJmapRequest, jmapSession, listIdentities } from './jmap/api.ts';
 import { vapidPublicKey, saveSubscription, removeSubscription } from './push.ts';
 import { broadcast } from './ws.ts';
+import { importWorkbook } from './import/xlsx.ts';
+import { reclassifyUser, recomputeDisposition, kickClassifier } from './classify/engine.ts';
+import { sweepRetention } from './classify/retention.ts';
+import { allUserSettings, setUserSetting, SETTING_DEFAULTS } from './classify/settings.ts';
 
 const PIXEL_GIF = Buffer.from('R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7', 'base64');
 const PUBLIC_PATHS = [/^\/t\//, /^\/api\/(login|setup|me)$/, /^\/(?!api|jmap)/];
@@ -238,20 +242,31 @@ export function registerRoutes(app: FastifyInstance): void {
   });
 
   // ---- labels ----
-  app.get('/api/labels', async (req) => q('SELECT id, name, color, description, sort FROM labels WHERE user_id = ? ORDER BY sort, id', [uid(req)]));
+  app.get('/api/labels', async (req) =>
+    (await q('SELECT id, name, color, description, sort, keep_default, retention_days, protected, auto_mark_read FROM labels WHERE user_id = ? ORDER BY sort, name', [uid(req)]))
+      .map((l: any) => ({
+        id: l.id, name: l.name, color: l.color, description: l.description, sort: l.sort,
+        keepDefault: l.keep_default, retentionDays: l.retention_days, protected: l.protected, autoMarkRead: l.auto_mark_read,
+      })));
 
   app.post('/api/labels', async (req) => {
     const b = req.body as any;
-    const id = await insertId('INSERT INTO labels(user_id, name, color, description, sort) VALUES (?,?,?,?,?)',
-      [uid(req), b.name, b.color ?? '#e05656', b.description ?? '', b.sort ?? 0]);
+    const id = await insertId('INSERT INTO labels(user_id, name, color, description, sort, keep_default, retention_days, protected, auto_mark_read) VALUES (?,?,?,?,?,?,?,?,?)',
+      [uid(req), b.name, b.color ?? '#e05656', b.description ?? '', b.sort ?? 0,
+       !!b.keepDefault, b.retentionDays ?? null, !!b.protected, !!b.autoMarkRead]);
     await bumpState(); broadcast({ type: 'stateChange' }, uid(req));
     return { id };
   });
 
   app.put('/api/labels/:id', async (req) => {
     const b = req.body as any;
-    await run('UPDATE labels SET name=?, color=?, description=?, sort=? WHERE id=? AND user_id=?',
-      [b.name, b.color, b.description ?? '', b.sort ?? 0, Number((req.params as any).id), uid(req)]);
+    const id = Number((req.params as any).id);
+    await run('UPDATE labels SET name=?, color=?, description=?, sort=?, keep_default=?, retention_days=?, protected=?, auto_mark_read=? WHERE id=? AND user_id=?',
+      [b.name, b.color, b.description ?? '', b.sort ?? 0,
+       !!b.keepDefault, b.retentionDays ?? null, !!b.protected, !!b.autoMarkRead, id, uid(req)]);
+    // retention semantics may have changed: recompute dispositions of everything carrying this label
+    const affected = await q<{ message_id: number }>('SELECT message_id FROM message_labels WHERE label_id = ?', [id]);
+    for (const a of affected) await recomputeDisposition(a.message_id);
     await bumpState(); broadcast({ type: 'stateChange' }, uid(req));
     return { ok: true };
   });
@@ -482,6 +497,123 @@ export function registerRoutes(app: FastifyInstance): void {
   app.post('/api/ai/draft', async (req, reply) => {
     try { return { draft: await draftReply(uid(req), (req.body as any).emailId, (req.body as any).instruction ?? '') }; }
     catch (err: any) { return reply.code(400).send({ error: err?.message }); }
+  });
+
+  // ---- classification rules ----
+  app.get('/api/rules', async (req) =>
+    (await q('SELECT * FROM rules WHERE user_id = ? ORDER BY ord, id', [uid(req)])).map((r: any) => ({
+      id: r.id, enabled: r.enabled, ord: r.ord, matchField: r.match_field, matchValue: r.match_value,
+      excludeContains: r.exclude_contains, action: r.action, labelId: r.label_id, stop: r.stop,
+      note: r.note, source: r.source, hitCount: r.hit_count,
+    })));
+
+  app.post('/api/rules', async (req) => {
+    const b = req.body as any;
+    const id = await insertId(`
+      INSERT INTO rules(user_id, enabled, ord, match_field, match_value, exclude_contains, action, label_id, stop, note, source, created_at)
+      VALUES (?,?,?,?,?,?,?,?,?,?,?,?)
+    `, [uid(req), b.enabled !== false, b.ord ?? 0, b.matchField, b.matchValue, b.excludeContains ?? '',
+        b.action === 'ai' ? 'ai' : 'label', b.action === 'ai' ? null : b.labelId, b.stop !== false, b.note ?? '', 'manual', Date.now()]);
+    return { id };
+  });
+
+  app.put('/api/rules/:id', async (req) => {
+    const b = req.body as any;
+    await run(`
+      UPDATE rules SET enabled=?, ord=?, match_field=?, match_value=?, exclude_contains=?, action=?, label_id=?, stop=?, note=?
+      WHERE id=? AND user_id=?
+    `, [b.enabled !== false, b.ord ?? 0, b.matchField, b.matchValue, b.excludeContains ?? '',
+        b.action === 'ai' ? 'ai' : 'label', b.action === 'ai' ? null : b.labelId, b.stop !== false, b.note ?? '',
+        Number((req.params as any).id), uid(req)]);
+    return { ok: true };
+  });
+
+  app.delete('/api/rules/:id', async (req) => {
+    await run('DELETE FROM rules WHERE id = ? AND user_id = ?', [Number((req.params as any).id), uid(req)]);
+    return { ok: true };
+  });
+
+  // ---- preferences (plain-English AI guidance, versioned) ----
+  app.get('/api/preferences', async (req) =>
+    (await q('SELECT id, enabled, guidance, version FROM preferences WHERE user_id = ? AND active = true ORDER BY id', [uid(req)]))
+      .map((p: any) => ({ id: p.id, enabled: p.enabled, guidance: p.guidance, version: p.version })));
+
+  app.post('/api/preferences', async (req) => {
+    const b = req.body as any;
+    const id = await insertId('INSERT INTO preferences(user_id, enabled, guidance, version, active, created_at) VALUES (?,?,?,1,true,?)',
+      [uid(req), b.enabled !== false, b.guidance ?? '', Date.now()]);
+    return { id };
+  });
+
+  app.put('/api/preferences/:id', async (req) => {
+    const b = req.body as any;
+    // editing bumps the version (audit trail for phase-3 ai_decisions)
+    await run('UPDATE preferences SET enabled=?, guidance=?, version = version + 1 WHERE id=? AND user_id=?',
+      [b.enabled !== false, b.guidance ?? '', Number((req.params as any).id), uid(req)]);
+    return { ok: true };
+  });
+
+  app.delete('/api/preferences/:id', async (req) => {
+    await run('UPDATE preferences SET active = false WHERE id = ? AND user_id = ?', [Number((req.params as any).id), uid(req)]);
+    return { ok: true };
+  });
+
+  // ---- spreadsheet import ----
+  app.post('/api/import/xlsx', async (req, reply) => {
+    const part = await (req as any).file();
+    if (!part) return reply.code(400).send({ error: 'no file' });
+    const buf = await part.toBuffer();
+    const commit = (req.query as any).commit === '1';
+    try {
+      const preview = await importWorkbook(uid(req), buf, commit);
+      if (commit) {
+        await reclassifyUser(uid(req));
+        broadcast({ type: 'stateChange' }, uid(req));
+      }
+      return preview;
+    } catch (err: any) {
+      return reply.code(400).send({ error: err?.message ?? 'import failed' });
+    }
+  });
+
+  // ---- classification / retention ops ----
+  app.post('/api/classify/run', async (req) => {
+    const n = await reclassifyUser(uid(req));
+    return { queued: n };
+  });
+
+  app.post('/api/retention/sweep', async () => {
+    const stats = await sweepRetention();
+    kickClassifier();
+    return stats;
+  });
+
+  app.get('/api/retention/settings', async (req) => {
+    const all = await allUserSettings(uid(req));
+    return { dryRun: all.dry_run !== 'false', trashDays: Number(all.trash_days) || 30, logRetentionDays: Number(all.log_retention_days) || 90 };
+  });
+
+  app.put('/api/retention/settings', async (req) => {
+    const b = req.body as any;
+    if (b.dryRun !== undefined) await setUserSetting(uid(req), 'dry_run', b.dryRun ? 'true' : 'false');
+    if (b.trashDays !== undefined) await setUserSetting(uid(req), 'trash_days', String(Number(b.trashDays) || 30));
+    if (b.logRetentionDays !== undefined) await setUserSetting(uid(req), 'log_retention_days', String(Number(b.logRetentionDays) || 90));
+    return { ok: true };
+  });
+
+  // ---- processing logs ----
+  app.get('/api/logs', async (req) => {
+    const kind = (req.query as any).kind as string | undefined;
+    const limit = Math.min(Number((req.query as any).limit) || 200, 1000);
+    const rows = kind
+      ? await q('SELECT id, email_id, kind, level, message, created_at FROM processing_logs WHERE user_id = ? AND kind = ? ORDER BY id DESC LIMIT ?', [uid(req), kind, limit])
+      : await q('SELECT id, email_id, kind, level, message, created_at FROM processing_logs WHERE user_id = ? ORDER BY id DESC LIMIT ?', [uid(req), limit]);
+    return rows.map((r: any) => ({ id: r.id, emailId: r.email_id, kind: r.kind, level: r.level, message: r.message, createdAt: new Date(r.created_at).toISOString() }));
+  });
+
+  app.delete('/api/logs', async (req) => {
+    await run('DELETE FROM processing_logs WHERE user_id = ?', [uid(req)]);
+    return { ok: true };
   });
 
   // ---- tracking pixel (public) ----

@@ -56,6 +56,7 @@ export interface MsgRow {
   has_attachments: boolean; tracking_token: string | null; s3_key: string | null;
   account_email: string; account_color: string; mailbox_role: string | null;
   message_id: string | null; references_ids: string;
+  disposition: string; delete_at: number | null; classify_state: string;
 }
 
 const BASE_SELECT = `
@@ -104,6 +105,9 @@ export async function rowToApi(r: MsgRow): Promise<ApiEmail> {
     hasNote,
     openCount,
     lastOpenAt,
+    disposition: (r.disposition as 'keep' | 'delete') ?? 'keep',
+    deleteAt: r.delete_at ? new Date(r.delete_at).toISOString() : null,
+    needsReview: r.classify_state === 'needs_review',
   };
 }
 
@@ -227,6 +231,13 @@ export async function setKeywords(userId: number, emailId: string, patch: Record
     await run(`UPDATE messages SET ${map.col} = ? WHERE id = ?`, [dbVal, row.id]);
     (val ? add : remove).push(map.imap);
   }
+  if (patch.$seen === true) {
+    await run('UPDATE messages SET opened_at = COALESCE(opened_at, ?) WHERE id = ?', [Date.now(), row.id]);
+  }
+  if (patch.$seen === false) {
+    // manual mark-unread = "hands off": retention must never touch this message again
+    await run("UPDATE messages SET user_touched = true, disposition = 'keep', delete_at = NULL, keep_reason = 'user touched' WHERE id = ?", [row.id]);
+  }
   if ((add.length || remove.length) && row.uid > 0) {
     await enqueueOp(row.account_id, 'setFlags', { mailboxId: row.mailbox_id, uid: row.uid, add, remove });
   }
@@ -264,9 +275,16 @@ export async function moveEmail(userId: number, emailId: string, target: string)
   }
   if (!targetMailboxId || targetMailboxId === row.mailbox_id) return;
 
+  const targetRoleRow = await one<{ role: string | null }>('SELECT role FROM mailboxes WHERE id = ?', [targetMailboxId]);
   const realUid = row.uid;
   // optimistic local move: placeholder uid until the next sync reconciles
   await run('UPDATE messages SET mailbox_id = ?, uid = ? WHERE id = ?', [targetMailboxId, -row.id, row.id]);
+  if (targetRoleRow?.role === 'trash') {
+    await run('UPDATE messages SET trashed_at = COALESCE(trashed_at, ?) WHERE id = ?', [Date.now(), row.id]);
+  } else if (row.mailbox_role === 'trash') {
+    // restored from trash by the user: clear the purge clock and protect from re-trashing
+    await run("UPDATE messages SET trashed_at = NULL, user_touched = true, disposition = 'keep', delete_at = NULL, keep_reason = 'restored from trash' WHERE id = ?", [row.id]);
+  }
   if (realUid > 0) {
     await enqueueOp(row.account_id, 'move', { mailboxId: row.mailbox_id, uid: realUid, targetMailboxId });
   }

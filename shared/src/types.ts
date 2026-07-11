@@ -29,6 +29,41 @@ export interface ApiLabel {
   name: string;
   color: string;
   description: string;
+  keepDefault?: boolean;
+  retentionDays?: number | null;
+  protected?: boolean;
+  autoMarkRead?: boolean;
+}
+
+export interface ApiRule {
+  id: number;
+  enabled: boolean;
+  ord: number;
+  matchField: string;
+  matchValue: string;
+  excludeContains: string;
+  action: 'label' | 'ai';
+  labelId: number | null;
+  stop: boolean;
+  note: string;
+  source: string;
+  hitCount: number;
+}
+
+export interface ApiPreference {
+  id: number;
+  enabled: boolean;
+  guidance: string;
+  version: number;
+}
+
+export interface ApiProcessingLog {
+  id: number;
+  emailId: number | null;
+  kind: string;
+  level: string;
+  message: string;
+  createdAt: string;
 }
 
 export interface ApiEmail {
@@ -54,6 +89,9 @@ export interface ApiEmail {
   hasNote: boolean;        // a personal note is attached (private, never sent)
   openCount: number;       // tracking pixel opens (own sent mail), -1 = not tracked
   lastOpenAt: string | null;
+  disposition: 'keep' | 'delete';
+  deleteAt: string | null; // when the retention sweep will trash it (countdown badge)
+  needsReview: boolean;
 }
 
 export interface ApiAttachmentMeta {

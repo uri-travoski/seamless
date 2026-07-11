@@ -17,6 +17,18 @@ function fmtDate(iso: string): string {
   return d.toLocaleDateString([], { year: '2-digit', month: 'short', day: 'numeric' });
 }
 
+/** Countdown chip for mail the retention sweep will trash ("3d" = three days left). */
+function TtlBadge({ email }: { email: ApiEmail }) {
+  if (email.disposition !== 'delete' || !email.deleteAt) return null;
+  const days = Math.ceil((new Date(email.deleteAt).getTime() - Date.now()) / 86_400_000);
+  return (
+    <span className={`ttl-badge ${days <= 1 ? 'due' : ''}`}
+      title={`Auto-deletes ${new Date(email.deleteAt).toLocaleDateString()} (recoverable from Trash for 30 days). Mark unread to keep.`}>
+      <TrashIcon size={14} />{days <= 0 ? 'due' : `${days}d`}
+    </span>
+  );
+}
+
 function Row({ email, selected }: { email: ApiEmail; selected: boolean }) {
   const labels = useMail((s) => s.labels);
   const select = useMail((s) => s.select);
@@ -50,6 +62,7 @@ function Row({ email, selected }: { email: ApiEmail; selected: boolean }) {
             )}
             {email.hasNote && <NoteIcon size={18} weight="fill" className="note-flag" aria-label="Has a private note" />}
             {email.hasAttachment && <AttachClipIcon size={18} aria-label="Has attachment" />}
+            <TtlBadge email={email} />
           </span>
           <span className="date">{fmtDate(email.receivedAt)}</span>
         </div>
@@ -100,6 +113,7 @@ function TableRow({ email, selected }: { email: ApiEmail; selected: boolean }) {
         )}
         {email.hasNote && <NoteIcon size={18} weight="fill" className="note-flag" aria-label="Has a private note" />}
         {email.hasAttachment && <AttachClipIcon size={18} aria-label="Has attachment" />}
+        <TtlBadge email={email} />
         <span className="tbl-date">{fmtDate(email.receivedAt)}</span>
       </span>
     </div>

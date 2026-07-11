@@ -230,6 +230,89 @@ CREATE TABLE notes (
 );
 `,
   },
+  {
+    id: 2,
+    sql: `
+-- labels carry their retention (DESIGN.md §4)
+ALTER TABLE labels
+  ADD COLUMN parent_id INTEGER REFERENCES labels(id) ON DELETE SET NULL,
+  ADD COLUMN keep_default BOOLEAN NOT NULL DEFAULT false,
+  ADD COLUMN retention_days INTEGER,
+  ADD COLUMN protected BOOLEAN NOT NULL DEFAULT false,
+  ADD COLUMN auto_mark_read BOOLEAN NOT NULL DEFAULT false;
+
+-- classification + retention state per message
+ALTER TABLE messages
+  ADD COLUMN headers_json TEXT NOT NULL DEFAULT '{}',         -- decisive raw headers (list-id, precedence, ...)
+  ADD COLUMN classify_state TEXT NOT NULL DEFAULT 'pending',  -- pending|classified|needs_review
+  ADD COLUMN review_reason TEXT,
+  ADD COLUMN disposition TEXT NOT NULL DEFAULT 'keep',        -- keep|delete
+  ADD COLUMN delete_at BIGINT,
+  ADD COLUMN keep_reason TEXT,
+  ADD COLUMN trashed_at BIGINT,
+  ADD COLUMN opened_at BIGINT,
+  ADD COLUMN user_touched BOOLEAN NOT NULL DEFAULT false;
+CREATE INDEX msg_retention ON messages(user_id, disposition, delete_at);
+CREATE INDEX msg_classify ON messages(user_id, classify_state);
+
+CREATE TABLE rules (
+  id SERIAL PRIMARY KEY,
+  user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  enabled BOOLEAN NOT NULL DEFAULT true,
+  ord INTEGER NOT NULL DEFAULT 0,
+  match_field TEXT NOT NULL,   -- from|from_domain|to|delivered_to|subject_contains|body_contains|header|list_id|category
+  match_value TEXT NOT NULL,
+  exclude_contains TEXT NOT NULL DEFAULT '',
+  action TEXT NOT NULL DEFAULT 'label',  -- label|ai
+  label_id INTEGER REFERENCES labels(id) ON DELETE CASCADE,
+  stop BOOLEAN NOT NULL DEFAULT true,
+  note TEXT NOT NULL DEFAULT '',
+  source TEXT NOT NULL DEFAULT 'manual', -- manual|imported|suggested|promoted
+  hit_count INTEGER NOT NULL DEFAULT 0,
+  created_at BIGINT NOT NULL
+);
+CREATE INDEX rules_user_ord ON rules(user_id, ord);
+
+CREATE TABLE preferences (
+  id SERIAL PRIMARY KEY,
+  user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  enabled BOOLEAN NOT NULL DEFAULT true,
+  guidance TEXT NOT NULL,
+  version INTEGER NOT NULL DEFAULT 1,
+  active BOOLEAN NOT NULL DEFAULT true,
+  created_at BIGINT NOT NULL
+);
+
+CREATE TABLE user_settings (
+  user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  key TEXT NOT NULL,
+  value TEXT NOT NULL,
+  PRIMARY KEY(user_id, key)
+);
+
+CREATE TABLE routes (
+  id SERIAL PRIMARY KEY,
+  user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  enabled BOOLEAN NOT NULL DEFAULT true,
+  label_id INTEGER REFERENCES labels(id) ON DELETE CASCADE,
+  forward_to TEXT NOT NULL,
+  only_after BIGINT,
+  note TEXT NOT NULL DEFAULT ''
+);
+
+CREATE TABLE processing_logs (
+  id SERIAL PRIMARY KEY,
+  user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+  email_id INTEGER,
+  kind TEXT NOT NULL,   -- classify|retention|import|sync|send
+  level TEXT NOT NULL DEFAULT 'info',
+  message TEXT NOT NULL,
+  meta TEXT NOT NULL DEFAULT '{}',
+  created_at BIGINT NOT NULL
+);
+CREATE INDEX plogs_user_time ON processing_logs(user_id, created_at DESC);
+`,
+  },
 ];
 
 export async function migrate(): Promise<void> {

@@ -87,4 +87,7 @@ export {
   Note as NoteIcon,
   ArrowUUpLeft as RestoreMailIcon,
   UsersThree as UsersIcon,
+  TreeStructure as RulesIcon,
+  UploadSimple as ImportIcon,
+  ListMagnifyingGlass as LogsIcon,
 } from '@phosphor-icons/react';

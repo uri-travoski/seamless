@@ -17,6 +17,8 @@ import { categorizeEmail } from './ai/tasks.ts';
 import { startScheduler, onScheduledSend } from './mail/scheduler.ts';
 import { setScheduleCanceller } from './mail/store.ts';
 import { cancelScheduleByMessageId } from './mail/send.ts';
+import { startClassifier, kickClassifier, onClassified } from './classify/engine.ts';
+import { startRetention, onRetention } from './classify/retention.ts';
 
 await migrate();
 
@@ -62,6 +64,7 @@ syncManager.on('changed', (userId: number) => {
 
 syncManager.on('newMail', (ev: NewMailEvent) => {
   broadcast({ type: 'newMail', accountId: ev.accountId, from: ev.from, subject: ev.subject, mailboxRole: 'inbox' }, ev.userId);
+  kickClassifier();
   void notifyUser(ev.userId, ev.from || 'New mail', ev.subject || '(no subject)', `mail-${ev.rowId}`);
   if (ev.aiCategorize) {
     categorizeEmail(ev.userId, ev.rowId)
@@ -79,6 +82,12 @@ await initPush();
 setScheduleCanceller((messageId) => cancelScheduleByMessageId(messageId));
 onScheduledSend(async () => broadcast({ type: 'stateChange', state: await currentState() }));
 startScheduler();
+
+// classification + retention workers
+onClassified(async (userId) => broadcast({ type: 'stateChange', state: await currentState() }, userId));
+onRetention(async (userId) => broadcast({ type: 'stateChange', state: await currentState() }, userId));
+startClassifier();
+startRetention();
 
 await syncManager.startAll();
 
