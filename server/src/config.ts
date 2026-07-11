@@ -26,6 +26,14 @@ export const config = {
     secretKey: env('S3_SECRET_KEY', 'seamless-secret'),
     forcePathStyle: env('S3_FORCE_PATH_STYLE', 'true') === 'true',
   },
+  facade: {
+    imapPort: Number(env('FACADE_IMAP_PORT', '1143')),
+    smtpPort: Number(env('FACADE_SMTP_PORT', '1587')),
+    // set both to serve IMAPS on 993-style ports; plain otherwise (put a TLS proxy in front)
+    tlsKeyFile: process.env.FACADE_TLS_KEY ?? '',
+    tlsCertFile: process.env.FACADE_TLS_CERT ?? '',
+    enabled: env('FACADE_ENABLED', 'true') === 'true',
+  },
 };
 
 fs.mkdirSync(config.dataDir, { recursive: true });

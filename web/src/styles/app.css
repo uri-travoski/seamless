@@ -248,6 +248,17 @@ svg { flex: 0 0 auto; vertical-align: middle; }
 .review-labels { display: flex; gap: 5px; flex-wrap: wrap; margin-top: 8px; }
 .why-line { margin-left: 8px; }
 .teach-box { border-color: #cfd9ea; background: #f4f7fc; }
+.addr-suggest {
+  position: absolute; top: 100%; left: 60px; right: 8px; z-index: 40;
+  background: var(--md-bg, #fff); border: 1px solid var(--md-border); border-radius: 8px;
+  box-shadow: 0 6px 18px rgba(20, 30, 50, 0.14); overflow: hidden;
+}
+.addr-suggest-item {
+  display: block; width: 100%; text-align: left; padding: 7px 12px; font-size: 13px;
+  background: none; border: none; cursor: pointer; color: var(--md-text);
+}
+.addr-suggest-item.hi, .addr-suggest-item:hover { background: var(--md-hover, #eef2f7); }
+.addr-suggest-item span { color: var(--md-text-faint); }
 .msg-row .chips { display: flex; gap: 4px; margin-top: 3px; flex-wrap: wrap; }
 .chip {
   display: inline-flex; align-items: center; gap: 4px; font-size: 11px; font-weight: 600;

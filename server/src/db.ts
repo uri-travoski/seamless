@@ -436,6 +436,49 @@ ALTER TABLE email_vectors DROP CONSTRAINT IF EXISTS email_vectors_message_id_fke
 ALTER TABLE email_vectors ADD COLUMN source TEXT NOT NULL DEFAULT 'local';  -- local|gmail
 `,
   },
+  {
+    id: 5,
+    sql: `
+-- per-device credentials for the IMAP/SMTP/CardDAV facades
+CREATE TABLE app_passwords (
+  id SERIAL PRIMARY KEY,
+  user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  label TEXT NOT NULL,
+  secret_hash TEXT NOT NULL,
+  scopes TEXT NOT NULL DEFAULT 'imap,smtp,carddav',
+  created_at BIGINT NOT NULL,
+  last_used_at BIGINT
+);
+
+-- auto-built addressbook (send/reply history) + CardDAV representation
+CREATE TABLE contacts (
+  id SERIAL PRIMARY KEY,
+  user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  display_name TEXT NOT NULL DEFAULT '',
+  org TEXT NOT NULL DEFAULT '',
+  notes TEXT NOT NULL DEFAULT '',
+  sent_count INTEGER NOT NULL DEFAULT 0,
+  received_count INTEGER NOT NULL DEFAULT 0,
+  last_interaction_at BIGINT,
+  auto_created BOOLEAN NOT NULL DEFAULT true,
+  hidden BOOLEAN NOT NULL DEFAULT false,
+  created_at BIGINT NOT NULL,
+  updated_at BIGINT NOT NULL
+);
+CREATE INDEX contacts_user ON contacts(user_id, hidden);
+
+CREATE TABLE contact_emails (
+  contact_id INTEGER NOT NULL REFERENCES contacts(id) ON DELETE CASCADE,
+  email TEXT NOT NULL,
+  is_primary BOOLEAN NOT NULL DEFAULT false,
+  PRIMARY KEY(contact_id, email)
+);
+CREATE INDEX contact_email_lookup ON contact_emails(email);
+
+-- forwarding-out engine marker (routes table shipped in migration 2)
+ALTER TABLE messages ADD COLUMN forwarded_at BIGINT;
+`,
+  },
 ];
 
 export async function migrate(): Promise<void> {

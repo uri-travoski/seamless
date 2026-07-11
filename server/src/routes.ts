@@ -25,6 +25,9 @@ import { allUserSettings, setUserSetting, SETTING_DEFAULTS } from './classify/se
 import { saveOauthApp, startAuthUrl, handleCallback, redirectUri } from './oauth.ts';
 import { sweepSafeDelete, safeDeletePreview } from './classify/safedelete.ts';
 import { runGmailLearn, acceptProposals } from './import/gmailLearn.ts';
+import { createAppPassword } from './facade/auth.ts';
+import { listContacts, contactToVcf, importVcf, harvestContacts } from './contacts.ts';
+import { config } from './config.ts';
 
 const PIXEL_GIF = Buffer.from('R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7', 'base64');
 const PUBLIC_PATHS = [/^\/t\//, /^\/api\/(login|setup|me)$/, /^\/(?!api|jmap)/];
@@ -770,6 +773,84 @@ export function registerRoutes(app: FastifyInstance): void {
     await run("UPDATE rule_suggestions SET status = 'dismissed' WHERE id = ? AND user_id = ?", [Number((req.params as any).id), uid(req)]);
     return { ok: true };
   });
+
+  // ---- devices (app passwords for the IMAP/SMTP/CardDAV facades) ----
+  app.get('/api/devices', async (req) =>
+    (await q<any>('SELECT id, label, scopes, created_at, last_used_at FROM app_passwords WHERE user_id = ? ORDER BY id DESC', [uid(req)])).map((d) => ({
+      id: d.id, label: d.label, scopes: d.scopes.split(','),
+      createdAt: new Date(d.created_at).toISOString(),
+      lastUsedAt: d.last_used_at ? new Date(d.last_used_at).toISOString() : null,
+    })));
+
+  app.post('/api/devices', async (req) => {
+    const b = req.body as { label: string; scopes?: string[] };
+    const scopes = (b.scopes?.length ? b.scopes : ['imap', 'smtp', 'carddav']).filter((s) => ['imap', 'smtp', 'carddav'].includes(s));
+    return createAppPassword(uid(req), b.label || 'Device', scopes);
+  });
+
+  app.delete('/api/devices/:id', async (req) => {
+    await run('DELETE FROM app_passwords WHERE id = ? AND user_id = ?', [Number((req.params as any).id), uid(req)]);
+    return { ok: true };
+  });
+
+  app.get('/api/devices/server-info', async () => {
+    const host = new URL(config.publicUrl).hostname;
+    return {
+      imap: { host, port: config.facade.imapPort, tls: !!(config.facade.tlsKeyFile && config.facade.tlsCertFile) },
+      smtp: { host, port: config.facade.smtpPort, tls: false },
+      carddav: `${config.publicUrl}/dav/`,
+    };
+  });
+
+  // ---- contacts ----
+  app.get('/api/contacts', async (req) => {
+    const includeHidden = (req.query as any).hidden === '1';
+    return (await listContacts(uid(req), includeHidden)).map((c) => ({
+      id: c.id, displayName: c.display_name, org: c.org, notes: c.notes, emails: c.emails,
+      sentCount: c.sent_count, receivedCount: c.received_count,
+      lastInteractionAt: c.last_interaction_at ? new Date(c.last_interaction_at).toISOString() : null,
+      autoCreated: c.auto_created, hidden: c.hidden,
+    }));
+  });
+
+  app.put('/api/contacts/:id', async (req) => {
+    const b = req.body as any;
+    await run('UPDATE contacts SET display_name = ?, org = ?, notes = ?, hidden = ?, auto_created = false, updated_at = ? WHERE id = ? AND user_id = ?',
+      [b.displayName ?? '', b.org ?? '', b.notes ?? '', !!b.hidden, Date.now(), Number((req.params as any).id), uid(req)]);
+    return { ok: true };
+  });
+
+  app.delete('/api/contacts/:id', async (req) => {
+    await run('DELETE FROM contacts WHERE id = ? AND user_id = ?', [Number((req.params as any).id), uid(req)]);
+    return { ok: true };
+  });
+
+  app.get('/api/contacts/suggest', async (req) => {
+    const term = String((req.query as any).q ?? '').toLowerCase();
+    if (!term) return [];
+    const rows = await q<any>(`
+      SELECT c.display_name, ce.email FROM contacts c JOIN contact_emails ce ON ce.contact_id = c.id
+      WHERE c.user_id = ? AND c.hidden = false AND (lower(c.display_name) LIKE ? OR ce.email LIKE ?)
+      ORDER BY GREATEST(c.sent_count, c.received_count) DESC LIMIT 8
+    `, [uid(req), `%${term}%`, `%${term}%`]);
+    return rows.map((r) => ({ name: r.display_name, email: r.email }));
+  });
+
+  app.get('/api/contacts/export.vcf', async (req, reply) => {
+    const cards = (await listContacts(uid(req))).map(contactToVcf).join('');
+    reply.header('Content-Type', 'text/vcard; charset=utf-8');
+    reply.header('Content-Disposition', 'attachment; filename="seamless-contacts.vcf"');
+    return reply.send(cards);
+  });
+
+  app.post('/api/contacts/import', async (req, reply) => {
+    const part = await (req as any).file();
+    if (!part) return reply.code(400).send({ error: 'no file' });
+    const created = await importVcf(uid(req), (await part.toBuffer()).toString('utf8'));
+    return { created };
+  });
+
+  app.post('/api/contacts/harvest', async () => ({ scanned: await harvestContacts() }));
 
   // ---- processing logs ----
   app.get('/api/logs', async (req) => {

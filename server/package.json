@@ -24,6 +24,7 @@
     "pdf-parse": "^2.4.5",
     "pg": "^8.13.0",
     "sanitize-html": "^2.13.0",
+    "smtp-server": "^3.19.2",
     "tsx": "^4.19.0",
     "web-push": "^3.6.7"
   },
@@ -33,6 +34,7 @@
     "@types/nodemailer": "^7.0.0",
     "@types/pg": "^8.11.0",
     "@types/sanitize-html": "^2.11.0",
+    "@types/smtp-server": "^3.5.13",
     "@types/web-push": "^3.6.3",
     "@types/ws": "^8.18.1",
     "typescript": "^5.5.0",

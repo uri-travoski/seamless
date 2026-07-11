@@ -91,5 +91,7 @@ export {
   UploadSimple as ImportIcon,
   ListMagnifyingGlass as LogsIcon,
   Question as ReviewIcon,
+  DeviceMobileCamera as DevicesIcon,
+  AddressBook as ContactsIcon,
   Lightbulb as SuggestionIcon,
 } from '@phosphor-icons/react';
