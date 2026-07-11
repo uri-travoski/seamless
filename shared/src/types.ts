@@ -134,6 +134,7 @@ export interface EmailQueryFilter {
   accountId?: number;
   hasKeyword?: string;
   notKeyword?: string;
+  needsReview?: boolean;     // the review lane: low-confidence / ai-routed mail
 }
 
 export interface EmailQueryRequest {
@@ -201,7 +202,49 @@ export interface ApiAiProvider {
   hasKey: boolean;
 }
 
-export type AiTask = 'categorize' | 'summarize' | 'draft';
+export type AiTask = 'classify' | 'embed' | 'categorize' | 'summarize' | 'draft';
+
+/** Orthogonal-fields verdict from the LLM classify tier — never a single label. */
+export interface AiVerdict {
+  category: string;
+  label: string | null;
+  is_real_document: boolean;
+  requires_action: boolean;
+  worth_keeping: boolean;
+  retention: 'keep' | 'delete' | 'keep_1y' | 'keep_2y' | 'keep_3y';
+  warranty_months: number | null;
+  confidence: number;
+  reason: string;
+}
+
+export interface ApiRuleSuggestion {
+  id: number;
+  matchField: string;
+  matchValue: string;
+  labelId: number;
+  evidence: number;
+}
+
+export interface ApiProcessorNote {
+  id: number;
+  scope: 'sender' | 'domain';
+  scopeValue: string;
+  note: string;
+  labelId: number | null;
+  autoRead: boolean;
+  retentionDays: number | null;
+  deleteIfUnread: boolean;
+  active: boolean;
+}
+
+export interface ApiDecision {
+  tier: string;
+  model: string;
+  output: AiVerdict | Record<string, unknown>;
+  confidence: number;
+  reason: string;
+  createdAt: string;
+}
 
 export interface WsMessage {
   type: 'stateChange' | 'newMail' | 'counts';

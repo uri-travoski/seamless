@@ -164,6 +164,7 @@ export async function queryEmails(userId: number, req: EmailQueryRequest): Promi
   if (f.hasKeyword === '$seen') where.push('m.unread = false');
   if (f.notKeyword === '$seen') where.push('m.unread = true');
   if (f.hasKeyword === '$flagged') where.push('m.flagged = true');
+  if (f.needsReview) where.push("m.classify_state = 'needs_review'");
 
   if (f.text) {
     const p = parseSearch(f.text);
@@ -247,6 +248,7 @@ export async function setKeywords(userId: number, emailId: string, patch: Record
 export async function setLabels(userId: number, emailId: string, labelIds: number[]): Promise<void> {
   const row = await getMsgRow(userId, emailId);
   if (!row) return;
+  const before = (await q<{ label_id: number }>('SELECT label_id FROM message_labels WHERE message_id = ?', [row.id])).map((l) => l.label_id);
   await run('DELETE FROM message_labels WHERE message_id = ?', [row.id]);
   for (const lid of labelIds) {
     await run(`
@@ -255,7 +257,49 @@ export async function setLabels(userId: number, emailId: string, labelIds: numbe
       ON CONFLICT DO NOTHING
     `, [row.id, lid, userId]);
   }
+  await recordCorrection(userId, row, before, labelIds);
   await bumpState();
+}
+
+/**
+ * A manual relabel is training data (DESIGN.md §6): log it, retarget the message's
+ * embedding so similar mail lands right next time, and suggest a deterministic rule
+ * once the same sender has been corrected to the same label 3+ times.
+ */
+async function recordCorrection(userId: number, row: MsgRow, before: number[], after: number[]): Promise<void> {
+  const added = after.filter((id) => !before.includes(id));
+  const removed = before.filter((id) => !after.includes(id));
+  if (added.length === 0 && removed.length === 0) return;
+  const fromDomain = row.from_addr.split('@')[1]?.toLowerCase() ?? '';
+
+  await run('INSERT INTO corrections(user_id, email_id, from_domain, from_label_id, to_label_id, kind, created_at) VALUES (?,?,?,?,?,?,?)',
+    [userId, row.id, fromDomain, removed[0] ?? null, added[0] ?? null, 'relabel', Date.now()]);
+
+  // recompute disposition under the new labels; correcting a label = user opinion
+  const { recomputeDisposition } = await import('../classify/engine.ts');
+  await recomputeDisposition(row.id);
+
+  if (added.length > 0) {
+    // the embedding memory follows the user's correction immediately
+    await run('UPDATE email_vectors SET label_id = ? WHERE message_id = ?', [added[0], row.id]);
+
+    if (fromDomain) {
+      const evidence = await one<{ c: number }>(`
+        SELECT COUNT(*) AS c FROM corrections
+        WHERE user_id = ? AND from_domain = ? AND to_label_id = ? AND created_at > ?
+      `, [userId, fromDomain, added[0], Date.now() - 90 * 86_400_000]);
+      const hasRule = await one('SELECT 1 FROM rules WHERE user_id = ? AND match_field = ? AND lower(match_value) = ? AND label_id = ?',
+        [userId, 'from_domain', fromDomain, added[0]]);
+      if ((evidence?.c ?? 0) >= 3 && !hasRule) {
+        await run(`
+          INSERT INTO rule_suggestions(user_id, match_field, match_value, label_id, evidence, status, created_at)
+          VALUES (?,?,?,?,?,'pending',?)
+          ON CONFLICT (user_id, match_field, match_value, label_id)
+          DO UPDATE SET evidence = excluded.evidence, status = CASE WHEN rule_suggestions.status = 'dismissed' THEN 'dismissed' ELSE 'pending' END
+        `, [userId, 'from_domain', fromDomain, added[0], evidence!.c, Date.now()]);
+      }
+    }
+  }
 }
 
 /** Move to a mailbox ("mb:<id>" same-account, or "u:<role>" resolved per account). */

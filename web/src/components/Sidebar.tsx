@@ -3,11 +3,12 @@ import type { ComponentType } from 'react';
 import { useMail, type View } from '../state/mail.ts';
 import { useCompose } from '../state/compose.ts';
 import type { ApiMailbox } from '@seamless/shared';
-import { InboxIcon, DraftsIcon, SentIcon, ScheduledIcon, ArchiveIcon, JunkIcon, TrashIcon, FolderIcon, ComposeIcon, CaretDownIcon, CaretRightIcon, StarIcon } from '../icons.tsx';
+import { InboxIcon, DraftsIcon, SentIcon, ScheduledIcon, ArchiveIcon, JunkIcon, TrashIcon, FolderIcon, ComposeIcon, CaretDownIcon, CaretRightIcon, StarIcon, ReviewIcon } from '../icons.tsx';
 
 const STARRED_VIEW: View = { kind: 'search', query: 'is:starred', title: 'Starred' };
-// sidebar display order; 'starred' is a synthetic view, the rest are unified mailboxes by role
-const UNIFIED_ORDER = ['inbox', 'starred', 'scheduled', 'drafts', 'sent', 'archive', 'junk', 'trash'];
+const REVIEW_VIEW: View = { kind: 'review', title: 'Review' };
+// sidebar display order; 'starred'/'review' are synthetic views, the rest are unified mailboxes by role
+const UNIFIED_ORDER = ['inbox', 'starred', 'review', 'scheduled', 'drafts', 'sent', 'archive', 'junk', 'trash'];
 
 const ROLE_ICON: Record<string, ComponentType<{ className?: string }>> = {
   inbox: InboxIcon, drafts: DraftsIcon, sent: SentIcon, scheduled: ScheduledIcon, archive: ArchiveIcon, junk: JunkIcon, trash: TrashIcon,
@@ -21,6 +22,7 @@ function BoxGlyph({ mb }: { mb: ApiMailbox }) {
 export default function Sidebar({ open, onNavigate }: { open: boolean; onNavigate: () => void }) {
   const mailboxes = useMail((s) => s.mailboxes);
   const labels = useMail((s) => s.labels);
+  const reviewCount = useMail((s) => s.reviewCount);
   const view = useMail((s) => s.view);
   const setView = useMail((s) => s.setView);
   const openBlank = useCompose((s) => s.openBlank);
@@ -53,6 +55,16 @@ export default function Sidebar({ open, onNavigate }: { open: boolean; onNavigat
               <button key="starred" className={`side-item ${starredActive ? 'active' : ''}`} onClick={() => go(STARRED_VIEW)}>
                 <StarIcon className="glyph" weight="fill" />
                 <span className="name">Starred</span>
+              </button>
+            );
+          }
+          if (role === 'review') {
+            if (reviewCount === 0 && view.kind !== 'review') return null; // appears only when there is something to decide
+            return (
+              <button key="review" className={`side-item ${view.kind === 'review' ? 'active' : ''}`} onClick={() => go(REVIEW_VIEW)}>
+                <ReviewIcon className="glyph" />
+                <span className="name">Review</span>
+                {reviewCount > 0 && <span className="count">{reviewCount}</span>}
               </button>
             );
           }

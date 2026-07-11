@@ -313,6 +313,85 @@ CREATE TABLE processing_logs (
 CREATE INDEX plogs_user_time ON processing_logs(user_id, created_at DESC);
 `,
   },
+  {
+    id: 3,
+    sql: `
+CREATE EXTENSION IF NOT EXISTS vector;
+
+-- every AI verdict, auditable + cacheable (DESIGN.md §3c)
+CREATE TABLE ai_decisions (
+  id SERIAL PRIMARY KEY,
+  user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  email_id INTEGER REFERENCES messages(id) ON DELETE CASCADE,
+  tier TEXT NOT NULL,               -- embedding|llm
+  model TEXT NOT NULL DEFAULT '',
+  output TEXT NOT NULL,             -- the orthogonal-fields JSON verbatim
+  confidence REAL NOT NULL DEFAULT 0,
+  reason TEXT NOT NULL DEFAULT '',
+  cache_key TEXT,
+  preference_version INTEGER,
+  latency_ms INTEGER,
+  created_at BIGINT NOT NULL
+);
+CREATE INDEX aidec_email ON ai_decisions(email_id);
+CREATE INDEX aidec_cache ON ai_decisions(user_id, cache_key);
+
+-- the "memory": embeddings of labelled mail (dim varies by provider; exact scan per user+dim)
+CREATE TABLE email_vectors (
+  message_id INTEGER PRIMARY KEY REFERENCES messages(id) ON DELETE CASCADE,
+  user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  label_id INTEGER NOT NULL REFERENCES labels(id) ON DELETE CASCADE,
+  dim INTEGER NOT NULL,
+  embedding vector NOT NULL,
+  created_at BIGINT NOT NULL
+);
+CREATE INDEX vec_user_dim ON email_vectors(user_id, dim);
+
+-- the gold: every user correction (feeds the index + rule suggestions)
+CREATE TABLE corrections (
+  id SERIAL PRIMARY KEY,
+  user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  email_id INTEGER,
+  from_domain TEXT NOT NULL DEFAULT '',
+  from_label_id INTEGER,
+  to_label_id INTEGER,
+  kind TEXT NOT NULL,               -- relabel|delete|restore
+  created_at BIGINT NOT NULL
+);
+CREATE INDEX corr_user ON corrections(user_id, created_at DESC);
+
+CREATE TABLE rule_suggestions (
+  id SERIAL PRIMARY KEY,
+  user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  match_field TEXT NOT NULL,
+  match_value TEXT NOT NULL,
+  label_id INTEGER NOT NULL REFERENCES labels(id) ON DELETE CASCADE,
+  evidence INTEGER NOT NULL DEFAULT 0,
+  status TEXT NOT NULL DEFAULT 'pending',  -- pending|accepted|dismissed
+  created_at BIGINT NOT NULL,
+  UNIQUE(user_id, match_field, match_value, label_id)
+);
+
+-- per-sender/domain processing instructions ("teach the AI")
+CREATE TABLE processor_notes (
+  id SERIAL PRIMARY KEY,
+  user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  scope TEXT NOT NULL,              -- sender|domain
+  scope_value TEXT NOT NULL,
+  note TEXT NOT NULL,               -- plain English, injected into every AI decision for this scope
+  label_id INTEGER REFERENCES labels(id) ON DELETE SET NULL,
+  auto_read BOOLEAN NOT NULL DEFAULT false,
+  retention_days INTEGER,
+  delete_if_unread BOOLEAN NOT NULL DEFAULT false,
+  active BOOLEAN NOT NULL DEFAULT true,
+  created_at BIGINT NOT NULL,
+  updated_at BIGINT NOT NULL,
+  UNIQUE(user_id, scope, scope_value)
+);
+
+ALTER TABLE messages ADD COLUMN delete_if_unread BOOLEAN NOT NULL DEFAULT false;
+`,
+  },
 ];
 
 export async function migrate(): Promise<void> {

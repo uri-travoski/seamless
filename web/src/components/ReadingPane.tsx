@@ -69,6 +69,128 @@ function HtmlBody({ html, fontSize, fontFamily }: { html: string; fontSize: numb
   return <iframe ref={ref} sandbox="allow-same-origin allow-popups" srcDoc={doc} style={{ height }} title="Message" />;
 }
 
+/** Review lane: one-tap decision for mail the cascade would not guess about. */
+function ReviewBanner({ email }: { email: ApiEmail }) {
+  const labels = useMail((s) => s.labels);
+  const patchEmail = useMail((s) => s.patchEmail);
+  const destroy = useMail((s) => s.destroy);
+  const refreshMailboxes = useMail((s) => s.refreshMailboxes);
+  const [picking, setPicking] = useState(false);
+
+  const resolve = async (labelIds: number[] | null) => {
+    try {
+      await api.post(`/api/review/${email.id}/resolve`, labelIds ? { labelIds } : {});
+      patchEmail(email.id, { needsReview: false, labelIds: labelIds ?? email.labelIds });
+      void refreshMailboxes();
+    } catch { toast('Could not resolve', 'error'); }
+  };
+
+  return (
+    <div className="review-banner">
+      <div className="review-q">This one needs your call — what should happen to mail like this?</div>
+      <div className="review-actions">
+        <button className="btn" onClick={() => void resolve(null)}>Keep as is</button>
+        <button className="btn" onClick={() => setPicking((v) => !v)}>Label…</button>
+        <button className="btn danger" onClick={() => { void resolve(null); destroy(email.id); }}>Trash</button>
+      </div>
+      {picking && (
+        <div className="review-labels">
+          {labels.map((l) => (
+            <button key={l.id} className="chip" style={{ background: l.color, border: 'none', cursor: 'pointer' }}
+              onClick={() => { setPicking(false); void resolve([...new Set([...email.labelIds, l.id])]); }}>
+              {l.name}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/** "Teach the AI": a per-sender processing instruction (processor note). */
+function TeachPanel({ email, onClose }: { email: ApiEmail; onClose: () => void }) {
+  const labels = useMail((s) => s.labels);
+  const from = email.from[0]?.email ?? '';
+  const domain = from.split('@')[1] ?? '';
+  const [scope, setScope] = useState<'sender' | 'domain'>('sender');
+  const [note, setNote] = useState('');
+  const [labelId, setLabelId] = useState<number | ''>('');
+  const [autoRead, setAutoRead] = useState(false);
+  const [days, setDays] = useState<number | ''>('');
+  const [ifUnread, setIfUnread] = useState(false);
+
+  const save = async () => {
+    try {
+      await api.post('/api/processor-notes', {
+        scope, scopeValue: scope === 'sender' ? from : domain, note,
+        labelId: labelId === '' ? null : labelId, autoRead,
+        retentionDays: days === '' ? null : days, deleteIfUnread: ifUnread,
+      });
+      toast('Saved — future mail from this sender follows your instruction', 'info');
+      onClose();
+    } catch (e: any) { toast(e?.message ?? 'Could not save', 'error'); }
+  };
+
+  return (
+    <div className="note-box teach-box">
+      <div className="note-head"><SparkleIcon size={14} /> Teach the AI
+        <span className="note-hint">applies to future mail from {scope === 'sender' ? from : `*@${domain}`}</span>
+      </div>
+      <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center', fontSize: 12.5, marginBottom: 8 }}>
+        <select className="text-input" style={{ width: 'auto' }} value={scope} onChange={(e) => setScope(e.target.value as any)}>
+          <option value="sender">This sender</option>
+          <option value="domain">Whole domain</option>
+        </select>
+        <select className="text-input" style={{ width: 'auto' }} value={labelId} onChange={(e) => setLabelId(e.target.value === '' ? '' : Number(e.target.value))}>
+          <option value="">No fixed label</option>
+          {labels.map((l) => <option key={l.id} value={l.id}>{l.name}</option>)}
+        </select>
+        <label style={{ display: 'flex', gap: 5, alignItems: 'center' }}>
+          <input type="checkbox" checked={autoRead} onChange={(e) => setAutoRead(e.target.checked)} /> mark read
+        </label>
+        <label style={{ display: 'flex', gap: 5, alignItems: 'center' }}>
+          delete after <input className="text-input" type="number" min={1} style={{ width: 58 }} value={days}
+            onChange={(e) => setDays(e.target.value === '' ? '' : Number(e.target.value))} /> days
+        </label>
+        {days !== '' && (
+          <label style={{ display: 'flex', gap: 5, alignItems: 'center' }}>
+            <input type="checkbox" checked={ifUnread} onChange={(e) => setIfUnread(e.target.checked)} /> only if I never read it
+          </label>
+        )}
+      </div>
+      <textarea className="note-text" value={note} placeholder={'Explain it for the AI, e.g. "Newsletter I signed up for — I sometimes read it. Real receipts from this sender go to Receipts."'}
+        onChange={(e) => setNote(e.target.value)} />
+      <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
+        <button className="btn primary" onClick={() => void save()}>Save instruction</button>
+        <button className="btn ghost" onClick={onClose}>Cancel</button>
+      </div>
+    </div>
+  );
+}
+
+/** "Why this label?" — the stored cascade decision for this message. */
+function WhyLine({ email }: { email: ApiEmail }) {
+  const [why, setWhy] = useState<string | null>(null);
+  const [loaded, setLoaded] = useState(false);
+  const load = async () => {
+    setLoaded(true);
+    try {
+      const decisions = await api.get<any[]>(`/api/message/${email.id}/decisions`);
+      if (decisions.length === 0) { setWhy('matched by your rules (no AI involved)'); return; }
+      const d = decisions[0];
+      setWhy(`${d.tier === 'llm' ? `AI (${d.model})` : 'similarity to your labelled mail'} · ${Math.round(d.confidence * 100)}% · ${d.reason || d.output?.reason || ''}`);
+    } catch { setWhy(null); }
+  };
+  if (email.labelIds.length === 0 && email.disposition !== 'delete') return null;
+  return (
+    <span className="why-line">
+      {!loaded
+        ? <button className="details-toggle" style={{ fontSize: 11.5 }} onClick={(e) => { e.stopPropagation(); void load(); }}>why?</button>
+        : <span style={{ fontSize: 11.5, color: 'var(--md-text-faint)' }}>{why ?? ''}</span>}
+    </span>
+  );
+}
+
 function MessageCard({ email, expanded, onToggle }: { email: ApiEmail; expanded: boolean; onToggle: () => void }) {
   const settings = useSession((s) => s.settings);
   const openReply = useCompose((s) => s.openReply);
@@ -79,6 +201,7 @@ function MessageCard({ email, expanded, onToggle }: { email: ApiEmail; expanded:
   const [menuOpen, setMenuOpen] = useState(false);
   const [detailsOpen, setDetailsOpen] = useState(false);
   const [noteOpen, setNoteOpen] = useState(false);
+  const [teachOpen, setTeachOpen] = useState(false);
   const [noteDraft, setNoteDraft] = useState('');
   const [trackOpen, setTrackOpen] = useState(false);
   const [tracking, setTracking] = useState<TrackingInfo | null>(null);
@@ -141,6 +264,7 @@ function MessageCard({ email, expanded, onToggle }: { email: ApiEmail; expanded:
             to {email.to.map((a) => a.name || a.email).join(', ') || '—'}
             {email.cc.length > 0 && `, cc ${email.cc.map((a) => a.name || a.email).join(', ')}`}
             {' '}· via {email.accountEmail}
+            {expanded && <WhyLine email={email} />}
             {expanded && (
               <button className="details-toggle" title="Details"
                 onClick={(e) => { e.stopPropagation(); setDetailsOpen((v) => !v); }}>
@@ -184,13 +308,18 @@ function MessageCard({ email, expanded, onToggle }: { email: ApiEmail; expanded:
               <tr><th>Size:</th><td>{fmtSize(email.size)}</td></tr>
             </tbody></table>
           )}
+          {email.needsReview && <ReviewBanner email={email} />}
           {noteOpen && (
             <div className="note-box">
-              <div className="note-head"><NoteIcon size={14} weight="fill" /> Private note <span className="note-hint">only you can see this</span></div>
+              <div className="note-head"><NoteIcon size={14} weight="fill" /> Private note <span className="note-hint">only you can see this</span>
+                <button className="details-toggle" style={{ marginLeft: 'auto', fontSize: 11.5 }}
+                  onClick={() => setTeachOpen((v) => !v)}>{teachOpen ? 'hide' : 'teach the AI about this sender'}</button>
+              </div>
               <textarea className="note-text" value={noteDraft} placeholder="Add a personal note about this email…"
                 onChange={(e) => setNoteDraft(e.target.value)} onBlur={() => void persistNote(noteDraft)} />
             </div>
           )}
+          {noteOpen && teachOpen && <TeachPanel email={email} onClose={() => setTeachOpen(false)} />}
           {email.openCount >= 0 && (
             <div className="track-wrap">
               <button className={`track-banner ${email.openCount > 0 ? 'clickable' : ''}`}

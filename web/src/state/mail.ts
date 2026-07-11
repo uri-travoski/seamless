@@ -6,7 +6,7 @@ import { cache } from '../api/cache.ts';
 export const PAGE = 120;
 
 export interface View {
-  kind: 'mailbox' | 'label' | 'search';
+  kind: 'mailbox' | 'label' | 'search' | 'review';
   mailboxId?: string;
   labelId?: number;
   query?: string;
@@ -16,6 +16,7 @@ export interface View {
 function viewFilter(view: View): EmailQueryFilter {
   if (view.kind === 'mailbox') return { inMailbox: view.mailboxId };
   if (view.kind === 'label') return { label: view.labelId };
+  if (view.kind === 'review') return { needsReview: true };
   return { text: view.query ?? '' };
 }
 
@@ -26,6 +27,7 @@ function viewKey(view: View): string {
 interface MailState {
   mailboxes: ApiMailbox[];
   labels: ApiLabel[];
+  reviewCount: number;
   view: View;
   total: number;
   ids: string[];                    // sparse: ids[i] may be undefined until page loads
@@ -64,6 +66,7 @@ interface MailState {
 export const useMail = create<MailState>((set, get) => ({
   mailboxes: [],
   labels: [],
+  reviewCount: 0,
   view: { kind: 'mailbox', mailboxId: 'u:inbox', title: 'Inbox' },
   total: 0,
   ids: [],
@@ -96,6 +99,7 @@ export const useMail = create<MailState>((set, get) => ({
       const mailboxes = await fetchMailboxes();
       set({ mailboxes, online: true });
       void cache.putMailboxes(mailboxes);
+      void api.get<{ count: number }>('/api/review/count').then((r) => set({ reviewCount: r.count })).catch(() => {});
     } catch {
       set({ online: false });
     }

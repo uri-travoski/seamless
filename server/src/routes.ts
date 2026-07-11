@@ -10,7 +10,7 @@ import { getEmailBody, getParsed, getTracking } from './mail/body.ts';
 import { buildOriginalPage } from './mail/original.ts';
 import { sendEmail, saveDraft, saveUpload, scheduleEmail } from './mail/send.ts';
 import { matchReplyIdentity } from './mail/replyfrom.ts';
-import { getMsgRow, setNote, moveEmail } from './mail/store.ts';
+import { getMsgRow, setNote, moveEmail, setLabels } from './mail/store.ts';
 import { loadFilters, filterMatches, type FilterableMessage } from './mail/filters.ts';
 import { applyLocalFilterActions } from './mail/ingest.ts';
 import { summarizeThread, draftReply } from './ai/tasks.ts';
@@ -598,6 +598,86 @@ export function registerRoutes(app: FastifyInstance): void {
     if (b.dryRun !== undefined) await setUserSetting(uid(req), 'dry_run', b.dryRun ? 'true' : 'false');
     if (b.trashDays !== undefined) await setUserSetting(uid(req), 'trash_days', String(Number(b.trashDays) || 30));
     if (b.logRetentionDays !== undefined) await setUserSetting(uid(req), 'log_retention_days', String(Number(b.logRetentionDays) || 90));
+    return { ok: true };
+  });
+
+  // ---- review lane ----
+  app.get('/api/review/count', async (req) => {
+    const row = await one<{ c: number }>("SELECT COUNT(*) AS c FROM messages WHERE user_id = ? AND classify_state = 'needs_review'", [uid(req)]);
+    return { count: row?.c ?? 0 };
+  });
+
+  /** One-tap review decision: set labels (or none) and mark the message decided. */
+  app.post('/api/review/:id/resolve', async (req) => {
+    const emailId = String((req.params as any).id);
+    const b = (req.body ?? {}) as { labelIds?: number[] };
+    const row = await getMsgRow(uid(req), emailId);
+    if (!row) return { ok: false };
+    if (Array.isArray(b.labelIds)) await setLabels(uid(req), emailId, b.labelIds);
+    await run("UPDATE messages SET classify_state = 'classified', review_reason = NULL WHERE id = ?", [row.id]);
+    await bumpState();
+    broadcast({ type: 'stateChange' }, uid(req));
+    return { ok: true };
+  });
+
+  // ---- ai decisions ("why this label?") ----
+  app.get('/api/message/:id/decisions', async (req) => {
+    const row = await getMsgRow(uid(req), (req.params as any).id);
+    if (!row) return [];
+    const rows = await q<any>('SELECT tier, model, output, confidence, reason, created_at FROM ai_decisions WHERE email_id = ? ORDER BY id DESC LIMIT 5', [row.id]);
+    return rows.map((r) => ({
+      tier: r.tier, model: r.model, output: JSON.parse(r.output), confidence: r.confidence,
+      reason: r.reason, createdAt: new Date(r.created_at).toISOString(),
+    }));
+  });
+
+  // ---- processor notes ("teach the AI about this sender") ----
+  app.get('/api/processor-notes', async (req) =>
+    (await q<any>('SELECT * FROM processor_notes WHERE user_id = ? AND active = true ORDER BY id DESC', [uid(req)])).map((n) => ({
+      id: n.id, scope: n.scope, scopeValue: n.scope_value, note: n.note, labelId: n.label_id,
+      autoRead: n.auto_read, retentionDays: n.retention_days, deleteIfUnread: n.delete_if_unread, active: n.active,
+    })));
+
+  app.post('/api/processor-notes', async (req) => {
+    const b = req.body as any;
+    const scope = b.scope === 'domain' ? 'domain' : 'sender';
+    const id = await insertId(`
+      INSERT INTO processor_notes(user_id, scope, scope_value, note, label_id, auto_read, retention_days, delete_if_unread, active, created_at, updated_at)
+      VALUES (?,?,?,?,?,?,?,?,true,?,?)
+      ON CONFLICT (user_id, scope, scope_value) DO UPDATE SET
+        note = excluded.note, label_id = excluded.label_id, auto_read = excluded.auto_read,
+        retention_days = excluded.retention_days, delete_if_unread = excluded.delete_if_unread,
+        active = true, updated_at = excluded.updated_at
+    `, [uid(req), scope, String(b.scopeValue ?? '').trim().toLowerCase(), b.note ?? '',
+        b.labelId ?? null, !!b.autoRead, b.retentionDays ?? null, !!b.deleteIfUnread, Date.now(), Date.now()]);
+    return { id };
+  });
+
+  app.delete('/api/processor-notes/:id', async (req) => {
+    await run('UPDATE processor_notes SET active = false WHERE id = ? AND user_id = ?', [Number((req.params as any).id), uid(req)]);
+    return { ok: true };
+  });
+
+  // ---- rule suggestions (promoted from corrections) ----
+  app.get('/api/suggestions', async (req) =>
+    (await q<any>("SELECT * FROM rule_suggestions WHERE user_id = ? AND status = 'pending' ORDER BY evidence DESC", [uid(req)])).map((s) => ({
+      id: s.id, matchField: s.match_field, matchValue: s.match_value, labelId: s.label_id, evidence: s.evidence,
+    })));
+
+  app.post('/api/suggestions/:id/accept', async (req) => {
+    const s = await one<any>('SELECT * FROM rule_suggestions WHERE id = ? AND user_id = ?', [Number((req.params as any).id), uid(req)]);
+    if (!s) return { ok: false };
+    const maxOrd = (await one<{ m: number }>('SELECT COALESCE(MAX(ord),0) AS m FROM rules WHERE user_id = ?', [uid(req)]))?.m ?? 0;
+    await insertId(`
+      INSERT INTO rules(user_id, enabled, ord, match_field, match_value, exclude_contains, action, label_id, stop, note, source, created_at)
+      VALUES (?,true,?,?,?,'','label',?,true,'promoted from your corrections','promoted',?)
+    `, [uid(req), maxOrd + 10, s.match_field, s.match_value, s.label_id, Date.now()]);
+    await run("UPDATE rule_suggestions SET status = 'accepted' WHERE id = ?", [s.id]);
+    return { ok: true };
+  });
+
+  app.post('/api/suggestions/:id/dismiss', async (req) => {
+    await run("UPDATE rule_suggestions SET status = 'dismissed' WHERE id = ? AND user_id = ?", [Number((req.params as any).id), uid(req)]);
     return { ok: true };
   });
 

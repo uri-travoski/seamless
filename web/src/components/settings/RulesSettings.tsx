@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { api } from '../../api/client.ts';
 import { useMail } from '../../state/mail.ts';
 import { toast } from '../../toast.ts';
-import type { ApiRule, ApiPreference } from '@seamless/shared';
+import type { ApiRule, ApiPreference, ApiRuleSuggestion } from '@seamless/shared';
 
 const FIELDS: [string, string][] = [
   ['from', 'From (exact)'], ['from_domain', 'From domain'], ['to', 'To'],
@@ -20,6 +20,7 @@ export default function RulesSettings() {
   const labels = useMail((s) => s.labels);
   const [rules, setRules] = useState<ApiRule[]>([]);
   const [prefs, setPrefs] = useState<ApiPreference[]>([]);
+  const [suggestions, setSuggestions] = useState<ApiRuleSuggestion[]>([]);
   const [editing, setEditing] = useState<EditingRule | null>(null);
   const [newPref, setNewPref] = useState('');
   const [busy, setBusy] = useState(false);
@@ -27,6 +28,7 @@ export default function RulesSettings() {
   const refresh = async () => {
     setRules(await api.get<ApiRule[]>('/api/rules'));
     setPrefs(await api.get<ApiPreference[]>('/api/preferences'));
+    setSuggestions(await api.get<ApiRuleSuggestion[]>('/api/suggestions'));
   };
   useEffect(() => { void refresh(); }, []);
 
@@ -76,6 +78,21 @@ export default function RulesSettings() {
         (Import &amp; Retention tab) to seed these.
       </p>
       <button className="btn primary" disabled={busy} onClick={() => void runNow()}>Re-run rules on existing mail</button>
+
+      {suggestions.length > 0 && (
+        <div style={{ border: '1px solid #cfe0cd', background: '#f2f8f1', borderRadius: 8, padding: 12, marginTop: 14 }}>
+          <div style={{ fontWeight: 600, fontSize: 13, marginBottom: 8 }}>Suggested rules from your corrections</div>
+          {suggestions.map((s) => (
+            <div key={s.id} className="cond-row" style={{ margin: 0, padding: '4px 0' }}>
+              <span style={{ flex: 1, fontSize: 12.5 }}>
+                Mail from <b>{s.matchValue}</b> → {labelName(s.labelId)} <span style={{ color: 'var(--md-text-faint)' }}>(you did this {s.evidence}×)</span>
+              </span>
+              <button className="btn primary" onClick={async () => { await api.post(`/api/suggestions/${s.id}/accept`); await refresh(); toast('Rule created'); }}>Make it a rule</button>
+              <button className="btn ghost" onClick={async () => { await api.post(`/api/suggestions/${s.id}/dismiss`); await refresh(); }}>Dismiss</button>
+            </div>
+          ))}
+        </div>
+      )}
 
       <div style={{ marginTop: 14, maxHeight: 340, overflowY: 'auto', border: rules.length ? '1px solid var(--md-border)' : 'none', borderRadius: 8 }}>
         {rules.map((r) => (

@@ -90,4 +90,6 @@ export {
   TreeStructure as RulesIcon,
   UploadSimple as ImportIcon,
   ListMagnifyingGlass as LogsIcon,
+  Question as ReviewIcon,
+  Lightbulb as SuggestionIcon,
 } from '@phosphor-icons/react';

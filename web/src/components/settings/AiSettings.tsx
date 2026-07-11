@@ -7,6 +7,8 @@ interface Provider { id: number; name: string; baseUrl: string; model: string; h
 interface TaskRow { task: AiTask; provider_id: number | null; model: string; enabled: number }
 
 const TASKS: { task: AiTask; label: string; desc: string }[] = [
+  { task: 'classify', label: 'Classify (cascade)', desc: 'Tier 3 of the classification cascade: structured verdicts for mail rules could not settle (recommended: gemini-2.5-flash-lite)' },
+  { task: 'embed', label: 'Embeddings (memory)', desc: 'Tier 2: similarity against your own labelled mail via an /embeddings endpoint (recommended: Ollama nomic-embed-text)' },
   { task: 'categorize', label: 'Categorize', desc: 'Auto-label incoming mail (enable per account under Accounts)' },
   { task: 'summarize', label: 'Summarize', desc: 'Thread summary button in the reading pane' },
   { task: 'draft', label: 'Draft replies', desc: 'AI draft button in the compose window' },
