@@ -1,0 +1,46 @@
+services:
+  postgres:
+    image: pgvector/pgvector:pg17
+    ports:
+      - "5460:5432"
+    environment:
+      POSTGRES_USER: seamless
+      POSTGRES_PASSWORD: seamless
+      POSTGRES_DB: seamless
+    volumes:
+      - seamless-pg:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U seamless"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  minio:
+    image: minio/minio:latest
+    command: server /data --console-address ":9101"
+    ports:
+      - "9100:9000"
+      - "9101:9101"
+    environment:
+      MINIO_ROOT_USER: seamless
+      MINIO_ROOT_PASSWORD: seamless-secret
+    volumes:
+      - seamless-minio:/data
+
+  # Fake IMAP/SMTP server with seeded demo users for local development
+  greenmail:
+    image: greenmail/standalone:2.1.3
+    ports:
+      - "3026:3025"   # SMTP
+      - "3144:3143"   # IMAP
+    environment:
+      GREENMAIL_OPTS: >-
+        -Dgreenmail.setup.test.smtp
+        -Dgreenmail.setup.test.imap
+        -Dgreenmail.hostname=0.0.0.0
+        -Dgreenmail.users=alice:alicepw@demo.test,support:supportpw@demo.test,bob:bobpw@demo.test
+        -Dgreenmail.verbose
+
+volumes:
+  seamless-pg:
+  seamless-minio:
