@@ -28,7 +28,7 @@ const TABS: { id: string; name: string; Icon: ComponentType<{ className?: string
   { id: 'users', name: 'Users', Icon: UsersIcon },
 ];
 
-export default function Settings({ onClose, initialTab }: { onClose: () => void; initialTab?: string }) {
+export default function Settings({ onClose, initialTab, autoAddLabel }: { onClose: () => void; initialTab?: string; autoAddLabel?: boolean }) {
   const [tab, setTab] = useState<string>(initialTab && TABS.some((t) => t.id === initialTab) ? initialTab : 'general');
   const logout = useSession((s) => s.logout);
 
@@ -54,7 +54,7 @@ export default function Settings({ onClose, initialTab }: { onClose: () => void;
         <div className="settings-content">
           {tab === 'general' && <GeneralSettings />}
           {tab === 'accounts' && <AccountSettings />}
-          {tab === 'labels' && <LabelSettings />}
+          {tab === 'labels' && <LabelSettings autoAdd={autoAddLabel} />}
           {tab === 'filters' && <FilterSettings />}
           {tab === 'ai' && <AiSettings />}
           {tab === 'rules' && <RulesSettings />}

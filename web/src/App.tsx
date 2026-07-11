@@ -55,6 +55,7 @@ export default function App() {
   const init = useSession((s) => s.init);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [settingsTab, setSettingsTab] = useState<string | undefined>(undefined);
+  const [settingsAddLabel, setSettingsAddLabel] = useState(false);
   const [helpOpen, setHelpOpen] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [search, setSearch] = useState('');
@@ -92,13 +93,13 @@ export default function App() {
     <div className="app">
       <header className="topbar">
         <div className="brand">
-          <button className="icon-btn mobile-only" style={{ display: 'none' }} onClick={() => setSidebarOpen(!sidebarOpen)} aria-label="Menu"><MenuIcon /></button>
+          <button className="icon-btn mobile-only" onClick={() => setSidebarOpen(!sidebarOpen)} aria-label="Menu"><MenuIcon /></button>
           <MailLogo size="1.65em" />Seamless
         </div>
         <div className="search">
           <SearchIcon aria-hidden />
           <input
-            placeholder="Search mail  (from:  to:  label:  is:unread  has:attachment)"
+            placeholder="Search"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             onKeyDown={(e) => {
@@ -111,16 +112,17 @@ export default function App() {
         <div className="spacer" />
         <span className={`conn-dot ${wsConnected && online ? '' : 'offline'}`} title={wsConnected && online ? 'Live' : 'Offline / reconnecting'} />
         <button className="icon-btn" title="Help" onClick={() => setHelpOpen(true)}><HelpIcon /></button>
-        <button className="icon-btn" title="Settings" onClick={() => { setSettingsTab(undefined); setSettingsOpen(true); }}><SettingsIcon /></button>
+        <button className="icon-btn" title="Settings" onClick={() => { setSettingsTab(undefined); setSettingsAddLabel(false); setSettingsOpen(true); }}><SettingsIcon /></button>
       </header>
       <div className={`main ${layout === 'table' ? 'table-mode' : ''} ${selectedId ? 'reading' : ''}`}>
-        <Sidebar open={sidebarOpen} onNavigate={() => setSidebarOpen(false)} />
+        <Sidebar open={sidebarOpen} onNavigate={() => setSidebarOpen(false)}
+          onAddLabel={() => { setSettingsTab('labels'); setSettingsAddLabel(true); setSettingsOpen(true); }} />
         <MessageList />
         <ReadingPane />
       </div>
       <ComposeDock />
-      <GettingStarted openSettings={(tab) => { setSettingsTab(tab); setSettingsOpen(true); }} openHelp={() => setHelpOpen(true)} />
-      {settingsOpen && <Suspense fallback={null}><Settings initialTab={settingsTab} onClose={() => setSettingsOpen(false)} /></Suspense>}
+      <GettingStarted openSettings={(tab) => { setSettingsTab(tab); setSettingsAddLabel(false); setSettingsOpen(true); }} openHelp={() => setHelpOpen(true)} />
+      {settingsOpen && <Suspense fallback={null}><Settings initialTab={settingsTab} autoAddLabel={settingsAddLabel} onClose={() => setSettingsOpen(false)} /></Suspense>}
       {helpOpen && <Suspense fallback={null}><HelpModal onClose={() => setHelpOpen(false)} /></Suspense>}
       <div className="toast-wrap">
         {toasts.map((t) => <div key={t.id} className={`toast ${t.kind}`}>{t.text}</div>)}

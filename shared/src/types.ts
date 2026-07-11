@@ -89,6 +89,8 @@ export interface ApiEmail {
   hasNote: boolean;        // a personal note is attached (private, never sent)
   openCount: number;       // tracking pixel opens (own sent mail), -1 = not tracked
   lastOpenAt: string | null;
+  threadOpenCount: number; // opens on your tracked reply elsewhere in this thread, -1 = none
+  threadOpenAt: string | null;
   disposition: 'keep' | 'delete';
   deleteAt: string | null; // when the retention sweep will trash it (countdown badge)
   needsReview: boolean;

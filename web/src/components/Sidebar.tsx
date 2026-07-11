@@ -3,7 +3,11 @@ import type { ComponentType } from 'react';
 import { useMail, type View } from '../state/mail.ts';
 import { useCompose } from '../state/compose.ts';
 import type { ApiMailbox } from '@seamless/shared';
-import { InboxIcon, DraftsIcon, SentIcon, ScheduledIcon, ArchiveIcon, JunkIcon, TrashIcon, FolderIcon, ComposeIcon, CaretDownIcon, CaretRightIcon, StarIcon, ReviewIcon } from '../icons.tsx';
+import { InboxIcon, DraftsIcon, SentIcon, ScheduledIcon, ArchiveIcon, JunkIcon, TrashIcon, FolderIcon, ComposeIcon, CaretDownIcon, CaretRightIcon, StarIcon, ReviewIcon, CloudDownloadIcon } from '../icons.tsx';
+import { IconContext } from '@phosphor-icons/react';
+import { api } from '../api/client.ts';
+import { toast } from '../toast.ts';
+import LabelColorPicker from './LabelColorPicker.tsx';
 
 const STARRED_VIEW: View = { kind: 'search', query: 'is:starred', title: 'Starred' };
 const REVIEW_VIEW: View = { kind: 'review', title: 'Review' };
@@ -19,7 +23,7 @@ function BoxGlyph({ mb }: { mb: ApiMailbox }) {
   return <Icon className="glyph" />;
 }
 
-export default function Sidebar({ open, onNavigate }: { open: boolean; onNavigate: () => void }) {
+export default function Sidebar({ open, onNavigate, onAddLabel }: { open: boolean; onNavigate: () => void; onAddLabel: () => void }) {
   const mailboxes = useMail((s) => s.mailboxes);
   const labels = useMail((s) => s.labels);
   const reviewCount = useMail((s) => s.reviewCount);
@@ -27,6 +31,20 @@ export default function Sidebar({ open, onNavigate }: { open: boolean; onNavigat
   const setView = useMail((s) => s.setView);
   const openBlank = useCompose((s) => s.openBlank);
   const [expandedAccounts, setExpandedAccounts] = useState<Set<number>>(new Set());
+  const [fetching, setFetching] = useState(false);
+
+  const fetchAll = async () => {
+    if (fetching) return;
+    setFetching(true);
+    try {
+      const res = await api.post<{ accounts: number }>('/api/sync');
+      toast(res.accounts ? `Checking ${res.accounts} account${res.accounts === 1 ? '' : 's'} for new mail…` : 'No connected accounts to check');
+    } catch (e: any) {
+      toast(e?.message ?? 'Could not check for mail', 'error');
+    } finally {
+      setFetching(false);
+    }
+  };
 
   const unified = mailboxes.filter((m) => m.accountId === null);
   const accounts = new Map<number, ApiMailbox[]>();
@@ -45,8 +63,13 @@ export default function Sidebar({ open, onNavigate }: { open: boolean; onNavigat
   const starredActive = view.kind === 'search' && view.query === 'is:starred';
 
   return (
+    <IconContext.Provider value={{ weight: 'fill', size: 18 }}>
     <nav className={`sidebar ${open ? 'open' : ''}`}>
-      <button className="btn primary compose-btn" onClick={openBlank}><ComposeIcon /> Compose</button>
+      <div className="compose-actions">
+        <button className={`btn primary fetch-btn ${fetching ? 'busy' : ''}`} title="Check all accounts for new mail"
+          aria-label="Check all accounts for new mail" disabled={fetching} onClick={fetchAll}><CloudDownloadIcon /></button>
+        <button className="btn primary compose-btn" onClick={openBlank}><ComposeIcon /> Compose</button>
+      </div>
 
       <div className="side-section">
         {UNIFIED_ORDER.map((role) => {
@@ -87,16 +110,17 @@ export default function Sidebar({ open, onNavigate }: { open: boolean; onNavigat
 
       {labels.length > 0 && (
         <div className="side-section">
-          <div className="side-header">Labels</div>
+          <div className="side-header">
+            <span>Labels</span>
+            <button className="icon-btn side-add" title="Add label" aria-label="Add label" onClick={onAddLabel}>+</button>
+          </div>
           {labels.map((l) => (
-            <button
-              key={l.id}
-              className={`side-item ${isActive({ labelId: l.id }) ? 'active' : ''}`}
-              onClick={() => go({ kind: 'label', labelId: l.id, title: l.name })}
-            >
-              <span className="label-dot" style={{ background: l.color }} />
-              <span className="name">{l.name}</span>
-            </button>
+            <div key={l.id} className={`side-item label-item ${isActive({ labelId: l.id }) ? 'active' : ''}`}>
+              <LabelColorPicker label={l} dotSize={11} stop />
+              <button className="label-name-btn" onClick={() => go({ kind: 'label', labelId: l.id, title: l.name })}>
+                <span className="name">{l.name}</span>
+              </button>
+            </div>
           ))}
         </div>
       )}
@@ -140,6 +164,7 @@ export default function Sidebar({ open, onNavigate }: { open: boolean; onNavigat
         </div>
       )}
     </nav>
+    </IconContext.Provider>
   );
 }
 

@@ -373,6 +373,13 @@ class SyncManager extends EventEmitter {
     if (accountId !== undefined) this.syncers.get(accountId)?.kick();
     else for (const s of this.syncers.values()) s.kick();
   }
+
+  /** Kick every running syncer belonging to one user; returns how many were kicked. */
+  kickUser(userId: number): number {
+    let n = 0;
+    for (const s of this.syncers.values()) if (s.account.user_id === userId) { s.kick(); n++; }
+    return n;
+  }
 }
 
 export const syncManager = new SyncManager();

@@ -1,0 +1,26 @@
+# deps are installed inside the image
+node_modules
+**/node_modules
+
+# built in the image
+web/dist
+server/dist
+
+# secrets and local state — never ship these
+.env
+.env.*
+.git
+.gitignore
+server/data
+data
+
+# dev-only / tooling
+.impeccable
+**/.impeccable
+.playwright-mcp
+**/.playwright-mcp
+*.log
+graphify-out
+images
+*.xlsx
+old-prompt-maybe-useful?.md

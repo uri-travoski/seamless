@@ -8,6 +8,7 @@ import type { TrackingInfo } from '@seamless/shared';
 import { cache } from '../api/cache.ts';
 import { toast } from '../toast.ts';
 import LabelPicker from './LabelPicker.tsx';
+import { readableTextOn } from './LabelColorPicker.tsx';
 import {
   EyeIcon, ImageIcon, AttachIcon, PencilIcon, ReplyIcon, ReplyAllIcon, ForwardIcon, DownloadIcon,
   EnvelopeOpenIcon, BackIcon, ArchiveIcon, JunkIcon, TrashIcon, EnvelopeIcon, SparkleIcon, CloseIcon,
@@ -96,7 +97,7 @@ function ReviewBanner({ email }: { email: ApiEmail }) {
       {picking && (
         <div className="review-labels">
           {labels.map((l) => (
-            <button key={l.id} className="chip" style={{ background: l.color, border: 'none', cursor: 'pointer' }}
+            <button key={l.id} className="chip" style={{ background: l.color, color: readableTextOn(l.color), border: 'none', cursor: 'pointer' }}
               onClick={() => { setPicking(false); void resolve([...new Set([...email.labelIds, l.id])]); }}>
               {l.name}
             </button>
@@ -107,63 +108,90 @@ function ReviewBanner({ email }: { email: ApiEmail }) {
   );
 }
 
-/** "Teach the AI": a per-sender processing instruction (processor note). */
+interface TeachParse {
+  summary: string; label: string | null; retentionDays: number | null;
+  autoRead: boolean; deleteIfUnread: boolean; existingMatches: { id: number; name: string }[];
+}
+type LabelChoice = { kind: 'existing'; id: number; name: string } | { kind: 'new'; name: string } | { kind: 'none' };
+
+/** "Teach the AI": type plain English, AI parses it into directives and applies to future similar mail. */
 function TeachPanel({ email, onClose }: { email: ApiEmail; onClose: () => void }) {
-  const labels = useMail((s) => s.labels);
-  const from = email.from[0]?.email ?? '';
-  const domain = from.split('@')[1] ?? '';
-  const [scope, setScope] = useState<'sender' | 'domain'>('sender');
   const [note, setNote] = useState('');
-  const [labelId, setLabelId] = useState<number | ''>('');
-  const [autoRead, setAutoRead] = useState(false);
-  const [days, setDays] = useState<number | ''>('');
-  const [ifUnread, setIfUnread] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [result, setResult] = useState<TeachParse | null>(null);
+  const [choice, setChoice] = useState<LabelChoice>({ kind: 'none' });
+
+  const parse = async () => {
+    if (!note.trim()) return;
+    setBusy(true);
+    try {
+      const r = await api.post<TeachParse>('/api/processor-notes/parse', { emailId: email.id, note });
+      setResult(r);
+      if (r.existingMatches?.length) setChoice({ kind: 'existing', id: r.existingMatches[0].id, name: r.existingMatches[0].name });
+      else if (r.label) setChoice({ kind: 'new', name: r.label });
+      else setChoice({ kind: 'none' });
+    } catch (e: any) { toast(e?.message ?? 'Could not read that', 'error'); }
+    finally { setBusy(false); }
+  };
 
   const save = async () => {
+    if (!result) return;
+    setBusy(true);
     try {
       await api.post('/api/processor-notes', {
-        scope, scopeValue: scope === 'sender' ? from : domain, note,
-        labelId: labelId === '' ? null : labelId, autoRead,
-        retentionDays: days === '' ? null : days, deleteIfUnread: ifUnread,
+        emailId: email.id, note, summary: result.summary, label: choice,
+        autoRead: result.autoRead, retentionDays: result.retentionDays, deleteIfUnread: result.deleteIfUnread,
       });
-      toast('Saved — future mail from this sender follows your instruction', 'info');
+      toast('Learned — future emails like this will be handled the same way', 'info');
       onClose();
     } catch (e: any) { toast(e?.message ?? 'Could not save', 'error'); }
+    finally { setBusy(false); }
   };
 
   return (
     <div className="note-box teach-box">
       <div className="note-head"><SparkleIcon size={14} /> Teach the AI
-        <span className="note-hint">applies to future mail from {scope === 'sender' ? from : `*@${domain}`}</span>
+        <span className="note-hint">learns from this email and handles future ones like it</span>
       </div>
-      <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center', fontSize: 12.5, marginBottom: 8 }}>
-        <select className="text-input" style={{ width: 'auto' }} value={scope} onChange={(e) => setScope(e.target.value as any)}>
-          <option value="sender">This sender</option>
-          <option value="domain">Whole domain</option>
-        </select>
-        <select className="text-input" style={{ width: 'auto' }} value={labelId} onChange={(e) => setLabelId(e.target.value === '' ? '' : Number(e.target.value))}>
-          <option value="">No fixed label</option>
-          {labels.map((l) => <option key={l.id} value={l.id}>{l.name}</option>)}
-        </select>
-        <label style={{ display: 'flex', gap: 5, alignItems: 'center' }}>
-          <input type="checkbox" checked={autoRead} onChange={(e) => setAutoRead(e.target.checked)} /> mark read
-        </label>
-        <label style={{ display: 'flex', gap: 5, alignItems: 'center' }}>
-          delete after <input className="text-input" type="number" min={1} style={{ width: 58 }} value={days}
-            onChange={(e) => setDays(e.target.value === '' ? '' : Number(e.target.value))} /> days
-        </label>
-        {days !== '' && (
-          <label style={{ display: 'flex', gap: 5, alignItems: 'center' }}>
-            <input type="checkbox" checked={ifUnread} onChange={(e) => setIfUnread(e.target.checked)} /> only if I never read it
-          </label>
-        )}
-      </div>
-      <textarea className="note-text" value={note} placeholder={'Explain it for the AI, e.g. "Newsletter I signed up for — I sometimes read it. Real receipts from this sender go to Receipts."'}
-        onChange={(e) => setNote(e.target.value)} />
-      <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
-        <button className="btn primary" onClick={() => void save()}>Save instruction</button>
-        <button className="btn ghost" onClick={onClose}>Cancel</button>
-      </div>
+      {!result ? (
+        <>
+          <textarea className="note-text" value={note} autoFocus
+            placeholder={'Say what this email is and how to handle emails like it — e.g. "This is a product warranty. Label these Warranties and keep them for 2 years."'}
+            onChange={(e) => setNote(e.target.value)} />
+          <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
+            <button className="btn primary" disabled={busy || !note.trim()} onClick={() => void parse()}>{busy ? 'Reading…' : 'Continue'}</button>
+            <button className="btn ghost" onClick={onClose}>Cancel</button>
+          </div>
+        </>
+      ) : (
+        <div className="teach-confirm">
+          <p className="teach-summary"><b>Understood:</b> {result.summary}</p>
+          <div className="teach-field">
+            <span className="teach-label">File under</span>
+            <div className="teach-choices">
+              {result.existingMatches?.map((m) => (
+                <button key={m.id} className={`chip-choice ${choice.kind === 'existing' && choice.id === m.id ? 'on' : ''}`}
+                  onClick={() => setChoice({ kind: 'existing', id: m.id, name: m.name })}>{m.name} <span className="muted">existing</span></button>
+              ))}
+              {result.label && (
+                <button className={`chip-choice ${choice.kind === 'new' ? 'on' : ''}`}
+                  onClick={() => setChoice({ kind: 'new', name: result.label! })}>{result.label} <span className="muted">new label</span></button>
+              )}
+              <button className={`chip-choice ${choice.kind === 'none' ? 'on' : ''}`} onClick={() => setChoice({ kind: 'none' })}>No label</button>
+            </div>
+          </div>
+          {(result.retentionDays != null || result.autoRead || result.deleteIfUnread) && (
+            <ul className="teach-actions">
+              {result.retentionDays != null && <li>Delete after <b>{result.retentionDays} days</b>{result.deleteIfUnread ? ' (only if never read)' : ''}</li>}
+              {result.autoRead && <li>Mark as read on arrival</li>}
+            </ul>
+          )}
+          <div style={{ display: 'flex', gap: 8, marginTop: 10 }}>
+            <button className="btn primary" disabled={busy} onClick={() => void save()}>{busy ? 'Saving…' : 'Save & apply to future mail'}</button>
+            <button className="btn ghost" onClick={() => setResult(null)}>Back</button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -201,7 +229,6 @@ function MessageCard({ email, expanded, onToggle }: { email: ApiEmail; expanded:
   const [menuOpen, setMenuOpen] = useState(false);
   const [detailsOpen, setDetailsOpen] = useState(false);
   const [noteOpen, setNoteOpen] = useState(false);
-  const [teachOpen, setTeachOpen] = useState(false);
   const [noteDraft, setNoteDraft] = useState('');
   const [trackOpen, setTrackOpen] = useState(false);
   const [tracking, setTracking] = useState<TrackingInfo | null>(null);
@@ -311,15 +338,11 @@ function MessageCard({ email, expanded, onToggle }: { email: ApiEmail; expanded:
           {email.needsReview && <ReviewBanner email={email} />}
           {noteOpen && (
             <div className="note-box">
-              <div className="note-head"><NoteIcon size={14} weight="fill" /> Private note <span className="note-hint">only you can see this</span>
-                <button className="details-toggle" style={{ marginLeft: 'auto', fontSize: 11.5 }}
-                  onClick={() => setTeachOpen((v) => !v)}>{teachOpen ? 'hide' : 'teach the AI about this sender'}</button>
-              </div>
+              <div className="note-head"><NoteIcon size={14} weight="fill" /> Private note <span className="note-hint">only you can see this</span></div>
               <textarea className="note-text" value={noteDraft} placeholder="Add a personal note about this email…"
                 onChange={(e) => setNoteDraft(e.target.value)} onBlur={() => void persistNote(noteDraft)} />
             </div>
           )}
-          {noteOpen && teachOpen && <TeachPanel email={email} onClose={() => setTeachOpen(false)} />}
           {email.openCount >= 0 && (
             <div className="track-wrap">
               <button className={`track-banner ${email.openCount > 0 ? 'clickable' : ''}`}
@@ -403,11 +426,13 @@ export default function ReadingPane() {
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [summary, setSummary] = useState<string | null>(null);
   const [summarizing, setSummarizing] = useState(false);
+  const [teachOpen, setTeachOpen] = useState(false);
 
   const selected = selectedId ? emails[selectedId] : null;
 
   useEffect(() => {
     setSummary(null);
+    setTeachOpen(false);
     // expand the selected message + last in thread
     if (selectedId) setExpanded(new Set([selectedId, ...(threadIds.length ? [threadIds[threadIds.length - 1]] : [])]));
   }, [selectedId, threadIds.length > 0 ? threadIds[threadIds.length - 1] : '']);
@@ -452,15 +477,23 @@ export default function ReadingPane() {
         <button className="icon-btn" title="Delete" onClick={() => destroy(selected.id)}><TrashIcon /></button>
         <button className="icon-btn" title="Mark unread" onClick={() => { markRead(selected.id, false); void select(null); }}><EnvelopeIcon /></button>
         <LabelPicker value={selected.labelIds} onChange={(ids) => applyLabels(selected.id, ids)} />
+        <button className={`icon-btn ${teachOpen ? 'active' : ''}`} title="Teach the AI about emails like this" onClick={() => setTeachOpen((v) => !v)}><SparkleIcon /></button>
         <div style={{ flex: 1 }} />
         <button className="btn ghost" disabled={summarizing} onClick={summarize}><SparkleIcon /> {summarizing ? 'Summarizing…' : 'Summarize'}</button>
       </div>
       </IconContext.Provider>
       <div className="read-scroll">
+        {teachOpen && <div style={{ padding: '12px 16px 0' }}><TeachPanel email={selected} onClose={() => setTeachOpen(false)} /></div>}
         <h1 className="read-subject">
           {selected.subject || '(no subject)'}
           {thread.length > 1 && <span className="thread-count">{thread.length} messages</span>}
-          {chips.map((l) => <span key={l!.id} className="chip" style={{ background: l!.color }}>{l!.name}</span>)}
+          {chips.map((l) => (
+            <span key={l!.id} className="chip" style={{ background: l!.color, color: readableTextOn(l!.color) }}>
+              {l!.name}
+              <button className="chip-x" title="Remove label" aria-label={`Remove label ${l!.name}`}
+                onClick={() => applyLabels(selected.id, selected.labelIds.filter((id) => id !== l!.id))}>×</button>
+            </span>
+          ))}
         </h1>
         {summary && (
           <div className="summary-card">

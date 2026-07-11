@@ -16,8 +16,9 @@ import { matchReplyIdentity } from './mail/replyfrom.ts';
 import { getMsgRow, setNote, moveEmail, setLabels } from './mail/store.ts';
 import { loadFilters, filterMatches, type FilterableMessage } from './mail/filters.ts';
 import { applyLocalFilterActions } from './mail/ingest.ts';
-import { summarizeThread, draftReply } from './ai/tasks.ts';
-import { chatComplete, getProvider } from './ai/client.ts';
+import { summarizeThread, draftReply, parseTeachNote } from './ai/tasks.ts';
+import { chatComplete, getProvider, getTaskProvider } from './ai/client.ts';
+import { embedText, embeddingInput } from './classify/ai.ts';
 import { handleJmapRequest, jmapSession, listIdentities } from './jmap/api.ts';
 import { vapidPublicKey, saveSubscription, removeSubscription } from './push.ts';
 import { broadcast } from './ws.ts';
@@ -253,6 +254,11 @@ export function registerRoutes(app: FastifyInstance): void {
   });
 
   // ---- labels ----
+  app.post('/api/sync', async (req) => {
+    const n = syncManager.kickUser(uid(req));
+    return { ok: true, accounts: n };
+  });
+
   app.get('/api/labels', async (req) =>
     (await q('SELECT id, name, color, description, sort, keep_default, retention_days, protected, auto_mark_read FROM labels WHERE user_id = ? ORDER BY sort, name', [uid(req)]))
       .map((l: any) => ({
@@ -734,8 +740,66 @@ export function registerRoutes(app: FastifyInstance): void {
       autoRead: n.auto_read, retentionDays: n.retention_days, deleteIfUnread: n.delete_if_unread, active: n.active,
     })));
 
+  // parse a plain-English instruction into directives + candidate labels (no save yet)
+  app.post('/api/processor-notes/parse', async (req) => {
+    const b = req.body as any;
+    const d = await parseTeachNote(uid(req), String(b.emailId ?? ''), String(b.note ?? ''));
+    let existingMatches: { id: number; name: string }[] = [];
+    if (d.label) {
+      const want = d.label.toLowerCase();
+      const words = new Set(want.split(/\W+/).filter(Boolean));
+      const labels = await q<{ id: number; name: string }>('SELECT id, name FROM labels WHERE user_id = ? ORDER BY sort, id', [uid(req)]);
+      existingMatches = labels
+        .map((l) => {
+          const ln = l.name.toLowerCase();
+          let score = ln === want ? 1 : (ln.includes(want) || want.includes(ln)) ? 0.7 : 0;
+          if (!score) {
+            const lw = ln.split(/\W+/).filter(Boolean);
+            const overlap = lw.filter((w) => words.has(w)).length;
+            score = overlap / Math.max(1, words.size + lw.length - overlap);
+          }
+          return { id: l.id, name: l.name, score };
+        })
+        .filter((x) => x.score > 0.2)
+        .sort((a, b2) => b2.score - a.score).slice(0, 3)
+        .map(({ id, name }) => ({ id, name }));
+    }
+    return { ...d, existingMatches };
+  });
+
   app.post('/api/processor-notes', async (req) => {
     const b = req.body as any;
+    // "Teach the AI" content-similarity note (from the reading pane)
+    if (b.emailId) {
+      const userId = uid(req);
+      let labelId: number | null = null;
+      if (b.label?.kind === 'existing' && b.label.id) labelId = Number(b.label.id);
+      else if (b.label?.kind === 'new' && b.label.name) {
+        labelId = await insertId(
+          `INSERT INTO labels(user_id, name, color, description, sort, retention_days, auto_mark_read)
+           VALUES (?,?,?, '', 0, ?, ?)
+           ON CONFLICT (user_id, name) DO UPDATE SET retention_days = excluded.retention_days, auto_mark_read = excluded.auto_mark_read`,
+          [userId, String(b.label.name).trim(), b.color ?? '#2f8ed8', b.retentionDays ?? null, !!b.autoRead]);
+      }
+      const vecLit = (v: number[]) => '[' + v.map((x) => Number.isFinite(x) ? x.toFixed(6) : '0').join(',') + ']';
+      let embedLit: string | null = null; let dim: number | null = null;
+      const provider = await getTaskProvider(userId, 'embed');
+      const row = await getMsgRow(userId, String(b.emailId));
+      if (provider && row) {
+        try { const vec = await embedText(provider, embeddingInput(row)); embedLit = vecLit(vec); dim = vec.length; } catch { /* store without anchor */ }
+      }
+      const id = await insertId(`
+        INSERT INTO processor_notes(user_id, scope, scope_value, note, summary, label_id, auto_read, retention_days, delete_if_unread, embedding, embed_dim, active, created_at, updated_at)
+        VALUES (?, 'similar', ?, ?, ?, ?, ?, ?, ?, ?::vector, ?, true, ?, ?)
+        ON CONFLICT (user_id, scope, scope_value) DO UPDATE SET
+          note=excluded.note, summary=excluded.summary, label_id=excluded.label_id, auto_read=excluded.auto_read,
+          retention_days=excluded.retention_days, delete_if_unread=excluded.delete_if_unread,
+          embedding=excluded.embedding, embed_dim=excluded.embed_dim, active=true, updated_at=excluded.updated_at
+      `, [userId, String(b.emailId), b.note ?? '', b.summary ?? '', labelId, !!b.autoRead, b.retentionDays ?? null, !!b.deleteIfUnread, embedLit, dim, Date.now(), Date.now()]);
+      await bumpState();
+      return { id, labelId };
+    }
+    // legacy per-sender/domain note
     const scope = b.scope === 'domain' ? 'domain' : 'sender';
     const id = await insertId(`
       INSERT INTO processor_notes(user_id, scope, scope_value, note, label_id, auto_read, retention_days, delete_if_unread, active, created_at, updated_at)

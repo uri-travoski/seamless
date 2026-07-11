@@ -3,7 +3,7 @@ import { q, one, run, bumpState } from '../db.ts';
 import { evaluateRules, baseAddress, type MatchableMessage, type RuleRow } from './rules.ts';
 import { getUserSetting, plog } from './settings.ts';
 import { getTaskProvider } from '../ai/client.ts';
-import { embedText, embeddingInput, embeddingMatch, upsertVector, llmClassify, recordEmbeddingDecision } from './ai.ts';
+import { embedText, embeddingInput, embeddingMatch, upsertVector, llmClassify, recordEmbeddingDecision, matchTeachNote } from './ai.ts';
 import { enqueueOp } from '../imap/sync.ts';
 
 const TICK_MS = 20_000;
@@ -170,11 +170,36 @@ export async function classifyMessage(row: PendingRow, rules: RuleRow[]): Promis
   let vec: number[] | null = null;
   const embedProvider = await getTaskProvider(row.user_id, 'embed');
 
+  // ---- teach-the-AI tier: match this message to a taught example by content embedding ----
+  if (embedProvider && !labelApplied) {
+    const anyTeach = await one<{ c: number }>(
+      "SELECT COUNT(*) AS c FROM processor_notes WHERE user_id = ? AND scope = 'similar' AND active = true AND embedding IS NOT NULL", [row.user_id]);
+    if (anyTeach && anyTeach.c > 0) {
+      try {
+        vec = await embedText(embedProvider, embeddingInput(row));
+        const teachThreshold = Number(await getUserSetting(row.user_id, 'teach_threshold')) || 0.86;
+        const tm = await matchTeachNote(row.user_id, vec, teachThreshold);
+        if (tm) {
+          if (tm.note) guidance.push(tm.note);
+          if (tm.summary) guidance.push(tm.summary);
+          if (tm.labelId) {
+            const label = await applyLabel(row, tm.labelId);
+            if (label) { labelApplied = label; appliedNames.push(label.name); }
+          }
+          if (tm.autoRead && row.unread) await markRead(row);
+          await plog(row.user_id, 'classify', `teach-note #${tm.id} matched (sim ${tm.sim.toFixed(2)})`, { emailId: row.id });
+        }
+      } catch (err: any) {
+        await plog(row.user_id, 'classify', `teach tier error: ${err?.message ?? err}`, { emailId: row.id, level: 'warn' });
+      }
+    }
+  }
+
   if (!labelApplied || aiRouted) {
     // tier 2: embedding similarity (skipped for ai-routed mixed senders — those need content judgment)
     if (!aiRouted && !labelApplied && embedProvider) {
       try {
-        vec = await embedText(embedProvider, embeddingInput(row));
+        vec ??= await embedText(embedProvider, embeddingInput(row));
         const threshold = Number(await getUserSetting(row.user_id, 'embed_threshold')) || 0.88;
         const match = await embeddingMatch(row.user_id, vec, threshold);
         if (match) {

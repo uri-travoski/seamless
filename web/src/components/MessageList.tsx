@@ -2,8 +2,9 @@ import { useEffect, useRef } from 'react';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import { useMail, PAGE } from '../state/mail.ts';
 import LabelPicker from './LabelPicker.tsx';
+import { readableTextOn } from './LabelColorPicker.tsx';
 import { IconContext } from '@phosphor-icons/react';
-import { StarIcon, EyeIcon, AttachClipIcon, EnvelopeIcon, EnvelopeOpenIcon, ArchiveIcon, JunkIcon, TrashIcon, RefreshIcon, TableViewIcon, SplitViewIcon, CloseIcon, NoteIcon, RestoreMailIcon } from '../icons.tsx';
+import { StarIcon, EyeIcon, AttachClipIcon, EnvelopeIcon, EnvelopeOpenIcon, ArchiveIcon, JunkIcon, TrashIcon, RefreshIcon, TableViewIcon, SplitViewIcon, CloseIcon, NoteIcon, RestoreMailIcon, ReplyIcon } from '../icons.tsx';
 import { useSession } from '../state/session.ts';
 
 const TOOLBAR_ICONS = { weight: 'regular' as const, size: 18 };
@@ -60,8 +61,14 @@ function Row({ email, selected }: { email: ApiEmail; selected: boolean }) {
                 <EyeIcon size={18} />{email.openCount > 0 ? ` ${email.openCount}` : ''}
               </span>
             )}
+            {email.openCount < 0 && email.threadOpenCount > 0 && (
+              <span className="open-badge opened reply-open"
+                title={`Your reply in this thread was opened ${email.threadOpenCount}x${email.threadOpenAt ? `, last ${new Date(email.threadOpenAt).toLocaleString()}` : ''}`}>
+                <ReplyIcon size={13} /><EyeIcon size={18} /> {email.threadOpenCount}
+              </span>
+            )}
             {email.hasNote && <NoteIcon size={18} weight="fill" className="note-flag" aria-label="Has a private note" />}
-            {email.hasAttachment && <AttachClipIcon size={18} aria-label="Has attachment" />}
+            {email.hasAttachment && <AttachClipIcon size={14} aria-label="Has attachment" />}
             <TtlBadge email={email} />
           </span>
           <span className="date">{fmtDate(email.receivedAt)}</span>
@@ -74,7 +81,7 @@ function Row({ email, selected }: { email: ApiEmail; selected: boolean }) {
         </div>
         {chips.length > 0 && (
           <div className="chips">
-            {chips.map((l) => <span key={l!.id} className="chip" style={{ background: l!.color }}>{l!.name}</span>)}
+            {chips.map((l) => <span key={l!.id} className="chip" style={{ background: l!.color, color: readableTextOn(l!.color) }}>{l!.name}</span>)}
           </div>
         )}
       </div>
@@ -103,7 +110,7 @@ function TableRow({ email, selected }: { email: ApiEmail; selected: boolean }) {
         onClick={(e) => { e.stopPropagation(); toggleStar(email.id); }}><StarIcon weight={email.keywords.$flagged ? 'fill' : 'regular'} size={18} /></button>
       <span className="tbl-from">{from?.name || from?.email || '(unknown)'}</span>
       <span className="tbl-main">
-        {chips.map((l) => <span key={l!.id} className="chip" style={{ background: l!.color }}>{l!.name}</span>)}
+        {chips.map((l) => <span key={l!.id} className="chip" style={{ background: l!.color, color: readableTextOn(l!.color) }}>{l!.name}</span>)}
         <span className="tbl-subject">{email.subject || '(no subject)'}</span>
         {email.preview && <span className="tbl-snippet"> — {email.preview}</span>}
       </span>
@@ -111,8 +118,11 @@ function TableRow({ email, selected }: { email: ApiEmail; selected: boolean }) {
         {email.openCount > 0 && (
           <span className="open-badge opened" title={`Opened ${email.openCount}x`}><EyeIcon size={18} /> {email.openCount}</span>
         )}
+        {email.openCount < 0 && email.threadOpenCount > 0 && (
+          <span className="open-badge opened reply-open" title={`Your reply in this thread was opened ${email.threadOpenCount}x`}><ReplyIcon size={13} /><EyeIcon size={18} /> {email.threadOpenCount}</span>
+        )}
         {email.hasNote && <NoteIcon size={18} weight="fill" className="note-flag" aria-label="Has a private note" />}
-        {email.hasAttachment && <AttachClipIcon size={18} aria-label="Has attachment" />}
+        {email.hasAttachment && <AttachClipIcon size={14} aria-label="Has attachment" />}
         <TtlBadge email={email} />
         <span className="tbl-date">{fmtDate(email.receivedAt)}</span>
       </span>

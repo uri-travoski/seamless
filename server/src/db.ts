@@ -479,6 +479,15 @@ CREATE INDEX contact_email_lookup ON contact_emails(email);
 ALTER TABLE messages ADD COLUMN forwarded_at BIGINT;
 `,
   },
+  {
+    id: 6,
+    sql: `
+-- "Teach the AI": content-similarity processor notes (anchor embedding + AI-parsed directives)
+ALTER TABLE processor_notes ADD COLUMN IF NOT EXISTS summary TEXT;
+ALTER TABLE processor_notes ADD COLUMN IF NOT EXISTS embedding vector;
+ALTER TABLE processor_notes ADD COLUMN IF NOT EXISTS embed_dim INTEGER;
+`,
+  },
 ];
 
 export async function migrate(): Promise<void> {

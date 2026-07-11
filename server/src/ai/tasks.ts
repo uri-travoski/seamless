@@ -70,6 +70,40 @@ export async function summarizeThread(userId: number, threadId: string): Promise
   ], { maxTokens: 500 });
 }
 
+export interface TeachDirectives {
+  summary: string;
+  label: string | null;         // proposed label name (existing or new)
+  retentionDays: number | null;
+  autoRead: boolean;
+  deleteIfUnread: boolean;
+}
+
+/** Parse a plain-English "teach the AI" instruction into structured directives. */
+export async function parseTeachNote(userId: number, emailId: string, note: string): Promise<TeachDirectives> {
+  const fallback: TeachDirectives = { summary: note.trim().slice(0, 160), label: null, retentionDays: null, autoRead: false, deleteIfUnread: false };
+  const provider = await getTaskProvider(userId, 'classify');
+  const row = await getMsgRow(userId, emailId);
+  if (!provider || !row) return fallback;
+  const labels = await q<{ name: string; description: string }>(
+    'SELECT name, description FROM labels WHERE user_id = ? ORDER BY sort, id', [userId]);
+  const labelList = labels.map((l) => `- "${l.name}"${l.description ? `: ${l.description}` : ''}`).join('\n') || '(none yet)';
+  const out = await chatComplete(provider, [
+    {
+      role: 'system',
+      content: `Convert the user's instruction about handling an email into structured directives for future similar mail. Respond JSON only: {"summary": string, "label": string|null, "retention_days": number|null, "auto_read": boolean, "delete_if_unread": boolean}. "summary" restates the rule in one short sentence. "label" is a short category name to file matching mail under — reuse one of the user's existing labels if it fits, otherwise propose a concise new name. Existing labels:\n${labelList}`,
+    },
+    { role: 'user', content: `Email — From: ${row.from_name} <${row.from_addr}>\nSubject: ${row.subject}\n${row.snippet}\n\nInstruction: ${note}` },
+  ], { json: true, maxTokens: 200 });
+  const p = extractJson(out) ?? {};
+  return {
+    summary: typeof p.summary === 'string' && p.summary.trim() ? p.summary.trim() : fallback.summary,
+    label: typeof p.label === 'string' && p.label.trim() ? p.label.trim() : null,
+    retentionDays: Number.isFinite(p.retention_days) ? Number(p.retention_days) : null,
+    autoRead: !!p.auto_read,
+    deleteIfUnread: !!p.delete_if_unread,
+  };
+}
+
 export async function draftReply(userId: number, emailId: string, instruction: string): Promise<string> {
   const provider = await getTaskProvider(userId, 'draft');
   if (!provider) throw new Error('No AI provider configured for draft (Settings > AI)');

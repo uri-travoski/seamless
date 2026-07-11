@@ -76,6 +76,17 @@ export async function rowToApi(r: MsgRow): Promise<ApiEmail> {
     openCount = t?.c ?? 0;
     lastOpenAt = t?.last ? new Date(t.last).toISOString() : null;
   }
+  // For untracked (inbound) rows, surface whether your tracked reply elsewhere in
+  // the thread was opened by the recipient, so the inbox row reflects the thread.
+  let threadOpenCount = -1;
+  let threadOpenAt: string | null = null;
+  if (!r.tracking_token) {
+    const ta = await one<{ c: number; last: number | null }>(
+      `SELECT COUNT(t.id) AS c, MAX(t.ts) AS last
+       FROM messages sm JOIN tracking_opens t ON t.token = sm.tracking_token
+       WHERE sm.thread_id = ? AND sm.tracking_token IS NOT NULL`, [r.thread_id]);
+    if (ta && ta.c > 0) { threadOpenCount = ta.c; threadOpenAt = new Date(ta.last!).toISOString(); }
+  }
   const hasNote = !!(await one('SELECT 1 FROM notes WHERE user_id = ? AND email_id = ?', [r.user_id, `m${r.id}`]));
   return {
     id: `m${r.id}`,
@@ -105,6 +116,8 @@ export async function rowToApi(r: MsgRow): Promise<ApiEmail> {
     hasNote,
     openCount,
     lastOpenAt,
+    threadOpenCount,
+    threadOpenAt,
     disposition: (r.disposition as 'keep' | 'delete') ?? 'keep',
     deleteAt: r.delete_at ? new Date(r.delete_at).toISOString() : null,
     needsReview: r.classify_state === 'needs_review',

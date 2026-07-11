@@ -1,12 +1,8 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { api } from '../../api/client.ts';
 import { useMail } from '../../state/mail.ts';
 import { toast } from '../../toast.ts';
-
-const LABEL_COLORS = [
-  '#e05656', '#e88b3a', '#c9a13a', '#4d9e53', '#3a9e9e',
-  '#2f7ed8', '#7a5fd0', '#d05f8e', '#8a939c', '#5b6570',
-];
+import LabelColorPicker, { LABEL_COLORS, DEFAULT_LABEL_COLOR } from '../LabelColorPicker.tsx';
 
 interface Editing {
   id?: number; name: string; color: string; description: string;
@@ -20,10 +16,14 @@ function retentionSummary(l: { retentionDays?: number | null; keepDefault?: bool
   return '';
 }
 
-export default function LabelSettings() {
+export default function LabelSettings({ autoAdd }: { autoAdd?: boolean }) {
   const labels = useMail((s) => s.labels);
   const refreshLabels = useMail((s) => s.refreshLabels);
   const [editing, setEditing] = useState<Editing | null>(null);
+
+  useEffect(() => {
+    if (autoAdd) setEditing({ name: '', color: DEFAULT_LABEL_COLOR, description: '', retentionDays: null, keepDefault: false, protected: false, autoMarkRead: false });
+  }, [autoAdd]);
 
   const save = async () => {
     if (!editing?.name.trim()) return;
@@ -51,29 +51,15 @@ export default function LabelSettings() {
         auto-deleted, keep-labels keep forever, and a delete-after sets the countdown the retention sweep enforces.
       </p>
 
-      {labels.map((l) => (
-        <div key={l.id} className="cond-row">
-          <span className="label-dot" style={{ background: l.color, width: 14, height: 14 }} />
-          <span style={{ width: 200, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={l.name}>{l.name}</span>
-          <span style={{ width: 150, color: 'var(--md-text-soft)', fontSize: 12 }}>{retentionSummary(l)}</span>
-          <span style={{ flex: 1, color: 'var(--md-text-faint)', fontSize: 12.5, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{l.description}</span>
-          <button className="btn ghost" onClick={() => setEditing({
-            id: l.id, name: l.name, color: l.color, description: l.description,
-            retentionDays: l.retentionDays ?? null, keepDefault: !!l.keepDefault, protected: !!l.protected, autoMarkRead: !!l.autoMarkRead,
-          })}>Edit</button>
-          <button className="btn ghost danger" onClick={() => void remove(l.id)}>Delete</button>
-        </div>
-      ))}
-
       {editing ? (
-        <div style={{ border: '1px solid var(--md-border)', borderRadius: 8, padding: 14, marginTop: 14 }}>
+        <div style={{ border: '1px solid var(--md-border)', borderRadius: 8, padding: 14, marginBottom: 14 }}>
           <div className="field"><label>Name</label>
             <input className="text-input" value={editing.name} autoFocus onChange={(e) => setEditing({ ...editing, name: e.target.value })} /></div>
           <div className="field"><label>Description (used by AI categorization)</label>
             <input className="text-input" value={editing.description} placeholder="e.g. Invoices, receipts and payment notifications"
               onChange={(e) => setEditing({ ...editing, description: e.target.value })} /></div>
           <div className="field"><label>Color</label>
-            <div className="swatches">
+            <div className="swatches palette">
               {LABEL_COLORS.map((c) => (
                 <button key={c} className={`swatch ${editing.color === c ? 'on' : ''}`} style={{ background: c }}
                   onClick={() => setEditing({ ...editing, color: c })} aria-label={c} />
@@ -112,9 +98,23 @@ export default function LabelSettings() {
           </div>
         </div>
       ) : (
-        <button className="btn primary" style={{ marginTop: 14 }}
-          onClick={() => setEditing({ name: '', color: LABEL_COLORS[0], description: '', retentionDays: null, keepDefault: false, protected: false, autoMarkRead: false })}>Add label</button>
+        <button className="btn primary" style={{ marginBottom: 14 }}
+          onClick={() => setEditing({ name: '', color: DEFAULT_LABEL_COLOR, description: '', retentionDays: null, keepDefault: false, protected: false, autoMarkRead: false })}>Add label</button>
       )}
+
+      {labels.map((l) => (
+        <div key={l.id} className="cond-row">
+          <LabelColorPicker label={l} dotSize={14} />
+          <span style={{ width: 200, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={l.name}>{l.name}</span>
+          <span style={{ width: 150, color: 'var(--md-text-soft)', fontSize: 12 }}>{retentionSummary(l)}</span>
+          <span style={{ flex: 1, color: 'var(--md-text-faint)', fontSize: 12.5, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{l.description}</span>
+          <button className="btn ghost" onClick={() => setEditing({
+            id: l.id, name: l.name, color: l.color, description: l.description,
+            retentionDays: l.retentionDays ?? null, keepDefault: !!l.keepDefault, protected: !!l.protected, autoMarkRead: !!l.autoMarkRead,
+          })}>Edit</button>
+          <button className="btn ghost danger" onClick={() => void remove(l.id)}>Delete</button>
+        </div>
+      ))}
     </div>
   );
 }

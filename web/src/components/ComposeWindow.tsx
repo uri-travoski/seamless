@@ -18,10 +18,11 @@ import { sendMail, saveDraftApi, scheduleMail, uploadFile, api } from '../api/cl
 import { toast } from '../toast.ts';
 import {
   MinimizeIcon, MaximizeIcon, RestoreIcon, CloseIcon, UndoIcon, RedoIcon, BoldIcon, ItalicIcon,
-  UnderlineIcon, StrikethroughIcon, HighlightIcon, BulletListIcon, NumberedListIcon, QuoteIcon, CodeIcon,
+  UnderlineIcon, StrikethroughIcon, HighlightIcon, BulletListIcon, NumberedListIcon,
   AlignLeftIcon, AlignCenterIcon, AlignRightIcon, LinkIcon, ImageIcon, ClearFormatIcon, AttachIcon, SparkleIcon, EyeIcon, TrashIcon,
   ScheduledIcon, CaretDownIcon,
 } from '../icons.tsx';
+import { IconContext } from '@phosphor-icons/react';
 
 interface QuickTime { label: string; at: number }
 
@@ -157,12 +158,14 @@ export default function ComposeWindow({ draft }: { draft: Draft }) {
 
   if (draft.minimized) {
     return (
+      <IconContext.Provider value={{ weight: 'regular', size: 16 }}>
       <div className="compose-win minimized">
         <div className="compose-head" onClick={() => update(draft.key, { minimized: false })}>
           <span className="t">{draft.subject || 'New message'}</span>
           <button className="icon-btn" onClick={(e) => { e.stopPropagation(); void doSaveDraft(); }} title="Close (saves draft)"><CloseIcon /></button>
         </div>
       </div>
+      </IconContext.Provider>
     );
   }
 
@@ -172,6 +175,7 @@ export default function ComposeWindow({ draft }: { draft: Draft }) {
   );
 
   return (
+    <IconContext.Provider value={{ weight: 'regular', size: 16 }}>
     <div className={`compose-win ${draft.maximized ? 'maximized' : ''}`}
       onDragOver={(e) => e.preventDefault()}
       onDrop={(e) => { e.preventDefault(); void attach(e.dataTransfer.files); }}>
@@ -222,8 +226,6 @@ export default function ComposeWindow({ draft }: { draft: Draft }) {
           <span className="sep" />
           {tb(!!editor?.isActive('bulletList'), 'Bullet list', <BulletListIcon />, () => editor?.chain().focus().toggleBulletList().run())}
           {tb(!!editor?.isActive('orderedList'), 'Numbered list', <NumberedListIcon />, () => editor?.chain().focus().toggleOrderedList().run())}
-          {tb(!!editor?.isActive('blockquote'), 'Quote', <QuoteIcon />, () => editor?.chain().focus().toggleBlockquote().run())}
-          {tb(!!editor?.isActive('codeBlock'), 'Code', <CodeIcon />, () => editor?.chain().focus().toggleCodeBlock().run())}
           <span className="sep" />
           {tb(!!editor?.isActive({ textAlign: 'left' }), 'Align left', <AlignLeftIcon />, () => editor?.chain().focus().setTextAlign('left').run())}
           {tb(!!editor?.isActive({ textAlign: 'center' }), 'Center', <AlignCenterIcon />, () => editor?.chain().focus().setTextAlign('center').run())}
@@ -257,8 +259,8 @@ export default function ComposeWindow({ draft }: { draft: Draft }) {
           <div className="compose-atts">
             {draft.attachments.map((a) => (
               <span key={a.id} className="addr-chip">
-                <AttachIcon size={13} /> {a.filename} ({fmtSize(a.size)})
-                <button onClick={() => update(draft.key, { attachments: draft.attachments.filter((x) => x.id !== a.id) })} aria-label="Remove attachment"><CloseIcon size={13} /></button>
+                <AttachIcon /> {a.filename} ({fmtSize(a.size)})
+                <button onClick={() => update(draft.key, { attachments: draft.attachments.filter((x) => x.id !== a.id) })} aria-label="Remove attachment"><CloseIcon /></button>
               </span>
             ))}
           </div>
@@ -267,10 +269,10 @@ export default function ComposeWindow({ draft }: { draft: Draft }) {
         <div className="compose-foot">
           <div className="send-split">
             <button className="btn primary" disabled={sending} onClick={doSend}>{sending ? 'Sending…' : 'Send'}</button>
-            <button className="btn primary split-caret" disabled={sending} title="Send later" onClick={() => setScheduleOpen((v) => !v)}><CaretDownIcon size={14} /></button>
+            <button className="btn primary split-caret" disabled={sending} title="Send later" onClick={() => setScheduleOpen((v) => !v)}><CaretDownIcon /></button>
             {scheduleOpen && (
               <div className="schedule-menu">
-                <div className="schedule-head"><ScheduledIcon size={14} /> Send later</div>
+                <div className="schedule-head"><ScheduledIcon /> Send later</div>
                 {quickScheduleTimes().map((q) => (
                   <button key={q.label} className="side-item" onClick={() => void doSchedule(q.at)}>
                     <span className="name">{q.label}</span>
@@ -291,12 +293,13 @@ export default function ComposeWindow({ draft }: { draft: Draft }) {
           <div className="grow" />
           <label className="track-toggle" title="Insert an invisible tracking pixel to see when the message is opened">
             <input type="checkbox" checked={draft.track} onChange={(e) => update(draft.key, { track: e.target.checked })} />
-            <EyeIcon size={14} /> Track opens
+            <EyeIcon /> Track opens
           </label>
           <button className="icon-btn" title="Discard" onClick={() => close(draft.key)}><TrashIcon /></button>
         </div>
       </div>
     </div>
+    </IconContext.Provider>
   );
 }
 

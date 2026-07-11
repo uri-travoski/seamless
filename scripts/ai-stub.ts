@@ -67,6 +67,28 @@ const server = http.createServer((req, res) => {
       const user: string = data.messages.find((m: any) => m.role === 'user')?.content ?? '';
       if (system.includes('orthogonal fields')) {
         content = classifyVerdict(user);
+      } else if (system.includes('structured directives')) {
+        const instr = (user.match(/Instruction: ([\s\S]*)$/)?.[1] ?? user).toLowerCase();
+        const labels = [...system.matchAll(/- "([^"]+)"/g)].map((m) => m[1]);
+        let label: string | null = null;
+        // an explicit "label these X" instruction wins over keyword guesses
+        const explicit = instr.match(/label(?:\s+(?:it|them|these|as))*\s+(?:as\s+)?["']?([a-z][a-z]+)/);
+        if (explicit) label = explicit[1].trim().replace(/\b\w/g, (c) => c.toUpperCase());
+        if (!label) label = labels.find((l) => instr.includes(l.toLowerCase())) ?? null;
+        if (!label) {
+          if (/warrant/.test(instr)) label = 'Warranties';
+          else if (/receipt|invoice|purchase|order/.test(instr)) label = 'Receipts';
+          else if (/newsletter|digest|subscrib/.test(instr)) label = 'Newsletters';
+          else if (/travel|flight|hotel|booking|trip/.test(instr)) label = 'Travel';
+          else if (/bank|statement|financ/.test(instr)) label = 'Banking';
+        }
+        const days = instr.match(/(\d+)\s*day/);
+        const yrs = instr.match(/(\d+)\s*year/);
+        const retention_days = days ? Number(days[1]) : yrs ? Number(yrs[1]) * 365 : null;
+        const auto_read = /mark(?:ed)?(?: it| them| these)? (?:as )?read|auto.?read|read on arrival/.test(instr);
+        const delete_if_unread = /if i (?:don'?t|never|do not) read|unless i read/.test(instr);
+        const summary = (user.match(/Instruction: (.+)/)?.[1] ?? '').slice(0, 160) || 'Handle matching mail per your instruction';
+        content = JSON.stringify({ summary, label, retention_days, auto_read, delete_if_unread });
       } else if (system.includes('categorize')) {
         const labels = [...system.matchAll(/- "([^"]+)"/g)].map((m) => m[1]);
         const text = user.toLowerCase();

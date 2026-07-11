@@ -69,6 +69,25 @@ export async function embeddingMatch(userId: number, vec: number[], threshold: n
   return { labelId: top.label_id, confidence: top.sim, neighbors: agree };
 }
 
+export interface TeachMatch {
+  id: number; note: string; summary: string | null;
+  labelId: number | null; autoRead: boolean; retentionDays: number | null; sim: number;
+}
+
+/** Match an incoming message's embedding to the closest active "teach the AI" note anchor. */
+export async function matchTeachNote(userId: number, vec: number[], threshold: number): Promise<TeachMatch | null> {
+  const rows = await q<any>(`
+    SELECT id, note, summary, label_id, auto_read, retention_days,
+           1 - (embedding <=> ?::vector) AS sim
+    FROM processor_notes
+    WHERE user_id = ? AND scope = 'similar' AND active = true AND embedding IS NOT NULL AND embed_dim = ?
+    ORDER BY embedding <=> ?::vector LIMIT 1
+  `, [vecLiteral(vec), userId, vec.length, vecLiteral(vec)]);
+  const top = rows[0];
+  if (!top || top.sim < threshold) return null;
+  return { id: top.id, note: top.note, summary: top.summary, labelId: top.label_id, autoRead: top.auto_read, retentionDays: top.retention_days, sim: top.sim };
+}
+
 export async function upsertVector(userId: number, messageId: number, labelId: number, vec: number[]): Promise<void> {
   await q(`
     INSERT INTO email_vectors(message_id, user_id, label_id, dim, embedding, created_at)
