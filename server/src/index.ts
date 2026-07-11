@@ -19,6 +19,7 @@ import { setScheduleCanceller } from './mail/store.ts';
 import { cancelScheduleByMessageId } from './mail/send.ts';
 import { startClassifier, kickClassifier, onClassified } from './classify/engine.ts';
 import { startRetention, onRetention } from './classify/retention.ts';
+import { startSafeDelete } from './classify/safedelete.ts';
 
 await migrate();
 
@@ -88,6 +89,7 @@ onClassified(async (userId) => broadcast({ type: 'stateChange', state: await cur
 onRetention(async (userId) => broadcast({ type: 'stateChange', state: await currentState() }, userId));
 startClassifier();
 startRetention();
+startSafeDelete();
 
 await syncManager.startAll();
 

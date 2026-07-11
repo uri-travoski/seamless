@@ -1,19 +1,20 @@
 import { ImapFlow } from 'imapflow';
 import { EventEmitter } from 'node:events';
 import { q, one, run, bumpState } from '../db.ts';
-import { decrypt } from '../crypto.ts';
 import { getBlob } from '../s3.ts';
 import { detectRole } from './roles.ts';
 import { ingestMessage, deleteMessageRow, setFlagOpEnqueuer } from '../mail/ingest.ts';
+import { accountAuth } from '../oauth.ts';
 
 const POLL_MS = 45_000;
 const BATCH = 50;
 
 export interface AccountRow {
-  id: number; user_id: number; name: string; email: string; aliases: string;
+  id: number; user_id: number; kind: string; name: string; email: string; aliases: string;
   imap_host: string; imap_port: number; imap_secure: boolean; imap_user: string; imap_pass_enc: string;
   smtp_host: string; smtp_port: number; smtp_secure: boolean; smtp_user: string; smtp_pass_enc: string;
   color: string; signature: string; sent_copy: boolean; ai_categorize: boolean; enabled: boolean;
+  safe_delete_enabled: boolean; safe_delete_mode: string; safe_delete_grace_days: number;
 }
 
 export interface NewMailEvent {
@@ -59,7 +60,7 @@ class AccountSyncer extends EventEmitter {
           host: this.account.imap_host,
           port: this.account.imap_port,
           secure: !!this.account.imap_secure,
-          auth: { user: this.account.imap_user, pass: decrypt(this.account.imap_pass_enc) },
+          auth: await accountAuth(this.account),
           logger: false,
         });
         const client = this.client;
@@ -184,14 +185,16 @@ class AccountSyncer extends EventEmitter {
         }
       }
 
-      const localRows = await q<{ id: number; uid: number; unread: boolean; flagged: boolean; answered: boolean; draft: boolean }>(
-        'SELECT id, uid, unread, flagged, answered, draft FROM messages WHERE mailbox_id = ?', [box.id]);
+      const localRows = await q<{ id: number; uid: number; unread: boolean; flagged: boolean; answered: boolean; draft: boolean; origin_state: string }>(
+        'SELECT id, uid, unread, flagged, answered, draft, origin_state FROM messages WHERE mailbox_id = ?', [box.id]);
       const localByUid = new Map(localRows.map((r) => [r.uid, r]));
 
       let changed = false;
 
-      // deletions
+      // deletions — never for messages Seamless itself removed at the origin (safe delete):
+      // the local copy is the record now
       for (const row of localRows) {
+        if (row.origin_state !== 'present') continue;
         if (!serverFlags.has(row.uid)) { await deleteMessageRow(row.id); changed = true; }
       }
 

@@ -27,7 +27,7 @@ async function deliverOne(row: SchedRow): Promise<void> {
   const raw = await getBlob(row.s3_key);
   const envelopeTo = JSON.parse(row.envelope_to) as string[];
 
-  await smtpTransport(acct).sendMail({ envelope: { from: row.envelope_from, to: envelopeTo }, raw });
+  await (await smtpTransport(acct)).sendMail({ envelope: { from: row.envelope_from, to: envelopeTo }, raw });
 
   // remove the message from the Scheduled folder (local row + IMAP expunge)
   if (row.message_id) {

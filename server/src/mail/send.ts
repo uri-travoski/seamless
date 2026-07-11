@@ -62,12 +62,16 @@ async function getAccount(userId: number, accountId: number): Promise<AccountRow
   return acct;
 }
 
-export function smtpTransport(acct: AccountRow) {
+export async function smtpTransport(acct: AccountRow) {
+  const isOauth = acct.kind === 'gmail' || acct.kind === 'microsoft';
+  const { freshAccessToken } = await import('../oauth.ts');
   return nodemailer.createTransport({
     host: acct.smtp_host,
     port: acct.smtp_port,
     secure: !!acct.smtp_secure,
-    auth: { user: acct.smtp_user, pass: decrypt(acct.smtp_pass_enc) },
+    auth: isOauth
+      ? { type: 'OAuth2' as const, user: acct.smtp_user, accessToken: await freshAccessToken(acct.id) }
+      : { user: acct.smtp_user, pass: decrypt(acct.smtp_pass_enc) },
     tls: { rejectUnauthorized: acct.smtp_host !== 'localhost' && acct.smtp_host !== '127.0.0.1' },
   });
 }
@@ -125,7 +129,7 @@ export async function sendEmail(userId: number, payload: ComposePayload): Promis
   const acct = await getAccount(userId, payload.accountId);
   const { raw, trackingToken } = await buildRaw(payload, acct, {});
 
-  const transport = smtpTransport(acct);
+  const transport = await smtpTransport(acct);
   const envelopeTo = [...payload.to, ...payload.cc, ...payload.bcc].map((a) => a.email);
   await transport.sendMail({ envelope: { from: payload.fromEmail, to: envelopeTo }, raw });
 

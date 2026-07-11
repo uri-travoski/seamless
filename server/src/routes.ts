@@ -22,6 +22,9 @@ import { importWorkbook } from './import/xlsx.ts';
 import { reclassifyUser, recomputeDisposition, kickClassifier } from './classify/engine.ts';
 import { sweepRetention } from './classify/retention.ts';
 import { allUserSettings, setUserSetting, SETTING_DEFAULTS } from './classify/settings.ts';
+import { saveOauthApp, startAuthUrl, handleCallback, redirectUri } from './oauth.ts';
+import { sweepSafeDelete, safeDeletePreview } from './classify/safedelete.ts';
+import { runGmailLearn, acceptProposals } from './import/gmailLearn.ts';
 
 const PIXEL_GIF = Buffer.from('R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7', 'base64');
 const PUBLIC_PATHS = [/^\/t\//, /^\/api\/(login|setup|me)$/, /^\/(?!api|jmap)/];
@@ -47,11 +50,13 @@ function isAdmin(req: FastifyRequest): boolean {
 
 function accountToApi(r: AccountRow) {
   return {
-    id: r.id, name: r.name, email: r.email, aliases: JSON.parse(r.aliases),
+    id: r.id, kind: r.kind ?? 'imap', name: r.name, email: r.email, aliases: JSON.parse(r.aliases),
     imapHost: r.imap_host, imapPort: r.imap_port, imapSecure: !!r.imap_secure, imapUser: r.imap_user,
     smtpHost: r.smtp_host, smtpPort: r.smtp_port, smtpSecure: !!r.smtp_secure, smtpUser: r.smtp_user,
     color: r.color, signature: r.signature, sentCopy: !!r.sent_copy,
     aiCategorize: !!r.ai_categorize, enabled: !!r.enabled,
+    safeDeleteEnabled: !!r.safe_delete_enabled, safeDeleteMode: r.safe_delete_mode ?? 'trash',
+    safeDeleteGraceDays: r.safe_delete_grace_days ?? 30,
   };
 }
 
@@ -599,6 +604,91 @@ export function registerRoutes(app: FastifyInstance): void {
     if (b.trashDays !== undefined) await setUserSetting(uid(req), 'trash_days', String(Number(b.trashDays) || 30));
     if (b.logRetentionDays !== undefined) await setUserSetting(uid(req), 'log_retention_days', String(Number(b.logRetentionDays) || 90));
     return { ok: true };
+  });
+
+  // ---- OAuth (Google / Microsoft) ----
+  app.get('/api/oauth/apps', async (req, reply) => {
+    if (!isAdmin(req)) return reply.code(403).send({ error: 'admin only' });
+    const rows = await q<any>('SELECT provider, client_id FROM oauth_apps');
+    return rows.map((r) => ({ provider: r.provider, clientId: r.client_id }));
+  });
+
+  app.put('/api/oauth/apps/:provider', async (req, reply) => {
+    if (!isAdmin(req)) return reply.code(403).send({ error: 'admin only' });
+    const provider = String((req.params as any).provider);
+    if (provider !== 'google' && provider !== 'microsoft') return reply.code(400).send({ error: 'unknown provider' });
+    const b = req.body as { clientId: string; clientSecret: string };
+    if (!b.clientId || !b.clientSecret) return reply.code(400).send({ error: 'clientId and clientSecret required' });
+    await saveOauthApp(provider, b.clientId.trim(), b.clientSecret.trim());
+    return { ok: true, redirectUri: redirectUri(provider) };
+  });
+
+  app.get('/api/oauth/:provider/start', async (req, reply) => {
+    const provider = String((req.params as any).provider) as 'google' | 'microsoft';
+    if (provider !== 'google' && provider !== 'microsoft') return reply.code(400).send({ error: 'unknown provider' });
+    const url = await startAuthUrl(uid(req), provider);
+    if (!url) return reply.code(400).send({ error: `${provider} OAuth app not configured (Settings > Accounts)` });
+    return { url };
+  });
+
+  app.get('/api/oauth/:provider/callback', async (req, reply) => {
+    const provider = String((req.params as any).provider) as 'google' | 'microsoft';
+    const { code, state, error } = req.query as any;
+    const back = (msg: string) => reply.type('text/html').send(
+      `<script>window.opener?.postMessage(${JSON.stringify({ seamlessOauth: msg })}, '*'); window.close();</script>` +
+      `<p>${msg} — you can close this window.</p>`);
+    if (error) return back(`Connection cancelled: ${error}`);
+    try {
+      const result = await handleCallback(provider, String(code), String(state));
+      await syncManager.restartAccount(result.accountId);
+      await bumpState();
+      broadcast({ type: 'stateChange' }, uid(req));
+      return back(`Connected ${result.email}`);
+    } catch (err: any) {
+      return back(`Connection failed: ${err?.message ?? err}`);
+    }
+  });
+
+  // ---- safe delete ----
+  app.put('/api/accounts/:id/safe-delete', async (req, reply) => {
+    const id = Number((req.params as any).id);
+    const existing = await one('SELECT id FROM accounts WHERE id = ? AND user_id = ?', [id, uid(req)]);
+    if (!existing) return reply.code(404).send({ error: 'not found' });
+    const b = req.body as { enabled: boolean; mode?: string; graceDays?: number };
+    await run('UPDATE accounts SET safe_delete_enabled = ?, safe_delete_mode = ?, safe_delete_grace_days = ? WHERE id = ?',
+      [!!b.enabled, b.mode === 'expunge' ? 'expunge' : 'trash', Math.max(1, Number(b.graceDays) || 30), id]);
+    return { ok: true };
+  });
+
+  app.get('/api/accounts/:id/safe-delete/preview', async (req) =>
+    safeDeletePreview(uid(req), Number((req.params as any).id)));
+
+  app.post('/api/safe-delete/run', async () => sweepSafeDelete());
+
+  // ---- learn from Gmail ----
+  app.post('/api/gmail-learn/:accountId', async (req, reply) => {
+    try {
+      const importId = await runGmailLearn(uid(req), Number((req.params as any).accountId));
+      return { importId };
+    } catch (err: any) {
+      return reply.code(400).send({ error: err?.message ?? 'could not start' });
+    }
+  });
+
+  app.get('/api/gmail-learn/:importId/status', async (req, reply) => {
+    const imp = await one<any>('SELECT * FROM gmail_imports WHERE id = ? AND user_id = ?', [Number((req.params as any).importId), uid(req)]);
+    if (!imp) return reply.code(404).send({ error: 'not found' });
+    return { status: imp.status, stats: JSON.parse(imp.stats), proposals: JSON.parse(imp.proposals) };
+  });
+
+  app.post('/api/gmail-learn/:importId/accept', async (req, reply) => {
+    try {
+      const created = await acceptProposals(uid(req), Number((req.params as any).importId), (req.body as any)?.indexes ?? []);
+      await reclassifyUser(uid(req));
+      return { created };
+    } catch (err: any) {
+      return reply.code(400).send({ error: err?.message ?? 'accept failed' });
+    }
   });
 
   // ---- review lane ----

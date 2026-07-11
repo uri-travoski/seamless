@@ -392,6 +392,50 @@ CREATE TABLE processor_notes (
 ALTER TABLE messages ADD COLUMN delete_if_unread BOOLEAN NOT NULL DEFAULT false;
 `,
   },
+  {
+    id: 4,
+    sql: `
+-- instance-level OAuth app registrations (admin enters client id/secret once)
+CREATE TABLE oauth_apps (
+  id SERIAL PRIMARY KEY,
+  provider TEXT NOT NULL UNIQUE CHECK (provider IN ('google','microsoft')),
+  client_id TEXT NOT NULL,
+  client_secret_enc TEXT NOT NULL,
+  created_at BIGINT NOT NULL
+);
+
+ALTER TABLE accounts
+  ADD COLUMN kind TEXT NOT NULL DEFAULT 'imap',              -- imap|gmail|microsoft
+  ADD COLUMN oauth_refresh_enc TEXT,
+  ADD COLUMN oauth_access_enc TEXT,
+  ADD COLUMN oauth_expires_at BIGINT,
+  ADD COLUMN safe_delete_enabled BOOLEAN NOT NULL DEFAULT false,
+  ADD COLUMN safe_delete_mode TEXT NOT NULL DEFAULT 'trash', -- trash|expunge
+  ADD COLUMN safe_delete_grace_days INTEGER NOT NULL DEFAULT 30;
+
+-- origin-side lifecycle: once Seamless removes a message at the origin, the local
+-- copy is the record and sync must never delete it
+ALTER TABLE messages
+  ADD COLUMN origin_state TEXT NOT NULL DEFAULT 'present',   -- present|removed
+  ADD COLUMN origin_deleted_at BIGINT;
+CREATE INDEX msg_origin ON messages(account_id, origin_state);
+
+CREATE TABLE gmail_imports (
+  id SERIAL PRIMARY KEY,
+  user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  account_id INTEGER REFERENCES accounts(id) ON DELETE SET NULL,
+  status TEXT NOT NULL DEFAULT 'running',                    -- running|done|error
+  stats TEXT NOT NULL DEFAULT '{}',
+  proposals TEXT NOT NULL DEFAULT '[]',
+  started_at BIGINT NOT NULL,
+  finished_at BIGINT
+);
+
+-- Gmail-history seeds aren't local messages: drop the FK, keep the PK
+ALTER TABLE email_vectors DROP CONSTRAINT IF EXISTS email_vectors_message_id_fkey;
+ALTER TABLE email_vectors ADD COLUMN source TEXT NOT NULL DEFAULT 'local';  -- local|gmail
+`,
+  },
 ];
 
 export async function migrate(): Promise<void> {

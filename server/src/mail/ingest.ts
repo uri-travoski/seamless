@@ -179,5 +179,6 @@ export function setFlagOpEnqueuer(fn: (accountId: number, payload: unknown) => P
 }
 
 export async function deleteMessageRow(rowId: number): Promise<void> {
+  await run("DELETE FROM email_vectors WHERE message_id = ? AND source = 'local'", [rowId]); // FK dropped in migration 4
   await run('DELETE FROM messages WHERE id = ?', [rowId]); // message_fts + labels cascade
 }
