@@ -8,10 +8,12 @@ import Sidebar from './components/Sidebar.tsx';
 import MessageList from './components/MessageList.tsx';
 import ReadingPane from './components/ReadingPane.tsx';
 import ComposeDock from './components/ComposeDock.tsx';
-import { MenuIcon, SearchIcon, CloseIcon, SettingsIcon, MailLogo } from './icons.tsx';
+import { MenuIcon, SearchIcon, CloseIcon, SettingsIcon, HelpIcon, MailLogo } from './icons.tsx';
+import GettingStarted from './components/GettingStarted.tsx';
 import { lazy, Suspense } from 'react';
 
 const Settings = lazy(() => import('./components/settings/Settings.tsx'));
+const HelpModal = lazy(() => import('./components/HelpModal.tsx'));
 import type { WsMessage } from '@seamless/shared';
 
 function useWebSocket(enabled: boolean): boolean {
@@ -52,6 +54,8 @@ export default function App() {
   const status = useSession((s) => s.status);
   const init = useSession((s) => s.init);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [settingsTab, setSettingsTab] = useState<string | undefined>(undefined);
+  const [helpOpen, setHelpOpen] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [search, setSearch] = useState('');
   const view = useMail((s) => s.view);
@@ -106,7 +110,8 @@ export default function App() {
         </div>
         <div className="spacer" />
         <span className={`conn-dot ${wsConnected && online ? '' : 'offline'}`} title={wsConnected && online ? 'Live' : 'Offline / reconnecting'} />
-        <button className="icon-btn" title="Settings" onClick={() => setSettingsOpen(true)}><SettingsIcon /></button>
+        <button className="icon-btn" title="Help" onClick={() => setHelpOpen(true)}><HelpIcon /></button>
+        <button className="icon-btn" title="Settings" onClick={() => { setSettingsTab(undefined); setSettingsOpen(true); }}><SettingsIcon /></button>
       </header>
       <div className={`main ${layout === 'table' ? 'table-mode' : ''} ${selectedId ? 'reading' : ''}`}>
         <Sidebar open={sidebarOpen} onNavigate={() => setSidebarOpen(false)} />
@@ -114,7 +119,9 @@ export default function App() {
         <ReadingPane />
       </div>
       <ComposeDock />
-      {settingsOpen && <Suspense fallback={null}><Settings onClose={() => setSettingsOpen(false)} /></Suspense>}
+      <GettingStarted openSettings={(tab) => { setSettingsTab(tab); setSettingsOpen(true); }} openHelp={() => setHelpOpen(true)} />
+      {settingsOpen && <Suspense fallback={null}><Settings initialTab={settingsTab} onClose={() => setSettingsOpen(false)} /></Suspense>}
+      {helpOpen && <Suspense fallback={null}><HelpModal onClose={() => setHelpOpen(false)} /></Suspense>}
       <div className="toast-wrap">
         {toasts.map((t) => <div key={t.id} className={`toast ${t.kind}`}>{t.text}</div>)}
       </div>

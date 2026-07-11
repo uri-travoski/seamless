@@ -94,4 +94,5 @@ export {
   DeviceMobileCamera as DevicesIcon,
   AddressBook as ContactsIcon,
   Lightbulb as SuggestionIcon,
+  Question as HelpIcon,
 } from '@phosphor-icons/react';

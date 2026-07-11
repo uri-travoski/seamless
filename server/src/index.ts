@@ -20,6 +20,7 @@ import { cancelScheduleByMessageId } from './mail/send.ts';
 import { startClassifier, kickClassifier, onClassified } from './classify/engine.ts';
 import { startRetention, onRetention } from './classify/retention.ts';
 import { startSafeDelete } from './classify/safedelete.ts';
+import { startForwarding } from './classify/forward.ts';
 import { startImapFacade } from './facade/imap.ts';
 import { startSmtpFacade } from './facade/smtp.ts';
 import { registerCardDav } from './facade/carddav.ts';
@@ -96,6 +97,7 @@ startClassifier();
 startRetention();
 startSafeDelete();
 startContactHarvest();
+startForwarding();
 startImapFacade();
 startSmtpFacade();
 

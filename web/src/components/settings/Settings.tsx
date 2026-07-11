@@ -28,8 +28,8 @@ const TABS: { id: string; name: string; Icon: ComponentType<{ className?: string
   { id: 'users', name: 'Users', Icon: UsersIcon },
 ];
 
-export default function Settings({ onClose }: { onClose: () => void }) {
-  const [tab, setTab] = useState<string>('general');
+export default function Settings({ onClose, initialTab }: { onClose: () => void; initialTab?: string }) {
+  const [tab, setTab] = useState<string>(initialTab && TABS.some((t) => t.id === initialTab) ? initialTab : 'general');
   const logout = useSession((s) => s.logout);
 
   return (

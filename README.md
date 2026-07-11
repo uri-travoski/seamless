@@ -2,9 +2,16 @@
 
 Self-hosted, AI-native webmail. Multi-user, unified inbox across many IMAP accounts, portable `.eml` storage in S3-compatible object storage, Postgres + pgvector core, installable PWA. Successor to MailDeck — see `DESIGN.md` for the full architecture and roadmap (classification cascade, retention engine, Gmail onboarding, IMAP/SMTP/CardDAV facades).
 
-## Features (phase 1)
+## Features
 
 - **Multi-user** — admin + member logins, per-user accounts, labels, filters, AI config, mail. First run creates the admin.
+- **AI classification cascade** — deterministic rules (raw headers first-class) → embedding similarity against your own labelled mail → LLM structured verdicts (real document? requires action? worth keeping? how long?) → human review lane. Every correction teaches it; repeated corrections become rule suggestions.
+- **Retention engine** — labels carry retention (protected / keep / delete-after-N-days); hourly sweep to recoverable Trash with dry-run default, countdown badges, full processing logs with auto-clear.
+- **Spreadsheet config** — importer/round-trip for the rules sheet (Labels, Rules, Settings, Preferences, Forwarding tabs = the schema).
+- **Gmail / Microsoft OAuth** — XOAUTH2 sync + send, learn-from-Gmail onboarding (labelled history → rules + AI routing + embedding seed).
+- **Safe delete** — per account: checksum-verified archived mail is removed at the origin after a grace window (origin Trash first); Seamless keeps the record forever.
+- **Device facades** — built-in IMAP + SMTP submission servers (app passwords) so Thunderbird/iOS Mail/K-9 connect to Seamless directly; CardDAV serves the auto-built addressbook.
+- **Processor notes** — per-sender/domain instructions ("newsletter I signed up for — delete after 7 days unless I read it") enforced deterministically and injected into AI decisions.
 - **Unified inbox** — every account's Inbox merged into one view; Sent → one Sent, Drafts → one Drafts. Per-account color bars.
 - **Portable storage** — every message archived as raw RFC822 `.eml` in S3 (MinIO / R2 / B2).
 - **JMAP subset API** the client talks to (`Mailbox/get`, `Email/query|get|set`, `Thread/get`, `Identity/get`, `EmailSubmission/set`, `#ref` back-references).

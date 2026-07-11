@@ -131,6 +131,7 @@ function tokenize(line: string): string[] {
 class ImapSession {
   private buf = Buffer.alloc(0);
   private literalNeed = 0;
+  private queue: Promise<void> = Promise.resolve(); // commands must run in order
   private pendingLine: Buffer[] = [];
   private userId: number | null = null;
   private folder: Folder | null = null;
@@ -175,7 +176,7 @@ class ImapSession {
       this.pendingLine.push(Buffer.from(text, 'utf8'));
       const parts = this.pendingLine;
       this.pendingLine = [];
-      void this.handle(parts).catch((err) => {
+      this.queue = this.queue.then(() => this.handle(parts)).catch((err) => {
         console.error('[imapd]', err?.message ?? err);
         this.write('* BAD internal error\r\n');
       });
