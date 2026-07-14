@@ -2,7 +2,7 @@ import { gzipSync, gunzipSync } from 'node:zlib';
 import { pool, q, one, migrate } from '../db.ts';
 import { config } from '../config.ts';
 import { encryptBuffer, decryptBuffer, sha256 } from '../crypto.ts';
-import { s3Store, type BlobStore } from '../s3.ts';
+import { backupStore, type BlobStore } from '../s3.ts';
 
 /** Logical backup of the whole Postgres database.
  *
@@ -10,14 +10,16 @@ import { s3Store, type BlobStore } from '../s3.ts';
  *  so it has no pg_dump binary and no way to exec one in the database container.
  *  Instead every table is read through the pool the app already owns, streamed as
  *  NDJSON, gzipped, then AES-256-GCM encrypted with SEAMLESS_SECRET (DESIGN.md §0
- *  credential-at-rest pattern) before it lands in R2 next to the .eml blobs.
+ *  credential-at-rest pattern) before it is written to the BACKUP store.
  *
  *  Layout, one directory per run:
  *    <prefix><iso>/manifest.json      plaintext, so backups list + verify without the secret
  *    <prefix><iso>/data.ndjson.gz.enc ciphertext
  *
- *  The .eml blobs themselves are NOT copied — they already live in the same bucket
- *  and the restored rows still point at them by key. This backup is the index. */
+ *  The .eml blobs are NOT copied. They live in the MAIL store, which may be a different
+ *  bucket (or provider) entirely — the backup only carries the database, and the restored
+ *  rows reach the blobs through the mail store's own config by key. This backup is the
+ *  index, not the archive. */
 
 export const FORMAT_VERSION = 1;
 const SECRET_CHECK = 'seamless-backup-v1';
@@ -72,7 +74,7 @@ async function columnsOf(table: string): Promise<Column[]> {
 const ident = (name: string) => `"${name.replace(/"/g, '""')}"`;
 
 export async function createBackup(opts: { prefix?: string; store?: BlobStore; appVersion?: string } = {}): Promise<BackupManifest> {
-  const store = opts.store ?? s3Store;
+  const store = opts.store ?? backupStore;
   const prefix = opts.prefix ?? DEFAULT_PREFIX;
   const tables = await tableNames();
 
@@ -121,7 +123,7 @@ export async function createBackup(opts: { prefix?: string; store?: BlobStore; a
 }
 
 export async function listBackups(opts: { prefix?: string; store?: BlobStore } = {}): Promise<BackupSummary[]> {
-  const store = opts.store ?? s3Store;
+  const store = opts.store ?? backupStore;
   const prefix = opts.prefix ?? DEFAULT_PREFIX;
   const keys = (await store.list(prefix)).filter((k) => k.endsWith('/manifest.json'));
 
@@ -147,7 +149,7 @@ async function loadManifest(store: BlobStore, dir: string): Promise<BackupManife
  *  secret, then a full decrypt+gunzip+parse. This is what "Verify" in Settings runs,
  *  and what the scheduler runs after every write — an unverified backup is a rumour. */
 export async function verifyBackup(dir: string, opts: { store?: BlobStore } = {}): Promise<{ ok: true; manifest: BackupManifest; rows: number }> {
-  const store = opts.store ?? s3Store;
+  const store = opts.store ?? backupStore;
   const manifest = await loadManifest(store, dir);
 
   const cipher = await store.get(`${dir}data.ndjson.gz.enc`);
@@ -180,7 +182,7 @@ export interface RestoreReport {
  *  any order and a future table with a new FK needs no code change here. Runs in one
  *  transaction: a failure part-way leaves the existing database untouched. */
 export async function restoreBackup(dir: string, opts: { store?: BlobStore } = {}): Promise<RestoreReport> {
-  const store = opts.store ?? s3Store;
+  const store = opts.store ?? backupStore;
   const { manifest } = await verifyBackup(dir, { store });
 
   await migrate(); // a bare disaster-recovery database has no schema yet
@@ -278,7 +280,7 @@ export async function restoreBackup(dir: string, opts: { store?: BlobStore } = {
 
 /** Keep the newest `keep` runs; delete the rest. Returns the directories removed. */
 export async function pruneBackups(keep: number, opts: { prefix?: string; store?: BlobStore } = {}): Promise<string[]> {
-  const store = opts.store ?? s3Store;
+  const store = opts.store ?? backupStore;
   const prefix = opts.prefix ?? DEFAULT_PREFIX;
   if (keep < 1) return [];
 

@@ -170,6 +170,63 @@ describe('backup round-trip', () => {
   });
 });
 
+describe('separate buckets for mail and backups', () => {
+  /** A second, physically distinct store: nothing the mail store holds is visible here.
+   *  This is what S3_BACKUP_BUCKET (or a whole other provider) looks like to the engine. */
+  const otherBucket = new Map<string, Buffer>();
+  const remoteBackupStore: BlobStore = {
+    put: async (k, b) => { otherBucket.set(k, b); },
+    get: async (k) => {
+      const b = otherBucket.get(k);
+      if (!b) throw new Error(`no blob ${k}`);
+      return b;
+    },
+    list: async (p) => [...otherBucket.keys()].filter((k) => k.startsWith(p)).sort(),
+    del: async (k) => { otherBucket.delete(k); },
+  };
+
+  beforeEach(() => otherBucket.clear());
+
+  it('backs up to the backup bucket and restores from it, with mail left in the mail bucket', async () => {
+    const { ids } = await seedRealisticData();
+    const mailKeysBefore = [...blobStore.keys()];
+    expect(mailKeysBefore.some((k) => k.startsWith('msg/'))).toBe(true);
+
+    const manifest = await createBackup({ prefix: PREFIX, store: remoteBackupStore, appVersion: 'test' });
+
+    // the backup landed ONLY in the backup bucket
+    expect([...otherBucket.keys()].every((k) => k.startsWith(PREFIX))).toBe(true);
+    expect([...blobStore.keys()].some((k) => k.startsWith(PREFIX))).toBe(false);
+    // and it copied no mail: the backup is the index, not the archive
+    expect([...otherBucket.keys()].some((k) => k.startsWith('msg/'))).toBe(false);
+
+    await wipeDatabase();
+    await restoreBackup(manifest.key, { store: remoteBackupStore });
+
+    // rows are back, and their s3_key still points into the untouched mail bucket
+    const msg = await one<{ s3_key: string }>('SELECT s3_key FROM messages WHERE id = ?', [ids[0]]);
+    expect(msg!.s3_key.startsWith('msg/')).toBe(true);
+    expect(blobStore.has(msg!.s3_key)).toBe(true);
+    expect([...blobStore.keys()]).toEqual(mailKeysBefore);   // mail bucket never touched
+  });
+
+  it('restores even when the mail bucket is gone entirely', async () => {
+    await seedRealisticData();
+    const manifest = await createBackup({ prefix: PREFIX, store: remoteBackupStore, appVersion: 'test' });
+
+    // lose the mail bucket AND the database: only the backup bucket survives
+    blobStore.clear();
+    await wipeDatabase();
+
+    const report = await restoreBackup(manifest.key, { store: remoteBackupStore });
+
+    // the database comes back whole — the mail bodies are simply missing until the mail
+    // bucket is restored, which is exactly the separation the two buckets buy
+    expect(report.rows).toBe(manifest.rows);
+    expect((await tableCounts()).messages).toBe(5);
+  });
+});
+
 describe('backup integrity', () => {
   it('encrypts the payload: the plaintext subject is not in the uploaded bytes', async () => {
     await seedRealisticData();

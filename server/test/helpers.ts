@@ -13,10 +13,12 @@ vi.mock('../src/s3.ts', () => {
   };
   const list = async (prefix: string) => [...blobStore.keys()].filter((k) => k.startsWith(prefix)).sort();
   const del = async (key: string) => { blobStore.delete(key); };
+  const store = { put, get, list, del };
   return {
     ensureBucket: async () => {},
     putBlob: put, getBlob: get, listKeys: list, deleteBlob: del,
-    s3Store: { put, get, list, del },
+    mailStore: store, backupStore: store, s3Store: store,
+    backupSharesMailBucket: true,
   };
 });
 

@@ -36,6 +36,7 @@ export const config = {
     'DATABASE_URL',
     isTest ? 'postgres://seamless:seamless@localhost:5460/seamless_test' : 'postgres://seamless:seamless@localhost:5460/seamless',
   ),
+  // Mail blobs: the raw .eml archive.
   s3: {
     endpoint: env('S3_ENDPOINT', 'http://localhost:9100'),
     region: env('S3_REGION', 'us-east-1'),
@@ -43,6 +44,19 @@ export const config = {
     accessKey: env('S3_ACCESS_KEY', 'seamless'),
     secretKey: env('S3_SECRET_KEY', 'seamless-secret'),
     forcePathStyle: env('S3_FORCE_PATH_STYLE', 'true') === 'true',
+  },
+  // Database backups. Each S3_BACKUP_* falls back to its S3_* twin, so leaving them unset
+  // keeps the old single-bucket behaviour. Set S3_BACKUP_BUCKET to separate the two, and
+  // the endpoint/credentials too to put backups in a different account or provider
+  // entirely — then losing the mail bucket (or its credentials) cannot take the backups
+  // with it, which is the whole point of a backup.
+  s3Backup: {
+    endpoint: env('S3_BACKUP_ENDPOINT', env('S3_ENDPOINT', 'http://localhost:9100')),
+    region: env('S3_BACKUP_REGION', env('S3_REGION', 'us-east-1')),
+    bucket: env('S3_BACKUP_BUCKET', env('S3_BUCKET', 'seamless')),
+    accessKey: env('S3_BACKUP_ACCESS_KEY', env('S3_ACCESS_KEY', 'seamless')),
+    secretKey: env('S3_BACKUP_SECRET_KEY', env('S3_SECRET_KEY', 'seamless-secret')),
+    forcePathStyle: env('S3_BACKUP_FORCE_PATH_STYLE', env('S3_FORCE_PATH_STYLE', 'true')) === 'true',
   },
   // Where backups live in the bucket: always inside the app folder, never at the bucket root
   // and never in a generic `backup/` prefix, so one bucket can hold several apps' backups.
