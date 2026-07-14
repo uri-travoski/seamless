@@ -23,10 +23,11 @@ export const INTERVAL_HOURS: Record<Frequency, number> = {
 
 export const FREQUENCIES = Object.keys(INTERVAL_HOURS) as Frequency[];
 
-/** Backups always live under an app-named folder, so one bucket can serve several apps
+/** Backups always live under the app's own folder, so one bucket can serve several apps
  *  without their backups mixing. A prefix typed in Settings is namespaced into it rather
- *  than replacing it: "nightly" becomes "seamless/nightly/". */
-export const APP_FOLDER = 'seamless/';
+ *  than replacing it: "nightly" becomes "seamless/nightly/". Derived from package.json,
+ *  so renaming the app moves its folder instead of silently keeping a stale literal. */
+export const APP_FOLDER = config.appFolder;
 
 export function normalizePrefix(raw: string): string {
   let p = raw.trim().replace(/^\/+/, '');

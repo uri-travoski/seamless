@@ -12,7 +12,7 @@
  * still has users unless --force is given.
  */
 import { listBackups, verifyBackup, restoreBackup, databaseIsEmpty } from '../server/src/backup/engine.ts';
-import { getBackupConfig } from '../server/src/backup/schedule.ts';
+import { getBackupConfig, normalizePrefix } from '../server/src/backup/schedule.ts';
 import { migrate, pool } from '../server/src/db.ts';
 
 const args = process.argv.slice(2);
@@ -24,8 +24,10 @@ const fmtBytes = (n: number) => (n < 1024 * 1024 ? `${(n / 1024).toFixed(0)} KB`
 async function main() {
   await migrate();
   // --prefix wins, then BACKUP_PREFIX / the stored setting. A rebuilt box has no stored
-  // setting, so a non-default prefix must be supplied here or via the env var.
-  const prefix = val('--prefix') ?? (await getBackupConfig()).prefix;
+  // setting, so a non-default prefix must be supplied here or via the env var. Either way
+  // it is namespaced into the app folder, matching where backups were actually written.
+  const raw = val('--prefix');
+  const prefix = raw ? normalizePrefix(raw) : (await getBackupConfig()).prefix;
   const backups = await listBackups({ prefix });
 
   if (!backups.length) {

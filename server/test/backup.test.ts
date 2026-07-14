@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { blobStore, resetDb, makeAccount, makeMailbox, ingest, rawEmail, TEST_USER } from './helpers.ts';
 import { q, one, run, insertId, migrate } from '../src/db.ts';
+import { config } from '../src/config.ts';
 import type { BlobStore } from '../src/s3.ts';
 import {
   createBackup, restoreBackup, verifyBackup, listBackups, pruneBackups,
@@ -270,9 +271,28 @@ describe('retention', () => {
 });
 
 describe('app-folder namespacing', () => {
-  it('puts backups under the app folder by default', () => {
+  it('derives the app folder from the app name, not a hardcoded string', () => {
     expect(APP_FOLDER).toBe('seamless/');
+    expect(config.appFolder).toBe(`${config.appName}/`);
     expect(normalizePrefix('seamless/')).toBe('seamless/');
+  });
+
+  it('keeps a backup inside the app folder even when no prefix is passed at all', async () => {
+    await seedRealisticData();
+    // the caller-forgot-a-prefix path: engine's own default must not be a bare "backup/"
+    const m = await createBackup({ store, appVersion: 'test' });
+    expect(m.key.startsWith(APP_FOLDER)).toBe(true);
+    expect([...blobStore.keys()].some((k) => k.startsWith('backup/'))).toBe(false);
+  });
+
+  it('cannot be escaped by an absolute or traversing prefix', () => {
+    expect(normalizePrefix('/')).toBe(APP_FOLDER);
+    expect(normalizePrefix('//rooted')).toBe('seamless/rooted/');
+    expect(normalizePrefix('backup/')).toBe('seamless/backup/');
+    // every result stays under the app folder, whatever went in
+    for (const p of ['', '/', 'x', 'a/b', 'seamless', 'seamless/x', 'backup/']) {
+      expect(normalizePrefix(p).startsWith(APP_FOLDER)).toBe(true);
+    }
   });
 
   it.each([

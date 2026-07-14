@@ -9,7 +9,25 @@ function env(name: string, def?: string): string {
 
 const isTest = process.env.NODE_ENV === 'test';
 
+/** The app's own name, from the root package.json. Everything this app writes into shared
+ *  storage is namespaced under it, so one bucket can serve many apps without collision. */
+function appName(): string {
+  try {
+    const pkg = JSON.parse(fs.readFileSync(new URL('../../package.json', import.meta.url), 'utf8')) as { name?: string };
+    const name = (pkg.name ?? '').trim().replace(/^@[^/]+\//, '').replace(/[^a-z0-9._-]/gi, '-');
+    if (name) return name;
+  } catch {
+    // fall through: a missing package.json must not stop the server booting
+  }
+  return 'seamless';
+}
+
+const APP = appName();
+
 export const config = {
+  appName: APP,
+  /** Root folder for anything this app stores in shared object storage. */
+  appFolder: `${APP}/`,
   port: Number(env('PORT', '4900')),
   dataDir: path.resolve(env('DATA_DIR', './data')),
   publicUrl: env('PUBLIC_URL', `http://localhost:${env('PORT', '4900')}`).replace(/\/$/, ''),
@@ -26,13 +44,16 @@ export const config = {
     secretKey: env('S3_SECRET_KEY', 'seamless-secret'),
     forcePathStyle: env('S3_FORCE_PATH_STYLE', 'true') === 'true',
   },
-  // Where backups live in the bucket: always namespaced under an app folder (`seamless/`),
-  // so one bucket can hold several apps' backups without them colliding.
+  // Where backups live in the bucket: always inside the app folder, never at the bucket root
+  // and never in a generic `backup/` prefix, so one bucket can hold several apps' backups.
+  // A BACKUP_PREFIX that points elsewhere is nested under the app folder, not honoured as-is.
   // The UI setting is stored in Postgres — which is the thing a disaster destroys — so on a
   // rebuilt box this env var is the only thing left that knows the prefix.
   backupPrefix: (() => {
-    const p = env('BACKUP_PREFIX', 'seamless/');
-    return p.endsWith('/') ? p : `${p}/`;
+    let p = env('BACKUP_PREFIX', `${APP}/`).trim().replace(/^\/+/, '');
+    if (!p.endsWith('/')) p = `${p}/`;
+    if (p === '/') return `${APP}/`;
+    return p.startsWith(`${APP}/`) ? p : `${APP}/${p}`;
   })(),
   facade: {
     imapPort: Number(env('FACADE_IMAP_PORT', '1143')),

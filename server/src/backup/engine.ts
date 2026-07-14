@@ -1,5 +1,6 @@
 import { gzipSync, gunzipSync } from 'node:zlib';
 import { pool, q, one, migrate } from '../db.ts';
+import { config } from '../config.ts';
 import { encryptBuffer, decryptBuffer, sha256 } from '../crypto.ts';
 import { s3Store, type BlobStore } from '../s3.ts';
 
@@ -20,7 +21,9 @@ import { s3Store, type BlobStore } from '../s3.ts';
 
 export const FORMAT_VERSION = 1;
 const SECRET_CHECK = 'seamless-backup-v1';
-const DEFAULT_PREFIX = 'backup/';
+/** Never a bare "backup/": an omitted prefix must still land inside the app folder,
+ *  or a caller that forgets to pass one silently writes to the bucket root. */
+const DEFAULT_PREFIX = config.backupPrefix;
 const INSERT_CHUNK = 500;
 
 export interface BackupManifest {
