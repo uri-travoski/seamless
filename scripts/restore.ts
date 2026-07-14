@@ -23,11 +23,14 @@ const fmtBytes = (n: number) => (n < 1024 * 1024 ? `${(n / 1024).toFixed(0)} KB`
 
 async function main() {
   await migrate();
-  const prefix = (await getBackupConfig()).prefix;
+  // --prefix wins, then BACKUP_PREFIX / the stored setting. A rebuilt box has no stored
+  // setting, so a non-default prefix must be supplied here or via the env var.
+  const prefix = val('--prefix') ?? (await getBackupConfig()).prefix;
   const backups = await listBackups({ prefix });
 
   if (!backups.length) {
-    console.error(`No backups found under ${prefix} in bucket. Check S3_* env vars.`);
+    console.error(`No backups found under "${prefix}" in bucket ${process.env.S3_BUCKET}.`);
+    console.error('If you backed up to a different prefix, pass it: npm run restore -- --prefix your-prefix/ --list');
     process.exit(1);
   }
 

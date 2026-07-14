@@ -18,24 +18,29 @@ export default function BackupSettings() {
   const [config, setConfig] = useState<ApiBackupConfig | null>(null);
   const [status, setStatus] = useState<ApiBackupStatus | null>(null);
   const [backups, setBackups] = useState<ApiBackup[]>([]);
+  const [storageError, setStorageError] = useState('');
   const [busy, setBusy] = useState('');
 
   const load = async () => {
-    const res = await api.get<{ config: ApiBackupConfig; status: ApiBackupStatus; backups: ApiBackup[] }>('/api/backup');
+    const res = await api.get<{ config: ApiBackupConfig; status: ApiBackupStatus; backups: ApiBackup[]; storageError?: string }>('/api/backup');
     setConfig(res.config);
     setStatus(res.status);
     setBackups(res.backups);
+    setStorageError(res.storageError ?? '');
   };
 
   useEffect(() => { void load().catch((e) => toast(e?.message ?? 'Could not load backup settings', 'error')); }, []);
 
   const save = async (patch: Partial<ApiBackupConfig>) => {
     if (!config) return;
-    const next = { ...config, ...patch };
-    setConfig(next);
+    setConfig({ ...config, ...patch });
     try {
       const res = await api.put<{ config: ApiBackupConfig; status: ApiBackupStatus }>('/api/backup', patch);
-      setConfig(res.config);
+      // Take the server's value back for the saved keys only (it normalises, e.g. adds the
+      // trailing slash to a prefix). Overwriting the whole object would wipe whatever the
+      // user has already typed into another field but not yet blurred.
+      const saved = Object.fromEntries(Object.keys(patch).map((k) => [k, (res.config as any)[k]]));
+      setConfig((prev) => (prev ? { ...prev, ...saved } : res.config));
       setStatus(res.status);
     } catch (e: any) {
       toast(e?.message ?? 'Save failed', 'error');
@@ -96,6 +101,16 @@ export default function BackupSettings() {
             <div className="dim">{fmtWhen(status.lastAt)}</div>
           </div>
           <button className="btn" onClick={() => void dismiss()}>Dismiss</button>
+        </div>
+      )}
+
+      {storageError && (
+        <div className="banner error">
+          <div>
+            <strong>Cannot reach your storage bucket</strong>
+            <div>{storageError}</div>
+            <div className="dim">Check the <code>S3_*</code> settings in your environment. Existing backups are not listed until this is fixed.</div>
+          </div>
         </div>
       )}
 

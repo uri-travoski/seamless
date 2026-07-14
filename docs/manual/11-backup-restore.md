@@ -63,6 +63,18 @@ The restore runs in one transaction. If anything goes wrong part-way, nothing is
 
 When it finishes, your mail, labels, rules, AI history and logins are all back, and the messages point at the `.eml` files that never moved.
 
+## If you change the prefix, set it in the environment too
+
+The prefix you type in Settings is stored in Postgres — the very thing a disaster destroys. A rebuilt server has no way to know you used anything other than the default `backup/`, and will report no backups found while yours sit safely in the bucket.
+
+If you use a custom prefix, put it in `.env` as well:
+
+```
+BACKUP_PREFIX=my-prefix/
+```
+
+Or pass it at restore time: `npm run restore -- --prefix my-prefix/ --list`.
+
 ## The one thing that can still lose you everything
 
 `SEAMLESS_SECRET` decrypts the backups. **Keep a copy somewhere other than the server.** A password manager is fine; the server's own disk is not.

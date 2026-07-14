@@ -1,4 +1,5 @@
 import { q, one, getSetting, setSetting } from '../db.ts';
+import { config } from '../config.ts';
 import { plog } from '../classify/settings.ts';
 import { notifyUser } from '../push.ts';
 import { smtpTransport } from '../mail/send.ts';
@@ -48,7 +49,7 @@ const DEFAULTS: BackupConfig = {
   frequency: 'daily',
   hour: 2,
   keep: 14,
-  prefix: 'backup/',
+  prefix: config.backupPrefix,   // BACKUP_PREFIX env: the only prefix a wiped box can know
   alertEmail: '',
 };
 

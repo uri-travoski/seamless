@@ -26,6 +26,13 @@ export const config = {
     secretKey: env('S3_SECRET_KEY', 'seamless-secret'),
     forcePathStyle: env('S3_FORCE_PATH_STYLE', 'true') === 'true',
   },
+  // Where backups live in the bucket. The UI setting is stored in Postgres — which is the
+  // thing a disaster destroys — so on a rebuilt box there is nothing left to tell us the
+  // prefix. This env var is the fallback the restore path reads before any database exists.
+  backupPrefix: (() => {
+    const p = env('BACKUP_PREFIX', 'backup/');
+    return p.endsWith('/') ? p : `${p}/`;
+  })(),
   facade: {
     imapPort: Number(env('FACADE_IMAP_PORT', '1143')),
     smtpPort: Number(env('FACADE_SMTP_PORT', '1587')),

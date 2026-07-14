@@ -952,7 +952,16 @@ export function registerRoutes(app: FastifyInstance): void {
   // ---- backup (admin) ----
   app.get('/api/backup', async (req, reply) => {
     if (!isAdmin(req)) return reply.code(403).send({ error: 'admin only' });
-    return { config: await getBackupConfig(), status: await getBackupStatus(), backups: await listBackupsForUi() };
+    // Unreachable storage must not 500 this page: a failing bucket is exactly when the
+    // admin needs to reach it to read the failure banner and fix the configuration.
+    let backups: Awaited<ReturnType<typeof listBackupsForUi>> = [];
+    let storageError = '';
+    try {
+      backups = await listBackupsForUi();
+    } catch (err: any) {
+      storageError = err?.message ?? 'cannot read backup storage';
+    }
+    return { config: await getBackupConfig(), status: await getBackupStatus(), backups, storageError };
   });
 
   app.put('/api/backup', async (req, reply) => {
