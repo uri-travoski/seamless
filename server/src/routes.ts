@@ -25,16 +25,30 @@ import { broadcast } from './ws.ts';
 import { importWorkbook } from './import/xlsx.ts';
 import { reclassifyUser, recomputeDisposition, kickClassifier } from './classify/engine.ts';
 import { sweepRetention } from './classify/retention.ts';
-import { allUserSettings, setUserSetting, SETTING_DEFAULTS } from './classify/settings.ts';
+import { allUserSettings, setUserSetting, plog, SETTING_DEFAULTS } from './classify/settings.ts';
 import { saveOauthApp, startAuthUrl, handleCallback, redirectUri } from './oauth.ts';
 import { sweepSafeDelete, safeDeletePreview } from './classify/safedelete.ts';
 import { runGmailLearn, acceptProposals } from './import/gmailLearn.ts';
 import { createAppPassword } from './facade/auth.ts';
 import { listContacts, contactToVcf, importVcf, harvestContacts } from './contacts.ts';
 import { config } from './config.ts';
+import { listBackups, verifyBackup, restoreBackup, databaseIsEmpty } from './backup/engine.ts';
+import {
+  getBackupConfig, setBackupConfig, getBackupStatus, runBackup, acknowledgeFailure, listBackupsForUi,
+} from './backup/schedule.ts';
 
 const PIXEL_GIF = Buffer.from('R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7', 'base64');
-const PUBLIC_PATHS = [/^\/t\//, /^\/api\/(login|setup|me)$/, /^\/(?!api|jmap)/];
+// /api/setup/{backups,restore} are public on purpose: after a total loss the database
+// is empty, so there is no account to authenticate with. Both refuse once a user exists.
+const PUBLIC_PATHS = [/^\/t\//, /^\/api\/(login|setup|me)$/, /^\/api\/setup\/(backups|restore)$/, /^\/(?!api|jmap)/];
+
+const pkgVersion = (() => {
+  try {
+    return (JSON.parse(fs.readFileSync(new URL('../../package.json', import.meta.url), 'utf8')) as { version: string }).version;
+  } catch {
+    return 'unknown';
+  }
+})();
 
 const loginAttempts = new Map<string, { count: number; resetAt: number }>();
 
@@ -923,15 +937,76 @@ export function registerRoutes(app: FastifyInstance): void {
   app.get('/api/logs', async (req) => {
     const kind = (req.query as any).kind as string | undefined;
     const limit = Math.min(Number((req.query as any).limit) || 200, 1000);
+    // user_id IS NULL covers instance-level entries (backup) that belong to no one user
     const rows = kind
-      ? await q('SELECT id, email_id, kind, level, message, created_at FROM processing_logs WHERE user_id = ? AND kind = ? ORDER BY id DESC LIMIT ?', [uid(req), kind, limit])
-      : await q('SELECT id, email_id, kind, level, message, created_at FROM processing_logs WHERE user_id = ? ORDER BY id DESC LIMIT ?', [uid(req), limit]);
+      ? await q('SELECT id, email_id, kind, level, message, created_at FROM processing_logs WHERE (user_id = ? OR user_id IS NULL) AND kind = ? ORDER BY id DESC LIMIT ?', [uid(req), kind, limit])
+      : await q('SELECT id, email_id, kind, level, message, created_at FROM processing_logs WHERE (user_id = ? OR user_id IS NULL) ORDER BY id DESC LIMIT ?', [uid(req), limit]);
     return rows.map((r: any) => ({ id: r.id, emailId: r.email_id, kind: r.kind, level: r.level, message: r.message, createdAt: new Date(r.created_at).toISOString() }));
   });
 
   app.delete('/api/logs', async (req) => {
     await run('DELETE FROM processing_logs WHERE user_id = ?', [uid(req)]);
     return { ok: true };
+  });
+
+  // ---- backup (admin) ----
+  app.get('/api/backup', async (req, reply) => {
+    if (!isAdmin(req)) return reply.code(403).send({ error: 'admin only' });
+    return { config: await getBackupConfig(), status: await getBackupStatus(), backups: await listBackupsForUi() };
+  });
+
+  app.put('/api/backup', async (req, reply) => {
+    if (!isAdmin(req)) return reply.code(403).send({ error: 'admin only' });
+    return { config: await setBackupConfig(req.body as any), status: await getBackupStatus() };
+  });
+
+  app.post('/api/backup/run', async (req, reply) => {
+    if (!isAdmin(req)) return reply.code(403).send({ error: 'admin only' });
+    const res = await runBackup({ appVersion: pkgVersion });
+    if (!res.ok) return reply.code(500).send({ error: res.error });
+    return { ...res, status: await getBackupStatus(), backups: await listBackupsForUi() };
+  });
+
+  app.post('/api/backup/verify', async (req, reply) => {
+    if (!isAdmin(req)) return reply.code(403).send({ error: 'admin only' });
+    const key = String((req.body as any)?.key ?? '');
+    try {
+      const { manifest, rows } = await verifyBackup(key);
+      return { ok: true, rows, tables: Object.keys(manifest.tables).length, bytes: manifest.bytes };
+    } catch (err: any) {
+      return reply.code(400).send({ error: err?.message ?? 'verify failed' });
+    }
+  });
+
+  app.post('/api/backup/ack', async (req, reply) => {
+    if (!isAdmin(req)) return reply.code(403).send({ error: 'admin only' });
+    await acknowledgeFailure();
+    return { ok: true };
+  });
+
+  // Restore is deliberately NOT exposed to a logged-in admin: it truncates every
+  // table, and the disaster case (empty database, nobody to log in as) is the only
+  // one that needs it. Both routes below are public but refuse once a user exists.
+  app.get('/api/setup/backups', async (req, reply) => {
+    if (!(await databaseIsEmpty())) return reply.code(403).send({ error: 'already set up' });
+    try {
+      return { backups: await listBackups({ prefix: (await getBackupConfig()).prefix }) };
+    } catch (err: any) {
+      return reply.code(400).send({ error: `cannot read backup storage: ${err?.message ?? err}` });
+    }
+  });
+
+  app.post('/api/setup/restore', async (req, reply) => {
+    if (!(await databaseIsEmpty())) return reply.code(403).send({ error: 'already set up' });
+    const key = String((req.body as any)?.key ?? '');
+    if (!key) return reply.code(400).send({ error: 'backup key required' });
+    try {
+      const report = await restoreBackup(key);
+      await plog(null, 'backup', `restored ${report.rows} rows from ${report.key}`, { meta: report });
+      return { ok: true, ...report };
+    } catch (err: any) {
+      return reply.code(400).send({ error: err?.message ?? 'restore failed' });
+    }
   });
 
   // ---- in-app manual ----

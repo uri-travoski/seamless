@@ -66,6 +66,37 @@ export interface ApiProcessingLog {
   createdAt: string;
 }
 
+export type BackupFrequency = 'twice_daily' | 'daily' | 'every_2_days' | 'twice_weekly' | 'weekly';
+
+export interface ApiBackupConfig {
+  enabled: boolean;
+  frequency: BackupFrequency;
+  hour: number;              // UTC hour of the run slot
+  keep: number;              // runs retained in the bucket
+  prefix: string;
+  alertEmail: string;
+}
+
+export interface ApiBackupStatus {
+  lastAt: number | null;
+  lastStatus: 'ok' | 'error' | null;
+  lastError: string;
+  lastKey: string;
+  lastRows: number;
+  lastBytes: number;
+  acknowledged: boolean;
+  nextDueAt: number | null;
+  running: boolean;
+}
+
+export interface ApiBackup {
+  key: string;
+  createdAt: number;
+  rows: number;
+  bytes: number;
+  tables: number;
+}
+
 export interface ApiEmail {
   id: string;              // "m<rowid>"
   threadId: string;

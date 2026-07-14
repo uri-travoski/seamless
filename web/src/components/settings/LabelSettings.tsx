@@ -65,6 +65,12 @@ export default function LabelSettings({ autoAdd }: { autoAdd?: boolean }) {
                   onClick={() => setEditing({ ...editing, color: c })} aria-label={c} />
               ))}
             </div>
+            <div className="custom-color">
+              <input type="color" value={editing.color} aria-label="Custom color"
+                onChange={(e) => setEditing({ ...editing, color: e.target.value })} />
+              <span>Custom colour</span>
+              <code className={LABEL_COLORS.includes(editing.color) ? '' : 'on'}>{editing.color}</code>
+            </div>
           </div>
           <div className="field"><label>Retention</label>
             <div style={{ display: 'flex', gap: 16, alignItems: 'center', flexWrap: 'wrap', fontSize: 13 }}>

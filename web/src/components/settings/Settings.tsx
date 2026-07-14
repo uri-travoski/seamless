@@ -9,10 +9,11 @@ import RulesSettings from './RulesSettings.tsx';
 import AutomationSettings from './AutomationSettings.tsx';
 import LogsSettings from './LogsSettings.tsx';
 import DevicesSettings from './DevicesSettings.tsx';
+import BackupSettings from './BackupSettings.tsx';
 import ContactsSettings from './ContactsSettings.tsx';
 import { useSession } from '../../state/session.ts';
 import type { ComponentType } from 'react';
-import { SettingsIcon, AccountIcon, TagIcon, FilterIcon, SparkleIcon, UsersIcon, LogoutIcon, BackIcon, RulesIcon, ImportIcon, LogsIcon, DevicesIcon, ContactsIcon } from '../../icons.tsx';
+import { SettingsIcon, AccountIcon, TagIcon, FilterIcon, SparkleIcon, UsersIcon, LogoutIcon, BackIcon, RulesIcon, ImportIcon, LogsIcon, DevicesIcon, ContactsIcon, BackupIcon } from '../../icons.tsx';
 
 const TABS: { id: string; name: string; Icon: ComponentType<{ className?: string }> }[] = [
   { id: 'general', name: 'General', Icon: SettingsIcon },
@@ -25,6 +26,7 @@ const TABS: { id: string; name: string; Icon: ComponentType<{ className?: string
   { id: 'contacts', name: 'Contacts', Icon: ContactsIcon },
   { id: 'devices', name: 'Devices', Icon: DevicesIcon },
   { id: 'logs', name: 'Logs', Icon: LogsIcon },
+  { id: 'backup', name: 'Backup', Icon: BackupIcon },
   { id: 'users', name: 'Users', Icon: UsersIcon },
 ];
 
@@ -62,6 +64,7 @@ export default function Settings({ onClose, initialTab, autoAddLabel }: { onClos
           {tab === 'contacts' && <ContactsSettings />}
           {tab === 'devices' && <DevicesSettings />}
           {tab === 'logs' && <LogsSettings />}
+          {tab === 'backup' && <BackupSettings />}
           {tab === 'users' && <UserSettings />}
         </div>
       </div>

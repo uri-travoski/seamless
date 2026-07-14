@@ -3,16 +3,22 @@ import { vi } from 'vitest';
 // in-memory S3 stand-in shared by all tests
 export const blobStore = new Map<string, Buffer>();
 
-vi.mock('../src/s3.ts', () => ({
-  ensureBucket: async () => {},
-  putBlob: async (key: string, body: Buffer) => { blobStore.set(key, body); },
-  getBlob: async (key: string) => {
+vi.mock('../src/s3.ts', () => {
+  // defined inside the factory: vi.mock is hoisted above every top-level const
+  const put = async (key: string, body: Buffer) => { blobStore.set(key, body); };
+  const get = async (key: string) => {
     const b = blobStore.get(key);
     if (!b) throw new Error(`no blob ${key}`);
     return b;
-  },
-  deleteBlob: async (key: string) => { blobStore.delete(key); },
-}));
+  };
+  const list = async (prefix: string) => [...blobStore.keys()].filter((k) => k.startsWith(prefix)).sort();
+  const del = async (key: string) => { blobStore.delete(key); };
+  return {
+    ensureBucket: async () => {},
+    putBlob: put, getBlob: get, listKeys: list, deleteBlob: del,
+    s3Store: { put, get, list, del },
+  };
+});
 
 import { run, insertId } from '../src/db.ts';
 import { encrypt, hashPassword } from '../src/crypto.ts';

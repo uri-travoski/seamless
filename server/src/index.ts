@@ -25,6 +25,9 @@ import { startImapFacade } from './facade/imap.ts';
 import { startSmtpFacade } from './facade/smtp.ts';
 import { registerCardDav } from './facade/carddav.ts';
 import { startContactHarvest } from './contacts.ts';
+import { startBackupScheduler } from './backup/schedule.ts';
+
+const pkg = JSON.parse(fs.readFileSync(new URL('../../package.json', import.meta.url), 'utf8')) as { version: string };
 
 await migrate();
 
@@ -98,6 +101,7 @@ startRetention();
 startSafeDelete();
 startContactHarvest();
 startForwarding();
+startBackupScheduler(pkg.version);
 startImapFacade();
 startSmtpFacade();
 

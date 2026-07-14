@@ -104,4 +104,5 @@ export {
   AddressBook as ContactsIcon,
   Lightbulb as SuggestionIcon,
   Question as HelpIcon,
+  HardDrives as BackupIcon,
 } from '@phosphor-icons/react';

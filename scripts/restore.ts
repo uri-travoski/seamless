@@ -1,0 +1,80 @@
+/**
+ * Disaster recovery from the terminal.
+ *
+ *   npm run restore -- --list             show what is in the bucket
+ *   npm run restore -- --latest           restore the newest backup
+ *   npm run restore -- --key backup/2026-07-14T02-00-00-000Z/
+ *   npm run restore -- --latest --verify-only   check it reads back, change nothing
+ *
+ * Needs the same .env as the server: DATABASE_URL, S3_* (pointed at the surviving
+ * bucket) and — critically — the SEAMLESS_SECRET the backup was written with.
+ * Restoring TRUNCATES every table, so it refuses to run against a database that
+ * still has users unless --force is given.
+ */
+import { listBackups, verifyBackup, restoreBackup, databaseIsEmpty } from '../server/src/backup/engine.ts';
+import { getBackupConfig } from '../server/src/backup/schedule.ts';
+import { migrate, pool } from '../server/src/db.ts';
+
+const args = process.argv.slice(2);
+const has = (f: string) => args.includes(f);
+const val = (f: string) => { const i = args.indexOf(f); return i >= 0 ? args[i + 1] : undefined; };
+
+const fmtBytes = (n: number) => (n < 1024 * 1024 ? `${(n / 1024).toFixed(0)} KB` : `${(n / 1024 / 1024).toFixed(1)} MB`);
+
+async function main() {
+  await migrate();
+  const prefix = (await getBackupConfig()).prefix;
+  const backups = await listBackups({ prefix });
+
+  if (!backups.length) {
+    console.error(`No backups found under ${prefix} in bucket. Check S3_* env vars.`);
+    process.exit(1);
+  }
+
+  if (has('--list') || (!has('--latest') && !val('--key'))) {
+    console.log(`${backups.length} backup(s) under ${prefix}:\n`);
+    for (const b of backups) {
+      console.log(`  ${b.key}`);
+      console.log(`      ${new Date(b.createdAt).toISOString()}  ${b.rows} rows  ${b.tables} tables  ${fmtBytes(b.bytes)}`);
+    }
+    console.log('\nRestore with:  npm run restore -- --latest');
+    return;
+  }
+
+  const key = val('--key') ?? backups[0].key;
+  const chosen = backups.find((b) => b.key === key);
+  if (!chosen) {
+    console.error(`No backup with key ${key}. Run with --list.`);
+    process.exit(1);
+  }
+
+  console.log(`Verifying ${key} ...`);
+  const { manifest } = await verifyBackup(key);
+  console.log(`  ok: ${manifest.rows} rows across ${Object.keys(manifest.tables).length} tables, ` +
+              `written ${new Date(manifest.createdAt).toISOString()} by Seamless ${manifest.appVersion}`);
+
+  if (has('--verify-only')) {
+    console.log('\n--verify-only: database untouched.');
+    return;
+  }
+
+  if (!(await databaseIsEmpty()) && !has('--force')) {
+    console.error('\nRefusing to restore: this database still has users, and restoring TRUNCATES every table.');
+    console.error('Re-run with --force if you really mean to overwrite it.');
+    process.exit(1);
+  }
+
+  console.log(`\nRestoring ${key} (this truncates every table) ...`);
+  const report = await restoreBackup(key);
+  console.log(`  restored ${report.rows} rows`);
+  for (const [t, n] of Object.entries(report.tables).filter(([, n]) => n > 0).sort()) console.log(`      ${t}: ${n}`);
+  if (report.skippedColumns.length) {
+    console.log(`\n  skipped (not in this schema version): ${report.skippedColumns.join(', ')}`);
+  }
+  console.log('\nDone. Start the server and log in with your existing credentials.');
+  console.log('The .eml blobs were never touched — restored rows point at them by key.');
+}
+
+main()
+  .catch((err) => { console.error(`\nrestore failed: ${err?.message ?? err}`); process.exit(1); })
+  .finally(() => pool.end());

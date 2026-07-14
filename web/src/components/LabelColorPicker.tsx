@@ -1,13 +1,19 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 import type { ApiLabel } from '@seamless/shared';
 import { useMail } from '../state/mail.ts';
 import { api } from '../api/client.ts';
 import { toast } from '../toast.ts';
 
-// Shared label palette (Synology-style: 14 hues x light/mid/dark). Used by the
-// settings label editor and the inline color dots in the settings list + sidebar.
+// Shared label palette (Synology-style: 14 hues x palest/paler/light/mid/dark). Used by
+// the settings label editor and the inline color dots in the settings list + sidebar.
 export const LABEL_COLORS = [
+  // palest
+  '#eef0f2', '#fbe6e5', '#fcece3', '#fcf2e1', '#faf7e1', '#f0f7e2', '#e5f4e6',
+  '#e3f4f1', '#e3f3f7', '#e4f0f9', '#e7ebf8', '#ece8f7', '#f3e7f5', '#fbe6ee',
+  // paler
+  '#e0e3e6', '#f8d0ce', '#fadbca', '#fae7c7', '#f5f0c6', '#e2f0c8', '#ceebd0',
+  '#caebe5', '#cbe8f0', '#cde3f4', '#d1d9f1', '#dbd3f0', '#e9d1ec', '#f7d0df',
   // light
   '#cbd0d6', '#f3b0ad', '#f6c3a6', '#f7d7a1', '#efe6a0', '#cfe6a4', '#aeddb0',
   '#a6ddd3', '#a9d8e6', '#abd0ec', '#b3bfe8', '#c3b6e6', '#dbb3e0', '#f2b0c9',
@@ -50,6 +56,13 @@ export default function LabelColorPicker({ label, dotSize = 14, stop, className 
 }) {
   const refreshLabels = useMail((s) => s.refreshLabels);
   const [anchor, setAnchor] = useState<{ left: number; top: number } | null>(null);
+
+  useEffect(() => {
+    if (!anchor) return;
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setAnchor(null); };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [anchor]);
 
   const openAt = (el: HTMLElement) => {
     const r = el.getBoundingClientRect();

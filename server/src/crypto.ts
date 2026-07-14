@@ -20,6 +20,24 @@ export function decrypt(enc: string): string {
   return Buffer.concat([decipher.update(ct), decipher.final()]).toString('utf8');
 }
 
+/** Binary variants for backup payloads: same AES-256-GCM key, raw bytes in/out
+ *  (iv | tag | ciphertext) so a multi-MB dump never round-trips through base64. */
+export function encryptBuffer(plain: Buffer): Buffer {
+  const iv = crypto.randomBytes(12);
+  const cipher = crypto.createCipheriv('aes-256-gcm', key, iv);
+  const ct = Buffer.concat([cipher.update(plain), cipher.final()]);
+  return Buffer.concat([iv, cipher.getAuthTag(), ct]);
+}
+
+export function decryptBuffer(enc: Buffer): Buffer {
+  const iv = enc.subarray(0, 12);
+  const tag = enc.subarray(12, 28);
+  const ct = enc.subarray(28);
+  const decipher = crypto.createDecipheriv('aes-256-gcm', key, iv);
+  decipher.setAuthTag(tag);
+  return Buffer.concat([decipher.update(ct), decipher.final()]);
+}
+
 export function hashPassword(password: string): string {
   const salt = crypto.randomBytes(16);
   const hash = crypto.scryptSync(password, salt, 32);
