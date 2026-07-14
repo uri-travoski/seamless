@@ -42,7 +42,19 @@ export interface BackupConfig {
   hour: number;            // UTC hour of the run slot
   keep: number;            // how many runs to retain in the bucket
   prefix: string;
-  alertEmail: string;
+  alertEmail: string;      // one or more addresses, comma-separated
+}
+
+/** Split the alert field into addresses. Accepts commas, semicolons, whitespace and
+ *  newlines, because people paste lists in every shape — and drops anything that is not
+ *  an address rather than handing nodemailer a string it will reject wholesale. */
+export function alertRecipients(raw: string): string[] {
+  return [...new Set(
+    (raw ?? '')
+      .split(/[,;\s]+/)
+      .map((s) => s.trim())
+      .filter((s) => /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(s)),
+  )];
 }
 
 export interface BackupStatus {
@@ -88,7 +100,8 @@ export async function setBackupConfig(cfg: Partial<BackupConfig>): Promise<Backu
   if (cfg.hour !== undefined) await setSetting('backup_hour', String(Math.min(23, Math.max(0, cfg.hour))));
   if (cfg.keep !== undefined) await setSetting('backup_keep', String(Math.max(1, cfg.keep)));
   if (cfg.prefix) await setSetting('backup_prefix', normalizePrefix(cfg.prefix));
-  if (cfg.alertEmail !== undefined) await setSetting('backup_alert_email', cfg.alertEmail.trim());
+  // store the cleaned list, so what the UI shows back is exactly what will be mailed
+  if (cfg.alertEmail !== undefined) await setSetting('backup_alert_email', alertRecipients(cfg.alertEmail).join(', '));
   return getBackupConfig();
 }
 
@@ -150,13 +163,16 @@ async function alert(subject: string, body: string, cfg: BackupConfig): Promise<
   const admins = await q<{ id: number }>("SELECT id FROM users WHERE role = 'admin'");
   for (const a of admins) await notifyUser(a.id, subject, body, 'backup-alert').catch(() => {});
 
-  if (!cfg.alertEmail) return;
+  const recipients = alertRecipients(cfg.alertEmail);
+  if (!recipients.length) return;
   const acct = await one<AccountRow>('SELECT * FROM accounts WHERE enabled = true ORDER BY id LIMIT 1');
   if (!acct) return;
   try {
     const transport = await smtpTransport(acct);
+    // one message addressed to everyone: a per-recipient loop would let the first bad
+    // address swallow the alert for the rest
     await transport.sendMail({
-      from: acct.email, to: cfg.alertEmail,
+      from: acct.email, to: recipients.join(', '),
       subject, text: `${body}\n\n-- Seamless`,
     });
   } catch (err: any) {

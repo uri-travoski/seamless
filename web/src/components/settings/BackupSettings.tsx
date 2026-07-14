@@ -83,6 +83,10 @@ export default function BackupSettings() {
   if (!config || !status) return <div><h2>Backup</h2><p className="settings-desc">Loading…</p></div>;
 
   const failing = status.lastStatus === 'error' && !status.acknowledged;
+  // mirrors alertRecipients() on the server, so the count shown is what will actually be mailed
+  const recipients = (config.alertEmail ?? '')
+    .split(/[,;\s]+/)
+    .filter((s) => /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(s.trim()));
 
   return (
     <div>
@@ -158,10 +162,17 @@ export default function BackupSettings() {
         </div>
         <div className="field">
           <label>Email me if a backup fails</label>
-          <input className="text-input" type="email" placeholder="you@example.com" value={config.alertEmail}
+          {/* type=text, not email: browsers reject a comma-separated list in an email input */}
+          <input className="text-input" type="text" placeholder="you@example.com, ops@example.com"
+            value={config.alertEmail}
             onChange={(e) => setConfig({ ...config, alertEmail: e.target.value })}
             onBlur={(e) => void save({ alertEmail: e.target.value })} />
-          <div className="hint">Sent through your first connected account. Failures also push-notify and land in Logs.</div>
+          <div className="hint">
+            {recipients.length > 1
+              ? `${recipients.length} recipients will be alerted.`
+              : 'Separate several addresses with commas.'}{' '}
+            Sent through your first connected account. Failures also push-notify and land in Logs.
+          </div>
         </div>
       </div>
 

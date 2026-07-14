@@ -6,7 +6,7 @@ import { setMailStore, type BlobStore } from '../src/s3.ts';
 import {
   createBackup, restoreBackup, verifyBackup, listBackups, pruneBackups,
 } from '../src/backup/engine.ts';
-import { isDue, nextDueAt, normalizePrefix, APP_FOLDER, INTERVAL_HOURS, type BackupConfig } from '../src/backup/schedule.ts';
+import { isDue, nextDueAt, normalizePrefix, alertRecipients, APP_FOLDER, INTERVAL_HOURS, type BackupConfig } from '../src/backup/schedule.ts';
 import { saveMailStoreConfig, loadMailStoreConfig } from '../src/backup/mailref.ts';
 
 /** The same in-memory store the helpers use for .eml blobs, exposed as a BlobStore. */
@@ -443,6 +443,34 @@ describe('app-folder namespacing', () => {
     const keys = await store.list('seamless/');
     expect(keys.some((k) => k.endsWith('manifest.json'))).toBe(true);
     expect(keys.every((k) => k.startsWith(APP_FOLDER))).toBe(true);
+  });
+});
+
+describe('failure alert recipients', () => {
+  it('accepts a single address', () => {
+    expect(alertRecipients('you@example.com')).toEqual(['you@example.com']);
+  });
+
+  it('accepts several, comma-separated', () => {
+    expect(alertRecipients('a@x.com,b@y.com,c@z.com')).toEqual(['a@x.com', 'b@y.com', 'c@z.com']);
+  });
+
+  it.each([
+    ['a@x.com, b@y.com', ['a@x.com', 'b@y.com']],                   // comma + space
+    ['a@x.com;b@y.com', ['a@x.com', 'b@y.com']],                     // semicolon (Outlook paste)
+    ['a@x.com\nb@y.com', ['a@x.com', 'b@y.com']],                    // newline
+    ['  a@x.com ,, b@y.com , ', ['a@x.com', 'b@y.com']],             // stray commas and padding
+    ['a@x.com, a@x.com', ['a@x.com']],                               // duplicate collapses
+    ['a@x.com, not-an-email, b@y.com', ['a@x.com', 'b@y.com']],      // junk dropped, rest survive
+    ['', []],
+    ['   ', []],
+  ])('parses %o', (input, expected) => {
+    expect(alertRecipients(input)).toEqual(expected);
+  });
+
+  it('drops junk rather than handing the mailer a list it will reject wholesale', () => {
+    // one bad address must not cost the good ones their alert
+    expect(alertRecipients('garbage, ops@example.com')).toEqual(['ops@example.com']);
   });
 });
 
