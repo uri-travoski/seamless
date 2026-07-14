@@ -14,6 +14,7 @@ Self-hosted, AI-native webmail. Multi-user, unified inbox across many IMAP accou
 - **Processor notes** — per-sender/domain instructions ("newsletter I signed up for — delete after 7 days unless I read it") enforced deterministically and injected into AI decisions.
 - **Unified inbox** — every account's Inbox merged into one view; Sent → one Sent, Drafts → one Drafts. Per-account color bars.
 - **Portable storage** — every message archived as raw RFC822 `.eml` in S3 (MinIO / R2 / B2).
+- **Encrypted backup + disaster restore** — scheduled database backups (twice-daily → weekly) to object storage, AES-256-GCM with `SEAMLESS_SECRET`, verified on write and pruned to a keep-count. Backups are **self-describing**: a rebuilt server finds its own mail bucket from the backup and proves it by checksum, so "restored" never means "rows are back but every body 404s". Restore from the first-run screen or the CLI. Backups can live in a **separate bucket or provider** from the mail they protect.
 - **JMAP subset API** the client talks to (`Mailbox/get`, `Email/query|get|set`, `Thread/get`, `Identity/get`, `EmailSubmission/set`, `#ref` back-references).
 - **Reply-from matching** — auto-replies from the address a message was delivered to (Delivered-To → To → Cc, primary + aliases).
 - **Fast frontend** — virtualized list, server-side pagination, IndexedDB cache, optimistic mutations, WebSocket push.
@@ -72,6 +73,32 @@ DATA_DIR=/var/lib/seamless NODE_ENV=production npm start --workspace server
 
 Point `DATABASE_URL` at your Postgres (pgvector image), `S3_*` at your MinIO/R2/B2 bucket, and set `PUBLIC_URL`. Put a TLS-terminating reverse proxy in front.
 
+Or run the image, which serves the API and the built web app:
+
+```bash
+docker run -d --name seamless --restart unless-stopped -p 4900:4900 \
+  --env-file .env -v /var/lib/seamless:/app/data \
+  ghcr.io/uri-travoski/seamless:latest
+```
+
+## Backup & restore
+
+Turn it on in **Settings → Backup**: pick a schedule (twice-daily → weekly), an hour, and how many runs to keep. Every run writes an encrypted dump to object storage, reads it back to verify it, prunes old runs, and alerts you (push + email + banner + log) if anything fails.
+
+The `.eml` blobs are never copied — a backup is the *index*, not the archive, so a few thousand messages costs a couple of hundred KB.
+
+To recover on a rebuilt box, give it the same `SEAMLESS_SECRET` and point `S3_BACKUP_*` at the bucket. Then either restore from the first-run screen, or:
+
+```bash
+npm run restore -- --list            # what is in the bucket
+npm run restore -- --latest          # restore the newest
+npm run restore -- --verify-only     # drill: prove it reads back, change nothing
+```
+
+The backup records **which bucket holds the mail** (and, encrypted, the credentials for it), so a restored server reconnects to the blobs on its own and checksum-verifies one before declaring success. Full details, including troubleshooting: `docs/manual/11-backup-restore.md`.
+
+> **Keep `SEAMLESS_SECRET` somewhere other than the server.** It decrypts the backups and every credential inside them. Without it they are unreadable.
+
 ## Tests
 
 ```bash
@@ -80,4 +107,6 @@ npm test    # vitest against Postgres (creates/rebuilds the seamless_test databa
 
 ## Environment
 
-See `.env.example`. Key vars: `SEAMLESS_SECRET` (required), `PORT` (4900), `DATABASE_URL`, `DATA_DIR`, `PUBLIC_URL`, `S3_*`.
+See `.env.example`. Key vars: `SEAMLESS_SECRET` (required), `PORT` (4900), `DATABASE_URL`, `DATA_DIR`, `PUBLIC_URL`, `S3_*` (mail blobs).
+
+Backups reuse the `S3_*` bucket unless you separate them — recommended, so one deleted bucket or leaked key cannot take both: `S3_BACKUP_BUCKET`, plus optional `S3_BACKUP_ENDPOINT` / `_REGION` / `_ACCESS_KEY` / `_SECRET_KEY` / `_FORCE_PATH_STYLE` (each falls back to its `S3_*` twin), and `BACKUP_PREFIX` (default `seamless/`).

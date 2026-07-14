@@ -412,6 +412,48 @@ layouts, virtualized list). Screenshot mapping:
 
 ---
 
+## 12a. Backup & restore (added post-v1)
+
+The `.eml` blobs already survive a dead server — they are in object storage. Everything that
+makes them *useful* did not: labels, threads, flags, rules, AI decisions, embeddings,
+retention state, contacts, users. That is the whole of Postgres, and it had no backup.
+
+**Dump.** Logical, not `pg_dump`: the app image is `node:20-slim` and reaches Postgres over
+TCP, so it has no `pg_dump` binary and no way to exec one in the database container. Every
+table is read through the pool the app already owns, streamed as NDJSON, gzipped, then
+AES-256-GCM encrypted with `SEAMLESS_SECRET` (the `auth_enc` pattern, §1). Generated columns
+(`message_fts.tsv`) are skipped and rebuild themselves.
+
+**Restore.** One transaction. `session_replication_role = replica` sidesteps FK ordering (the
+same switch `pg_restore` uses), then `TRUNCATE … RESTART IDENTITY`, replay, and `setval` every
+sequence — without which the first insert after a restore collides on the PK. Migrates from
+nothing first, so a bare database works.
+
+**Layout.** `<bucket>/seamless/<iso>/` holds `manifest.json` (plaintext: rows, checksum,
+mail-bucket location — never credentials, so backups list and verify without the secret) and
+`data.ndjson.gz.enc`. Always under an app folder, so one bucket serves several apps.
+
+**Self-describing.** A key like `msg/1/<sha>.eml` says nothing about *which* bucket holds it,
+so a restore could put every row back and 404 every body. The mail-store config therefore lives
+in `settings` (credentials encrypted), rides inside the dump, and a restore adopts it, repoints
+the store at runtime, then proves it: fetch one blob, match the sha256 embedded in its key.
+`S3_BUCKET` in the environment still wins — that is how you migrate mail to a new bucket.
+
+**Separation.** `S3_BACKUP_*` (each falling back to its `S3_*` twin) puts backups in another
+bucket, account or provider from the mail they protect. The backup bucket's own credentials can
+never come from the backup — you need them to read it — so they stay in the environment, or get
+typed into the setup screen.
+
+**Schedule.** Twice-daily → weekly, UTC slot hour, keep-last-N with pruning, catch-up after a
+missed slot. Every run reads back what it wrote (checksum → decrypt → parse) before reporting
+success; an unverified backup is a rumour. Failure raises three channels: web push to admins,
+email to a comma-separated list, and a banner plus a `backup` log entry.
+
+**Restore is CLI + first-run wizard only** — never a button in Settings. It truncates every
+table, and the case that needs it is a server nobody can log into.
+
+---
+
 ## 13. Non-goals (v1)
 
 Hosting a real MTA (no port-25 inbound; deliverability stays upstream) · CalDAV ·

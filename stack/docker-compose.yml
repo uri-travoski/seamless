@@ -1,0 +1,54 @@
+# Production stack: the published image + its database.
+#
+#   docker compose -f stack/docker-compose.yml pull      # get the latest published image
+#   docker compose -f stack/docker-compose.yml up -d
+#
+# Runs the image from GitHub Container Registry — `latest` always points at the newest
+# release, so `pull` + `up -d` is the whole upgrade. Pin the tag (e.g. :0.25.2) if you would
+# rather upgrade deliberately.
+#
+# Config comes from ../.env (SEAMLESS_SECRET, DATABASE_URL, S3_* for mail, S3_BACKUP_* for
+# backups). Mail blobs and database backups live in object storage, so the only state on
+# this box is the Postgres volume below — and that is exactly what Settings > Backup backs up.
+
+name: seamless
+
+services:
+  postgres:
+    image: pgvector/pgvector:pg17
+    restart: unless-stopped
+    ports:
+      - "5460:5432"
+    environment:
+      POSTGRES_USER: seamless
+      POSTGRES_PASSWORD: seamless
+      POSTGRES_DB: seamless
+    volumes:
+      - seamless-pg:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U seamless"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  app:
+    image: ghcr.io/uri-travoski/seamless:latest
+    pull_policy: always
+    restart: unless-stopped
+    # Host networking on purpose: the IMAP/SMTP facades serve real mail clients on the LAN,
+    # and accounts stored as "localhost" (a mail server on this machine) must stay reachable.
+    # It also means DATABASE_URL=...@localhost:5460 in .env works unchanged.
+    # Ports served: 4900 (web + API), 1143 (IMAP facade), 1587 (SMTP submission).
+    network_mode: host
+    env_file:
+      - ../.env
+    volumes:
+      # scratch only (upload staging) — nothing here is precious; mail is in object storage
+      - ../data:/app/data
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+volumes:
+  # the existing volume, so `up -d` adopts the running database rather than starting an empty one
+  seamless-pg:

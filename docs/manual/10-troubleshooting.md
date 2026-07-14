@@ -29,6 +29,13 @@ Remote images are blocked by default for privacy. Click **Load images** on a mes
 - Deletions go to **Trash** first; open Trash and **Restore**.
 - Protected labels and manually-unread mail are never swept.
 
+## Backups are failing
+
+- Open **Settings > Logs** and filter to `backup` — the `ERROR` line names the cause. Expired storage credentials and a full object store are the usual two.
+- If the Backup page shows **"Cannot reach your storage bucket"**, the endpoint or keys are wrong. Note that Seamless *creates* a bucket that does not exist, so a typo in the bucket name quietly makes a new empty one rather than failing.
+- A scheduled backup that never runs: check **Back up automatically** is ticked, and remember the hour is **UTC**.
+- Everything else — restoring, a lost prefix, a wrong secret, bodies that will not open after a restore — is covered in **Backup and restore**.
+
 ## A phone or desktop mail app will not connect
 
 - Use an **app password** from **Settings > Devices**, not your main password.

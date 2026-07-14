@@ -1,92 +1,193 @@
 # Backup and restore
 
-Your mail bodies are already safe. Every message is archived as a raw `.eml` file in your object storage (R2, B2, MinIO), and those files are portable — any mail client can read them.
+Your mail is already safe. Every message is archived as a raw `.eml` file in object storage, and those files are portable — any mail client can read them.
 
-Everything else is not. Labels, threads, read and starred state, your rules, every AI decision and embedding, retention countdowns, contacts, app passwords and users live only in Postgres, on the server. If the server dies, that is what you lose: not the mail, but everything that makes it findable and everything the AI has learned.
+Everything *else* is not. Labels, threads, read and starred state, your rules, every AI decision and embedding, retention countdowns, contacts, app passwords and users live only in Postgres, on the server. If the server dies, that is what you lose: not the mail, but everything that makes it findable and everything the AI has learned about you.
 
-Backup closes that gap. It writes the database to the same bucket the mail lives in, so one surviving bucket is enough to rebuild the whole instance.
+Backup closes that gap. It writes the database to object storage, encrypted, so a destroyed server is a restore rather than a loss.
 
-## What a backup contains
+## What is in a backup
 
-A single encrypted file plus a plaintext manifest, written to `seamless/<timestamp>/` in your bucket. Backups always live under the `seamless/` app folder, so one bucket can hold backups from several apps without them mixing — anything you type in the prefix box is nested inside it (`nightly` becomes `seamless/nightly/`).
+Two objects per run, in a folder named for the moment it was taken:
 
-- **`data.ndjson.gz.enc`** — every table, gzipped, then AES-256-GCM encrypted with your `SEAMLESS_SECRET`.
-- **`manifest.json`** — timestamp, row counts per table, size and checksum. Left readable so you can list and check backups without the secret.
+```
+<bucket>/seamless/2026-07-14T02-00-00-000Z/
+    manifest.json          plaintext — what this backup is
+    data.ndjson.gz.enc     ciphertext — the database itself
+```
 
-The `.eml` blobs are not copied. They are already in the bucket, and the restored rows point straight back at them.
+**`data.ndjson.gz.enc`** is every table, gzipped, then AES-256-GCM encrypted with your `SEAMLESS_SECRET`. It holds the whole database: mail metadata, labels, rules, AI decisions, embeddings, contacts, users, and your stored account credentials.
 
-At a few thousand messages a backup is a couple of hundred kilobytes, because it stores the index rather than the mail.
+**`manifest.json`** is deliberately left readable, so you can list and check backups without the secret. It records when the backup was taken, how many rows, a checksum, and **which bucket the mail blobs live in** — but never any credentials.
+
+The `.eml` files are **not copied**. They are already in object storage, and the restored rows point straight back at them. A backup is the *index*, not the archive. That is why a few thousand messages costs a couple of hundred kilobytes rather than gigabytes.
+
+### The app folder
+
+Backups always live under a `seamless/` folder inside the bucket, so one bucket can hold several applications' backups without them mixing. Anything you type in the prefix box is nested inside it — `nightly` becomes `seamless/nightly/`. This cannot be escaped, by design.
 
 ## Turning it on
 
-**Settings → Backup.**
+**Settings > Backup.**
 
-- **Back up automatically** — off by default. Nothing runs until you tick it.
-- **How often** — twice a day, daily, every 2 days, twice a week, or weekly.
-- **At** — the UTC hour the run starts. Twice-daily also runs twelve hours later.
-- **Keep last** — how many runs to retain. Older ones are deleted from the bucket automatically.
-- **Where it goes** — the prefix inside your existing bucket. Defaults to `backup/`, alongside the `msg/` mail blobs.
-- **Email me if a backup fails** — optional address, sent through your first connected account.
+1. Tick **Back up automatically**. Nothing runs until you do; the default is off.
+2. **How often** — twice a day, daily, every 2 days, twice a week, or weekly.
+3. **At** — the UTC hour the run starts. Twice-daily also runs twelve hours later.
+4. **Keep last** — how many runs to retain. Older ones are deleted from the bucket automatically.
+5. **Where it goes** — the prefix inside your bucket. Leave it alone unless you have a reason.
+6. **Email me if a backup fails** — one address, or several separated by commas.
 
-**Back up now** runs one immediately, whatever the schedule says.
+**Back up now** runs one immediately, whatever the schedule says. Use it once after setup, so you have a backup before you need one.
 
-Every run writes itself, then reads back what it wrote — checksum, then decryption, then a full parse — before reporting success. A backup that cannot be read is reported as a failure, not a success.
+## What each run does
 
-If the server is switched off through a scheduled slot, the run happens shortly after it comes back rather than waiting for the next slot.
+1. **Writes** the encrypted dump and its manifest to storage.
+2. **Reads back** what it just wrote — checksum, then decryption, then a full parse. A backup that cannot be read is reported as a **failure**, not a success. An unverified backup is a rumour.
+3. **Prunes** older runs beyond your keep-count.
+4. **Records** the result in **Settings > Logs** under `backup`.
+5. **Alerts** you if anything went wrong.
+
+If the server is switched off through a scheduled slot, the run happens shortly after it comes back rather than waiting a whole cycle.
 
 ## When a backup fails
 
 Three things happen at once, so a silent failure is not possible:
 
 - a **push notification** to every admin,
-- an **email**, if you set an address,
-- a **red banner** in Settings → Backup that stays until dismissed, and a line in **Settings → Logs** under `backup`.
+- an **email**, to every address in the alert field,
+- a **red banner** in Settings > Backup that stays until dismissed, plus an `ERROR` line in **Settings > Logs**.
+
+The email goes out through your first connected account. Separate several addresses with commas — `you@example.com, ops@example.com`. Duplicates and typos are dropped rather than allowed to break delivery for everyone else.
+
+If the storage bucket itself is unreachable, the Backup page still loads and shows you why. That is deliberate: the page you need in order to fix a broken bucket must not be the page that breaks with it.
 
 ## Restoring
 
 There is no restore button in Settings, on purpose. Restoring replaces every table, and the situation that calls for it is a server that no longer exists — one you cannot log in to.
 
-On the rebuilt machine, give Seamless the same `.env` it had before: the same `S3_*` pointing at the surviving bucket, and the same `SEAMLESS_SECRET`. Then either:
+### From the browser
 
-**From the browser.** Open Seamless. Because the database is empty it shows the first-run setup screen, and that screen lists the backups it can see in your bucket. Pick one, press Restore, then sign in with your old account.
+On the rebuilt machine, give Seamless the same `SEAMLESS_SECRET` and point `S3_BACKUP_*` at the bucket holding your backups. Then open Seamless. Because the database is empty it shows the first-run setup screen, and that screen lists the backups it can see.
 
-**From the terminal.**
+Pick one, press **Restore**, then sign in with your existing account. Your password still works — it came back with the database.
+
+If it finds nothing, it asks you where to look: bucket, endpoint, access key, secret key. You do **not** need to tell it where the mail is — that travels inside the backup.
+
+### From the terminal
 
 ```bash
-npm run restore -- --list      # what is in the bucket
-npm run restore -- --latest    # restore the newest
-npm run restore -- --key backup/2026-07-14T02-00-00-000Z/
-npm run restore -- --latest --verify-only   # check it reads back, change nothing
+npm run restore -- --list                    # what is in the bucket
+npm run restore -- --latest                  # restore the newest
+npm run restore -- --key seamless/2026-07-14T02-00-00-000Z/
+npm run restore -- --latest --verify-only    # check it reads back, change nothing
+npm run restore -- --prefix nightly/ --list  # if you used a custom prefix
 ```
 
-The restore runs in one transaction. If anything goes wrong part-way, nothing is applied. It refuses to run against a database that still has users unless you add `--force`.
+The restore runs in **one transaction**: if anything fails part-way, nothing is applied. It refuses to run against a database that still has users unless you add `--force`.
 
-When it finishes, your mail, labels, rules, AI history and logins are all back, and the messages point at the `.eml` files that never moved.
+### The mail comes back too
 
-## If you change the prefix, set it in the environment too
+The backup knows which bucket holds your mail, and the credentials for it, so a restored server **reconnects on its own** — you do not have to remember or retype the mail bucket's settings.
 
-The prefix you type in Settings is stored in Postgres — the very thing a disaster destroys. A rebuilt server has no way to know you used anything other than the default `seamless/`, and will report no backups found while yours sit safely in the bucket.
-
-If you use a custom prefix, put it in `.env` as well:
+Then it proves it: it fetches one message's blob and checks it against the checksum embedded in the key. You will see either
 
 ```
-BACKUP_PREFIX=my-prefix/
+Mail blobs: bucket "seamless-emails" (from the backup — no S3_* needed)
+  reachable: fetched msg/1/1c57…e49.eml and its checksum matches.
 ```
 
-Or pass it at restore time: `npm run restore -- --prefix my-prefix/ --list`.
+or a plain warning that the bucket is unreachable. Without that check, a restore would "succeed" with every row in place and every message body silently failing to open — the worst way to fail, because you would only find out weeks later.
+
+If you *do* set `S3_BUCKET` in the environment, it wins. That is how you migrate mail to a new bucket.
+
+## Keeping backups away from the mail
+
+By default, backups sit in the same bucket as the mail. That is convenient, and it is also a single point of failure: one deleted bucket, or one leaked key, takes both.
+
+To separate them, name a different bucket:
+
+```
+S3_BACKUP_BUCKET=backups
+```
+
+Better still, give the backups their own endpoint and credentials, so they live in a different account — or a different provider — from the mail they protect:
+
+```
+S3_BACKUP_ENDPOINT=https://<account>.r2.cloudflarestorage.com
+S3_BACKUP_REGION=auto
+S3_BACKUP_BUCKET=backups
+S3_BACKUP_ACCESS_KEY=...
+S3_BACKUP_SECRET_KEY=...
+S3_BACKUP_FORCE_PATH_STYLE=false
+```
+
+Every `S3_BACKUP_*` falls back to its `S3_*` twin, so leaving them unset keeps the single-bucket behaviour.
+
+Restore is unaffected by the split. The backup only ever carried the database; the restored rows reach the mail through the mail bucket's own settings. Losing the mail bucket does not even stop a restore — the database comes back whole, and the bodies reappear when the mail bucket does.
 
 ## The one thing that can still lose you everything
 
-`SEAMLESS_SECRET` decrypts the backups. **Keep a copy somewhere other than the server.** A password manager is fine; the server's own disk is not.
+`SEAMLESS_SECRET` decrypts your backups. It also decrypts the account credentials inside them — including the keys to your mail bucket.
 
-With the bucket but without the secret, the backups cannot be read — though your `.eml` files are still plain files in the bucket, so the mail itself is never held hostage.
+**Keep a copy somewhere other than the server.** A password manager is right; the server's own disk is not. With the bucket but without the secret, your backups are unreadable.
 
-## A drill is worth more than a backup
+Your `.eml` files remain plain files in the bucket regardless, so the mail itself is never held hostage — but the labels, rules and AI history would be gone.
 
-Once, after setting this up, prove it works rather than assuming:
+## Run a drill
+
+A backup you have never restored is a hope, not a plan. Once, after setting this up:
 
 ```bash
 npm run restore -- --latest --verify-only
 ```
 
-That downloads the backup, checks the checksum, decrypts it with your secret and parses every row, without touching the database. If it prints a row count, the recovery path is real.
+That downloads the backup, checks the checksum, decrypts it with your secret and parses every row — without touching the database. If it prints a row count, the recovery path is real.
+
+## Troubleshooting
+
+**"No backups found" on a rebuilt server.**
+Almost always the prefix. The prefix you typed in Settings was stored in the database — the very thing you lost. A rebuilt box looks in the default `seamless/`. If you used a custom one, set it in the environment (`BACKUP_PREFIX=seamless/nightly/`) or pass it: `npm run restore -- --prefix nightly/ --list`. Check `S3_BACKUP_BUCKET` too.
+
+**"SEAMLESS_SECRET does not match the one this backup was written with".**
+The backup is fine; the key is wrong. Find the secret that was in use when the backup was taken. There is no way around this one — that is the point of encrypting it.
+
+**"checksum mismatch: backup payload is corrupt or truncated".**
+The upload was cut short or the object was damaged. Restore an older run instead — this is exactly why **Keep last** is more than 1.
+
+**"Cannot reach your storage bucket" banner.**
+Credentials or endpoint are wrong, or the bucket does not exist. Check `S3_BACKUP_*`. Note that Seamless *creates* a bucket that does not exist, so a typo in the bucket name quietly makes a new empty bucket rather than failing — if backups have "disappeared", check you are looking at the right bucket name.
+
+**Restore succeeded, but no message bodies open.**
+The database is back but the mail bucket is not reachable. The restore will have told you so. Point `S3_BUCKET` / `S3_ACCESS_KEY` / `S3_SECRET_KEY` at the mail bucket and restart. The rows are fine; only the bodies are missing.
+
+**Backups are failing every night.**
+Open **Settings > Logs** and filter to `backup`. The `ERROR` line names the cause. The most common are expired storage credentials and a full disk on the object store.
+
+**The scheduled backup never runs.**
+Check that **Back up automatically** is actually ticked, and remember the hour is **UTC**, not local time. The Backup page shows the next run time.
+
+**Nothing is being backed up at all.**
+Backups do not include the `.eml` files by design — only the database. If you want copies of the raw mail as well, that is your object storage provider's job (R2 and S3 both offer versioning and lifecycle rules).
+
+## Reference
+
+**Environment**
+
+| Variable | Meaning |
+|---|---|
+| `SEAMLESS_SECRET` | Encrypts backups and stored credentials. Keep a copy off the server. |
+| `BACKUP_PREFIX` | Folder inside the bucket. Default `seamless/`. Always nested under the app folder. |
+| `S3_BACKUP_BUCKET` | Bucket for backups. Falls back to `S3_BUCKET`. |
+| `S3_BACKUP_ENDPOINT` / `_REGION` / `_ACCESS_KEY` / `_SECRET_KEY` / `_FORCE_PATH_STYLE` | Backup storage. Each falls back to its `S3_*` twin. |
+| `S3_BUCKET` and friends | Where the mail blobs live. On a restored server these are optional — the backup knows. |
+
+**Command line**
+
+| Command | Does |
+|---|---|
+| `npm run restore -- --list` | List backups |
+| `npm run restore -- --latest` | Restore the newest |
+| `npm run restore -- --key <dir>` | Restore a specific one |
+| `npm run restore -- --verify-only` | Check it reads back; change nothing |
+| `npm run restore -- --prefix <p>` | Look under a custom prefix |
+| `npm run restore -- --force` | Overwrite a database that still has users |
