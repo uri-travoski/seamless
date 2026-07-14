@@ -8,7 +8,7 @@ Backup closes that gap. It writes the database to the same bucket the mail lives
 
 ## What a backup contains
 
-A single encrypted file plus a plaintext manifest, written to `backup/<timestamp>/` in your bucket:
+A single encrypted file plus a plaintext manifest, written to `seamless/<timestamp>/` in your bucket. Backups always live under the `seamless/` app folder, so one bucket can hold backups from several apps without them mixing — anything you type in the prefix box is nested inside it (`nightly` becomes `seamless/nightly/`).
 
 - **`data.ndjson.gz.enc`** — every table, gzipped, then AES-256-GCM encrypted with your `SEAMLESS_SECRET`.
 - **`manifest.json`** — timestamp, row counts per table, size and checksum. Left readable so you can list and check backups without the secret.
@@ -65,7 +65,7 @@ When it finishes, your mail, labels, rules, AI history and logins are all back, 
 
 ## If you change the prefix, set it in the environment too
 
-The prefix you type in Settings is stored in Postgres — the very thing a disaster destroys. A rebuilt server has no way to know you used anything other than the default `backup/`, and will report no backups found while yours sit safely in the bucket.
+The prefix you type in Settings is stored in Postgres — the very thing a disaster destroys. A rebuilt server has no way to know you used anything other than the default `seamless/`, and will report no backups found while yours sit safely in the bucket.
 
 If you use a custom prefix, put it in `.env` as well:
 

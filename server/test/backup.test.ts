@@ -5,7 +5,7 @@ import type { BlobStore } from '../src/s3.ts';
 import {
   createBackup, restoreBackup, verifyBackup, listBackups, pruneBackups,
 } from '../src/backup/engine.ts';
-import { isDue, nextDueAt, INTERVAL_HOURS, type BackupConfig } from '../src/backup/schedule.ts';
+import { isDue, nextDueAt, normalizePrefix, APP_FOLDER, INTERVAL_HOURS, type BackupConfig } from '../src/backup/schedule.ts';
 
 /** The same in-memory store the helpers use for .eml blobs, exposed as a BlobStore. */
 const store: BlobStore = {
@@ -266,6 +266,34 @@ describe('retention', () => {
     await createBackup({ prefix: PREFIX, store, appVersion: 'test' });
     expect(await pruneBackups(14, { prefix: PREFIX, store })).toEqual([]);
     expect(await listBackups({ prefix: PREFIX, store })).toHaveLength(1);
+  });
+});
+
+describe('app-folder namespacing', () => {
+  it('puts backups under the app folder by default', () => {
+    expect(APP_FOLDER).toBe('seamless/');
+    expect(normalizePrefix('seamless/')).toBe('seamless/');
+  });
+
+  it.each([
+    ['nightly', 'seamless/nightly/'],
+    ['nightly/', 'seamless/nightly/'],
+    ['/nightly', 'seamless/nightly/'],
+    ['backup/', 'seamless/backup/'],
+    ['seamless/nightly/', 'seamless/nightly/'],   // already namespaced: left alone
+    ['', 'seamless/'],
+    ['/', 'seamless/'],
+  ])('normalizes %o -> %o', (input, expected) => {
+    expect(normalizePrefix(input)).toBe(expected);
+  });
+
+  it('writes a real backup inside the app folder', async () => {
+    await seedRealisticData();
+    const m = await createBackup({ prefix: normalizePrefix('nightly'), store, appVersion: 'test' });
+    expect(m.key.startsWith('seamless/nightly/')).toBe(true);
+    const keys = await store.list('seamless/');
+    expect(keys.some((k) => k.endsWith('manifest.json'))).toBe(true);
+    expect(keys.every((k) => k.startsWith(APP_FOLDER))).toBe(true);
   });
 });
 

@@ -23,6 +23,18 @@ export const INTERVAL_HOURS: Record<Frequency, number> = {
 
 export const FREQUENCIES = Object.keys(INTERVAL_HOURS) as Frequency[];
 
+/** Backups always live under an app-named folder, so one bucket can serve several apps
+ *  without their backups mixing. A prefix typed in Settings is namespaced into it rather
+ *  than replacing it: "nightly" becomes "seamless/nightly/". */
+export const APP_FOLDER = 'seamless/';
+
+export function normalizePrefix(raw: string): string {
+  let p = raw.trim().replace(/^\/+/, '');
+  if (!p.endsWith('/')) p = `${p}/`;
+  if (p === '/' || p === '') return APP_FOLDER;
+  return p === APP_FOLDER || p.startsWith(APP_FOLDER) ? p : `${APP_FOLDER}${p}`;
+}
+
 export interface BackupConfig {
   enabled: boolean;
   frequency: Frequency;
@@ -64,7 +76,7 @@ export async function getBackupConfig(): Promise<BackupConfig> {
     frequency: freq && FREQUENCIES.includes(freq) ? freq : DEFAULTS.frequency,
     hour: Math.min(23, Math.max(0, Number(await getSetting('backup_hour')) || DEFAULTS.hour)),
     keep: await num('backup_keep', DEFAULTS.keep),
-    prefix: (await getSetting('backup_prefix')) || DEFAULTS.prefix,
+    prefix: normalizePrefix((await getSetting('backup_prefix')) || DEFAULTS.prefix),
     alertEmail: (await getSetting('backup_alert_email')) ?? '',
   };
 }
@@ -74,7 +86,7 @@ export async function setBackupConfig(cfg: Partial<BackupConfig>): Promise<Backu
   if (cfg.frequency && FREQUENCIES.includes(cfg.frequency)) await setSetting('backup_frequency', cfg.frequency);
   if (cfg.hour !== undefined) await setSetting('backup_hour', String(Math.min(23, Math.max(0, cfg.hour))));
   if (cfg.keep !== undefined) await setSetting('backup_keep', String(Math.max(1, cfg.keep)));
-  if (cfg.prefix) await setSetting('backup_prefix', cfg.prefix.endsWith('/') ? cfg.prefix : `${cfg.prefix}/`);
+  if (cfg.prefix) await setSetting('backup_prefix', normalizePrefix(cfg.prefix));
   if (cfg.alertEmail !== undefined) await setSetting('backup_alert_email', cfg.alertEmail.trim());
   return getBackupConfig();
 }

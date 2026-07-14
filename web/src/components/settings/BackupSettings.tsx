@@ -151,7 +151,10 @@ export default function BackupSettings() {
           <input className="text-input" value={config.prefix}
             onChange={(e) => setConfig({ ...config, prefix: e.target.value })}
             onBlur={(e) => void save({ prefix: e.target.value })} />
-          <div className="hint">Prefix inside your existing bucket, alongside the <code>msg/</code> mail blobs.</div>
+          <div className="hint">
+            Always inside the <code>seamless/</code> app folder, so one bucket can hold several apps' backups.
+            Anything you type is nested under it.
+          </div>
         </div>
         <div className="field">
           <label>Email me if a backup fails</label>
