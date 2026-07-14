@@ -34,8 +34,9 @@ import { listContacts, contactToVcf, importVcf, harvestContacts } from './contac
 import { config } from './config.ts';
 import { listBackups, verifyBackup, restoreBackup, databaseIsEmpty } from './backup/engine.ts';
 import {
-  getBackupConfig, setBackupConfig, getBackupStatus, runBackup, acknowledgeFailure, listBackupsForUi,
+  getBackupConfig, setBackupConfig, getBackupStatus, runBackup, acknowledgeFailure, listBackupsForUi, normalizePrefix,
 } from './backup/schedule.ts';
+import { makeStore } from './s3.ts';
 
 const PIXEL_GIF = Buffer.from('R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7', 'base64');
 // /api/setup/{backups,restore} are public on purpose: after a total loss the database
@@ -996,21 +997,56 @@ export function registerRoutes(app: FastifyInstance): void {
   // Restore is deliberately NOT exposed to a logged-in admin: it truncates every
   // table, and the disaster case (empty database, nobody to log in as) is the only
   // one that needs it. Both routes below are public but refuse once a user exists.
+  // The backup store's own credentials can never come out of the backup — you need them to
+  // read it. So the setup screen may supply them, for a box rebuilt with no S3_BACKUP_* set.
+  // (The MAIL bucket needs no such thing: its config travels inside the backup.)
+  const backupStoreFrom = (body: any) => {
+    const s = body?.store;
+    if (!s?.bucket) return undefined;   // fall back to the environment
+    return makeStore({
+      endpoint: String(s.endpoint ?? config.s3Backup.endpoint),
+      region: String(s.region ?? config.s3Backup.region),
+      bucket: String(s.bucket),
+      accessKey: String(s.accessKey ?? config.s3Backup.accessKey),
+      secretKey: String(s.secretKey ?? config.s3Backup.secretKey),
+      forcePathStyle: s.forcePathStyle ?? config.s3Backup.forcePathStyle,
+    });
+  };
+
+  const listSetupBackups = async (body: any) => {
+    const store = backupStoreFrom(body);
+    const prefix = normalizePrefix(String(body?.prefix ?? (await getBackupConfig()).prefix));
+    const backups = await listBackups({ prefix, store });
+    return { backups, prefix, bucket: store ? (body.store.bucket as string) : config.s3Backup.bucket };
+  };
+
   app.get('/api/setup/backups', async (req, reply) => {
     if (!(await databaseIsEmpty())) return reply.code(403).send({ error: 'already set up' });
     try {
-      return { backups: await listBackups({ prefix: (await getBackupConfig()).prefix }) };
+      return await listSetupBackups(undefined);
     } catch (err: any) {
-      return reply.code(400).send({ error: `cannot read backup storage: ${err?.message ?? err}` });
+      // no usable storage config in the environment: the UI then asks the user for it
+      return reply.code(400).send({ error: `cannot read backup storage: ${err?.message ?? err}`, needsStorage: true });
+    }
+  });
+
+  /** Same as the GET, but the caller names the bucket + credentials to look in. */
+  app.post('/api/setup/backups', async (req, reply) => {
+    if (!(await databaseIsEmpty())) return reply.code(403).send({ error: 'already set up' });
+    try {
+      return await listSetupBackups(req.body);
+    } catch (err: any) {
+      return reply.code(400).send({ error: `cannot read that bucket: ${err?.message ?? err}`, needsStorage: true });
     }
   });
 
   app.post('/api/setup/restore', async (req, reply) => {
     if (!(await databaseIsEmpty())) return reply.code(403).send({ error: 'already set up' });
-    const key = String((req.body as any)?.key ?? '');
+    const body = req.body as any;
+    const key = String(body?.key ?? '');
     if (!key) return reply.code(400).send({ error: 'backup key required' });
     try {
-      const report = await restoreBackup(key);
+      const report = await restoreBackup(key, { store: backupStoreFrom(body) });
       await plog(null, 'backup', `restored ${report.rows} rows from ${report.key}`, { meta: report });
       return { ok: true, ...report };
     } catch (err: any) {

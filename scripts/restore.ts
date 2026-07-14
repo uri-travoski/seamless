@@ -76,8 +76,23 @@ async function main() {
   if (report.skippedColumns.length) {
     console.log(`\n  skipped (not in this schema version): ${report.skippedColumns.join(', ')}`);
   }
+
+  // the mail was never in the backup — only the pointer to it. Say plainly whether the
+  // rebuilt server can actually reach the blobs, rather than letting it surface as 404s later
+  const { mailStore, blobs } = report;
+  console.log(`\nMail blobs: bucket "${mailStore.bucket}" at ${mailStore.endpoint}` +
+              `${mailStore.adopted ? ' (from the backup — no S3_* needed)' : ' (from your environment)'}`);
+  if (!blobs.checked) {
+    console.log('  nothing archived yet, nothing to check.');
+  } else if (blobs.ok) {
+    console.log(`  reachable: fetched ${blobs.key} and its checksum matches.`);
+  } else {
+    console.log(`  UNREACHABLE: ${blobs.error}`);
+    console.log('  The database is restored, but message bodies will not open until this bucket is reachable.');
+    console.log('  Set S3_BUCKET / S3_ACCESS_KEY / S3_SECRET_KEY to the mail bucket and restart.');
+  }
+
   console.log('\nDone. Start the server and log in with your existing credentials.');
-  console.log('The .eml blobs were never touched — restored rows point at them by key.');
 }
 
 main()

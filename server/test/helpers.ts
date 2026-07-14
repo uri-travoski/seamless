@@ -13,12 +13,22 @@ vi.mock('../src/s3.ts', () => {
   };
   const list = async (prefix: string) => [...blobStore.keys()].filter((k) => k.startsWith(prefix)).sort();
   const del = async (key: string) => { blobStore.delete(key); };
-  const store = { put, get, list, del };
+  const store = { put, get, list, del, bucket: 'seamless', ensure: async () => {} };
+  // the mail store is repointable in production; the tests only need it to remember what it
+  // was pointed at, so a restore can adopt the config the backup brought back
+  let cfg = {
+    endpoint: 'http://localhost:9100', region: 'us-east-1', bucket: 'seamless',
+    accessKey: 'seamless', secretKey: 'seamless-secret', forcePathStyle: true,
+  };
   return {
     ensureBucket: async () => {},
     putBlob: put, getBlob: get, listKeys: list, deleteBlob: del,
     mailStore: store, backupStore: store, s3Store: store,
+    makeStore: () => store,
     backupSharesMailBucket: true,
+    mailStoreConfig: () => ({ ...cfg }),
+    mailStoreLocation: () => ({ endpoint: cfg.endpoint, region: cfg.region, bucket: cfg.bucket, forcePathStyle: cfg.forcePathStyle }),
+    setMailStore: (next: typeof cfg) => { cfg = { ...next }; },
   };
 });
 

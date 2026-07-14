@@ -2,7 +2,8 @@ import { gzipSync, gunzipSync } from 'node:zlib';
 import { pool, q, one, migrate } from '../db.ts';
 import { config } from '../config.ts';
 import { encryptBuffer, decryptBuffer, sha256 } from '../crypto.ts';
-import { backupStore, type BlobStore } from '../s3.ts';
+import { backupStore, mailStoreLocation, type BlobStore } from '../s3.ts';
+import { saveMailStoreConfig, adoptRestoredMailStore, verifyMailBlobs, type BlobCheck } from './mailref.ts';
 
 /** Logical backup of the whole Postgres database.
  *
@@ -39,6 +40,11 @@ export interface BackupManifest {
   enc: 'aes-256-gcm';
   secretCheck: string;        // SECRET_CHECK encrypted; wrong key is reported as such
   key: string;                // this backup's directory
+  /** Where this backup's mail blobs live — location only, never credentials: the manifest
+   *  is plaintext so backups can be listed without the secret. The credentials ride inside
+   *  the encrypted payload (settings.mail_s3). Lets you see which bucket a backup expects
+   *  BEFORE restoring it. */
+  mailStore?: { endpoint: string; region: string; bucket: string; forcePathStyle: boolean };
 }
 
 export interface BackupSummary {
@@ -76,6 +82,11 @@ const ident = (name: string) => `"${name.replace(/"/g, '""')}"`;
 export async function createBackup(opts: { prefix?: string; store?: BlobStore; appVersion?: string } = {}): Promise<BackupManifest> {
   const store = opts.store ?? backupStore;
   const prefix = opts.prefix ?? DEFAULT_PREFIX;
+
+  // record where the mail lives BEFORE the dump is taken, so the config travels inside the
+  // encrypted payload and a restore can find the blobs without being told where they are
+  await saveMailStoreConfig();
+
   const tables = await tableNames();
 
   const lines: string[] = [];
@@ -113,6 +124,7 @@ export async function createBackup(opts: { prefix?: string; store?: BlobStore; a
     enc: 'aes-256-gcm',
     secretCheck: encryptBuffer(Buffer.from(SECRET_CHECK)).toString('base64'),
     key: dir,
+    mailStore: mailStoreLocation(),
   };
 
   // data first: a manifest only ever exists once its payload is durably uploaded,
@@ -173,6 +185,11 @@ export interface RestoreReport {
   tables: Record<string, number>;
   rows: number;
   skippedColumns: string[];
+  /** Mail is not in the backup — only the pointer to it. These say whether the restored
+   *  server actually reached the blobs, so "restored" never means "rows are back but every
+   *  message body 404s". */
+  mailStore: { bucket: string; endpoint: string; adopted: boolean };
+  blobs: BlobCheck;
 }
 
 /** Destructive: truncates every table, then replays the dump.
@@ -275,7 +292,13 @@ export async function restoreBackup(dir: string, opts: { store?: BlobStore } = {
   }
 
   const rows = Object.values(applied).reduce((a, b) => a + b, 0);
-  return { key: dir, createdAt: manifest.createdAt, tables: applied, rows, skippedColumns };
+
+  // the restored settings say where the mail lives: point the store there, then prove it —
+  // fetch one blob and match it against the sha256 embedded in its key
+  const mailStore = await adoptRestoredMailStore();
+  const blobs = await verifyMailBlobs();
+
+  return { key: dir, createdAt: manifest.createdAt, tables: applied, rows, skippedColumns, mailStore, blobs };
 }
 
 /** Keep the newest `keep` runs; delete the rest. Returns the directories removed. */

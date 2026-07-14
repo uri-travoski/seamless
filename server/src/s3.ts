@@ -10,12 +10,12 @@ export interface BlobStore {
   del(key: string): Promise<void>;
 }
 
-interface S3Config {
+export interface S3Config {
   endpoint: string; region: string; bucket: string;
   accessKey: string; secretKey: string; forcePathStyle: boolean;
 }
 
-function makeStore(cfg: S3Config): BlobStore & { bucket: string; ensure(): Promise<void> } {
+export function makeStore(cfg: S3Config): BlobStore & { bucket: string; ensure(): Promise<void> } {
   const client = new S3Client({
     endpoint: cfg.endpoint,
     region: cfg.region,
@@ -65,8 +65,38 @@ function makeStore(cfg: S3Config): BlobStore & { bucket: string; ensure(): Promi
 
 /** Mail blobs (.eml archive) and database backups are separate stores, so backups can live
  *  in another bucket — or another provider — from the mail they protect. They collapse to
- *  the same bucket when no S3_BACKUP_* vars are set. */
-export const mailStore = makeStore(config.s3);
+ *  the same bucket when no S3_BACKUP_* vars are set.
+ *
+ *  The mail store is REPOINTABLE at runtime: a restore brings the mail-bucket config back
+ *  inside the backup, and the running server has to start reading blobs from wherever that
+ *  says — without a restart, since the restore happens through the web UI. */
+let mailCfg: S3Config = { ...config.s3 };
+let mail = makeStore(mailCfg);
+
+export function mailStoreConfig(): S3Config { return { ...mailCfg }; }
+
+/** Where the mail lives, minus the credentials — safe to log, show, or put in a manifest. */
+export function mailStoreLocation(): { endpoint: string; region: string; bucket: string; forcePathStyle: boolean } {
+  const { endpoint, region, bucket, forcePathStyle } = mailCfg;
+  return { endpoint, region, bucket, forcePathStyle };
+}
+
+export function setMailStore(cfg: S3Config): void {
+  mailCfg = { ...cfg };
+  mail = makeStore(mailCfg);
+}
+
+/** Indirect on purpose: every caller below re-reads `mail`, so repointing the store takes
+ *  effect immediately for code that imported these helpers at module load. */
+export const mailStore: BlobStore & { bucket: string; ensure(): Promise<void> } = {
+  get bucket() { return mailCfg.bucket; },
+  ensure: () => mail.ensure(),
+  put: (k, b, ct) => mail.put(k, b, ct),
+  get: (k) => mail.get(k),
+  list: (p) => mail.list(p),
+  del: (k) => mail.del(k),
+};
+
 export const backupStore = makeStore(config.s3Backup);
 
 /** Same bucket + endpoint means one store is doing both jobs (the default). */
@@ -79,10 +109,10 @@ export async function ensureBucket(): Promise<void> {
 }
 
 // mail-blob helpers used across ingest/send/safe-delete
-export const putBlob = mailStore.put;
-export const getBlob = mailStore.get;
-export const deleteBlob = mailStore.del;
-export const listKeys = mailStore.list;
+export const putBlob: BlobStore['put'] = (k, b, ct) => mail.put(k, b, ct);
+export const getBlob: BlobStore['get'] = (k) => mail.get(k);
+export const deleteBlob: BlobStore['del'] = (k) => mail.del(k);
+export const listKeys: BlobStore['list'] = (p) => mail.list(p);
 
 /** @deprecated use `mailStore`; kept so existing imports keep meaning the mail bucket. */
 export const s3Store: BlobStore = mailStore;

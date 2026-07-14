@@ -2,11 +2,12 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import { blobStore, resetDb, makeAccount, makeMailbox, ingest, rawEmail, TEST_USER } from './helpers.ts';
 import { q, one, run, insertId, migrate } from '../src/db.ts';
 import { config } from '../src/config.ts';
-import type { BlobStore } from '../src/s3.ts';
+import { setMailStore, type BlobStore } from '../src/s3.ts';
 import {
   createBackup, restoreBackup, verifyBackup, listBackups, pruneBackups,
 } from '../src/backup/engine.ts';
 import { isDue, nextDueAt, normalizePrefix, APP_FOLDER, INTERVAL_HOURS, type BackupConfig } from '../src/backup/schedule.ts';
+import { saveMailStoreConfig, loadMailStoreConfig } from '../src/backup/mailref.ts';
 
 /** The same in-memory store the helpers use for .eml blobs, exposed as a BlobStore. */
 const store: BlobStore = {
@@ -79,16 +80,19 @@ beforeEach(async () => {
   await migrate();   // a previous test may have dropped the schema to simulate a dead server
   await resetDb();
   blobStore.clear();
+  setMailStore({ ...config.s3 });   // the store is module state: a repointing test must not leak
 });
 
 describe('backup round-trip', () => {
   it('restores every table, row and value after the database is wiped', async () => {
     const { ids, labelId } = await seedRealisticData();
-    const before = await tableCounts();
     const beforeMsg = await one<any>('SELECT * FROM messages WHERE id = ?', [ids[0]]);
 
     const manifest = await createBackup({ prefix: PREFIX, store, appVersion: 'test' });
     expect(manifest.rows).toBeGreaterThan(0);
+    // snapshot AFTER the backup: taking one records the mail-store config in `settings`,
+    // so that row is part of what the dump holds and must come back too
+    const before = await tableCounts();
 
     await wipeDatabase();
     expect(Object.keys(await tableCounts())).toHaveLength(0);   // no schema at all, not just empty
@@ -224,6 +228,74 @@ describe('separate buckets for mail and backups', () => {
     // bucket is restored, which is exactly the separation the two buckets buy
     expect(report.rows).toBe(manifest.rows);
     expect((await tableCounts()).messages).toBe(5);
+  });
+});
+
+describe('self-describing mail store', () => {
+  /** Point the (mocked) mail store somewhere distinctive, so credentials in the output are
+   *  unmistakably credentials and not just the default strings appearing by coincidence. */
+  const pointMailStoreAt = (over: Partial<typeof config.s3> = {}) => setMailStore({
+    endpoint: 'https://acct.r2.cloudflarestorage.com', region: 'auto', bucket: 'mail-bucket',
+    accessKey: 'AK-distinctive-access', secretKey: 'SK-super-secret-key', forcePathStyle: false, ...over,
+  });
+
+  it('records the mail bucket in the manifest, but never its credentials', async () => {
+    await seedRealisticData();
+    pointMailStoreAt();
+    const m = await createBackup({ prefix: PREFIX, store, appVersion: 'test' });
+
+    expect(m.mailStore?.bucket).toBe('mail-bucket');
+    expect(m.mailStore?.endpoint).toBe('https://acct.r2.cloudflarestorage.com');
+    // the manifest is plaintext, so a credential in it would be a credential in the open
+    const manifestText = JSON.stringify(m);
+    expect(manifestText).not.toContain('SK-super-secret-key');
+    expect(manifestText).not.toContain('AK-distinctive-access');
+  });
+
+  it('carries the mail-store credentials inside the encrypted payload, not in the clear', async () => {
+    await seedRealisticData();
+    pointMailStoreAt();
+    const m = await createBackup({ prefix: PREFIX, store, appVersion: 'test' });
+
+    const cipher = blobStore.get(`${m.key}data.ndjson.gz.enc`)!;
+    expect(cipher.includes(Buffer.from('SK-super-secret-key'))).toBe(false);   // encrypted at rest
+    // and it really is in there: the whole config comes back after a restore
+    await wipeDatabase();
+    await restoreBackup(m.key, { store });
+    const back = await loadMailStoreConfig();
+    expect(back?.bucket).toBe('mail-bucket');
+    expect(back?.endpoint).toBe('https://acct.r2.cloudflarestorage.com');
+    expect(back?.secretKey).toBe('SK-super-secret-key');
+  });
+
+  it('reconnects to the mail bucket from the backup and proves the blobs are reachable', async () => {
+    const { ids } = await seedRealisticData();
+    const m = await createBackup({ prefix: PREFIX, store, appVersion: 'test' });
+
+    await wipeDatabase();
+    const report = await restoreBackup(m.key, { store });
+
+    expect(report.mailStore.bucket).toBe(config.s3.bucket);
+    expect(report.blobs.checked).toBe(true);
+    expect(report.blobs.ok).toBe(true);           // fetched a blob and its checksum matched
+    const msg = await one<{ s3_key: string }>('SELECT s3_key FROM messages WHERE id = ?', [ids[0]]);
+    expect(report.blobs.key).toBe(msg!.s3_key);
+  });
+
+  it('reports the mail bucket as unreachable instead of restoring into a silent 404', async () => {
+    await seedRealisticData();
+    const m = await createBackup({ prefix: PREFIX, store, appVersion: 'test' });
+
+    await wipeDatabase();
+    const mailKeys = [...blobStore.keys()].filter((k) => k.startsWith('msg/'));
+    for (const k of mailKeys) blobStore.delete(k);   // mail bucket gone / wrong bucket configured
+
+    const report = await restoreBackup(m.key, { store });
+
+    expect(report.rows).toBe(m.rows);              // the database still comes back whole
+    expect(report.blobs.checked).toBe(true);
+    expect(report.blobs.ok).toBe(false);           // and the missing mail is reported, not hidden
+    expect(report.blobs.error).toBeTruthy();
   });
 });
 

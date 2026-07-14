@@ -45,6 +45,10 @@ export const config = {
     secretKey: env('S3_SECRET_KEY', 'seamless-secret'),
     forcePathStyle: env('S3_FORCE_PATH_STYLE', 'true') === 'true',
   },
+  // Did the operator actually name a mail bucket, or are we on the built-in defaults?
+  // After a restore the mail-store config comes back inside the backup, and it must not be
+  // overridden by a default nobody chose — but a bucket named in the environment always wins.
+  s3FromEnv: !!process.env.S3_BUCKET || !!process.env.S3_ENDPOINT,
   // Database backups. Each S3_BACKUP_* falls back to its S3_* twin, so leaving them unset
   // keeps the old single-bucket behaviour. Set S3_BACKUP_BUCKET to separate the two, and
   // the endpoint/credentials too to put backups in a different account or provider

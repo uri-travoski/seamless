@@ -22,21 +22,63 @@ export default function Login() {
   const [backups, setBackups] = useState<ApiBackup[]>([]);
   const [restoring, setRestoring] = useState('');
   const [restored, setRestored] = useState('');
+  const [mailNote, setMailNote] = useState('');
+  const [mailWarn, setMailWarn] = useState(false);
+
+  // Only the BACKUP bucket ever has to be asked for: its credentials cannot come out of the
+  // backup (you need them to read it). The MAIL bucket does not — its config travels inside.
+  const [askStorage, setAskStorage] = useState(false);
+  const [store, setStore] = useState({ endpoint: '', bucket: '', accessKey: '', secretKey: '', region: 'auto' });
+  const [looking, setLooking] = useState(false);
+  const usingCustomStore = () => (store.bucket ? { store, prefix: undefined } : {});
 
   useEffect(() => {
     if (!isSetup) return;
     api.get<{ backups: ApiBackup[] }>('/api/setup/backups')
-      .then((r) => setBackups(r.backups))
-      .catch(() => setBackups([]));   // no bucket, no backups, no restore offer — just set up fresh
+      .then((r) => {
+        setBackups(r.backups);
+        if (!r.backups.length) setAskStorage(true);   // nothing where we looked — let them point us
+      })
+      .catch(() => setAskStorage(true));              // no usable storage config at all
   }, [isSetup]);
+
+  const findBackups = async () => {
+    setErr('');
+    setLooking(true);
+    try {
+      const r = await api.post<{ backups: ApiBackup[] }>('/api/setup/backups', { store });
+      setBackups(r.backups);
+      if (!r.backups.length) setErr('No backups found in that bucket.');
+    } catch (e: any) {
+      setErr(e?.message ?? 'Could not read that bucket');
+    } finally {
+      setLooking(false);
+    }
+  };
 
   const restore = async (key: string) => {
     setErr('');
     setRestoring(key);
     try {
-      const r = await api.post<{ rows: number }>('/api/setup/restore', { key });
+      const r = await api.post<{
+        rows: number;
+        mailStore: { bucket: string; endpoint: string; adopted: boolean };
+        blobs: { checked: boolean; ok: boolean; error?: string };
+      }>('/api/setup/restore', { key, ...usingCustomStore() });
+
       setRestored(`Restored ${r.rows} rows. Sign in with your existing account.`);
+      // the mail was never in the backup, only the pointer to it: say whether we reached it
+      if (!r.blobs.checked) {
+        setMailNote(`Mail bucket "${r.mailStore.bucket}" — nothing archived yet.`);
+      } else if (r.blobs.ok) {
+        setMailWarn(false);
+        setMailNote(`Mail reconnected: bucket "${r.mailStore.bucket}"${r.mailStore.adopted ? ', found in the backup' : ''} — blob checksum verified.`);
+      } else {
+        setMailWarn(true);
+        setMailNote(`Database restored, but the mail bucket "${r.mailStore.bucket}" is unreachable: ${r.blobs.error}. Message bodies will not open until it is.`);
+      }
       setBackups([]);
+      setAskStorage(false);
       await useSession.getState().init();   // users exist again: flips setup -> login
     } catch (e: any) {
       setErr(e?.message ?? 'Restore failed');
@@ -105,14 +147,24 @@ export default function Login() {
         </button>
         <div className="login-err">{err}</div>
 
-        {isSetup && restored && <div className="dim" style={{ marginTop: 12 }}>{restored}</div>}
+        {isSetup && restored && (
+          <div style={{ marginTop: 12 }}>
+            <div className="dim">{restored}</div>
+            {mailNote && (
+              <div className="hint" style={{ marginTop: 6, color: mailWarn ? 'var(--md-danger)' : undefined }}>
+                {mailNote}
+              </div>
+            )}
+          </div>
+        )}
 
         {isSetup && backups.length > 0 && (
           <div style={{ marginTop: 18, borderTop: '1px solid var(--md-border)', paddingTop: 14 }}>
             <strong style={{ fontSize: 13 }}>Rebuilding a lost server?</strong>
             <p className="hint" style={{ marginTop: 4 }}>
-              {backups.length} backup{backups.length > 1 ? 's' : ''} found in your storage bucket. Restoring replaces
-              this empty database with everything it held — mail, labels, rules and AI history.
+              {backups.length} backup{backups.length > 1 ? 's' : ''} found. Restoring replaces this empty database with
+              everything it held — mail, labels, rules and AI history — and reconnects to the mail bucket the backup
+              came from.
             </p>
             {backups.slice(0, 5).map((b) => (
               <div key={b.key} className="field-row" style={{ alignItems: 'center', gap: 8, marginBottom: 6 }}>
@@ -124,6 +176,41 @@ export default function Login() {
                 </button>
               </div>
             ))}
+          </div>
+        )}
+
+        {isSetup && askStorage && !backups.length && !restored && (
+          <div style={{ marginTop: 18, borderTop: '1px solid var(--md-border)', paddingTop: 14 }}>
+            <strong style={{ fontSize: 13 }}>Restoring from a backup?</strong>
+            <p className="hint" style={{ marginTop: 4 }}>
+              No backups found where this server was told to look. Point it at the bucket your backups are in. You do
+              not need the mail bucket — the backup knows where the mail lives.
+            </p>
+            <div className="field">
+              <label>Bucket</label>
+              <input className="text-input" value={store.bucket} placeholder="seamless-backups"
+                onChange={(e) => setStore({ ...store, bucket: e.target.value })} />
+            </div>
+            <div className="field">
+              <label>Endpoint</label>
+              <input className="text-input" value={store.endpoint} placeholder="https://<account>.r2.cloudflarestorage.com"
+                onChange={(e) => setStore({ ...store, endpoint: e.target.value })} />
+            </div>
+            <div className="field-row">
+              <div className="field">
+                <label>Access key</label>
+                <input className="text-input" value={store.accessKey}
+                  onChange={(e) => setStore({ ...store, accessKey: e.target.value })} />
+              </div>
+              <div className="field">
+                <label>Secret key</label>
+                <input className="text-input" type="password" value={store.secretKey}
+                  onChange={(e) => setStore({ ...store, secretKey: e.target.value })} />
+              </div>
+            </div>
+            <button className="btn" disabled={looking || !store.bucket} onClick={() => void findBackups()}>
+              {looking ? 'Looking…' : 'Find backups'}
+            </button>
           </div>
         )}
       </div>

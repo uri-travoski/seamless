@@ -26,6 +26,7 @@ import { startSmtpFacade } from './facade/smtp.ts';
 import { registerCardDav } from './facade/carddav.ts';
 import { startContactHarvest } from './contacts.ts';
 import { startBackupScheduler } from './backup/schedule.ts';
+import { initMailStore } from './backup/mailref.ts';
 
 const pkg = JSON.parse(fs.readFileSync(new URL('../../package.json', import.meta.url), 'utf8')) as { version: string };
 
@@ -82,6 +83,14 @@ syncManager.on('newMail', (ev: NewMailEvent) => {
       .catch((err) => console.error('[ai] categorize failed:', err?.message ?? err));
   }
 });
+
+// where the mail blobs live: a bucket named in the environment wins, otherwise use the one
+// the database remembers (that is how a restored server finds its mail with no S3_* set)
+const mailSrc = await initMailStore().catch((err) => {
+  console.error('mail store init failed:', err?.message ?? err);
+  return { source: 'default' as const, bucket: config.s3.bucket };
+});
+console.log(`Mail blobs: bucket "${mailSrc.bucket}" (${mailSrc.source === 'restored' ? 'from restored backup' : mailSrc.source})`);
 
 await ensureBucket().catch((err) => {
   console.error('S3 bucket check failed (blob storage unavailable):', err?.message ?? err);
