@@ -147,9 +147,9 @@ svg { flex: 0 0 auto; vertical-align: middle; }
 .sidebar .compose-actions { display: flex; gap: 6px; margin: 0 6px 14px; }
 .sidebar .compose-btn {
   flex: 1; padding: 9px 0; font-size: 14px; justify-content: center; border-radius: 5px;
-  background: var(--color-ink); border-color: var(--color-ink); color: var(--color-ink-text);
+  background: var(--color-header-bg); border-color: var(--color-header-bg); color: var(--color-header-text);
 }
-.sidebar .compose-btn:hover { background: var(--color-ink-hover); border-color: var(--color-ink-hover); }
+.sidebar .compose-btn:hover { background: color-mix(in srgb, var(--color-header-bg) 86%, #fff); border-color: color-mix(in srgb, var(--color-header-bg) 86%, #fff); }
 .sidebar .fetch-btn {
   flex: 0 0 auto; width: 38px; padding: 9px 0; justify-content: center; border-radius: 5px;
   background: var(--color-ink); border-color: var(--color-ink); color: var(--color-ink-text);
@@ -1190,11 +1190,6 @@ kbd { font-family: var(--font-mono); font-size: 11.5px; padding: 1px 6px; border
 /* sidebar: soft stone, tighter nav, outline icons */
 :root[data-theme="simply"] .sidebar { background: #f8fafc; border-right: none; }
 :root[data-theme="simply"] .sidebar .compose-actions { margin: 0 0 14px; }
-:root[data-theme="simply"] .sidebar .compose-btn {
-  background: #2b4c7e; border-color: #2b4c7e; border-radius: 8px;
-  box-shadow: inset 0 1px 0 rgba(255,255,255,.18), 0 1px 3px rgba(15,23,42,.25);
-}
-:root[data-theme="simply"] .sidebar .compose-btn:hover { background: #34598f; border-color: #34598f; }
 :root[data-theme="simply"] .side-item { border-radius: 6px; color: #475569; }
 :root[data-theme="simply"] .side-item svg, :root[data-theme="simply"] .side-item .glyph { color: #64748b; }
 :root[data-theme="simply"] .side-item:hover { background: #eef2f7; }
