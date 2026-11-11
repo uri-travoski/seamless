@@ -3,6 +3,7 @@ import type { ApiBackup } from '@seamless/shared';
 import { useSession } from '../state/session.ts';
 import { api } from '../api/client.ts';
 import { MailLogo } from '../icons.tsx';
+import { cachedAppName } from '../state/session.ts';
 
 export default function Login() {
   const status = useSession((s) => s.status);
@@ -14,6 +15,9 @@ export default function Login() {
   const [confirm, setConfirm] = useState('');
   const [err, setErr] = useState('');
   const [busy, setBusy] = useState(false);
+  const [mfaToken, setMfaToken] = useState('');
+  const [code, setCode] = useState('');
+  const loginMfa = useSession((s) => s.loginMfa);
   const isSetup = status === 'setup';
   const canSubmit = email.length > 0 && password.length > 0;
 
@@ -92,8 +96,16 @@ export default function Login() {
     if (isSetup && password !== confirm) { setErr('Passwords do not match'); return; }
     setBusy(true);
     try {
-      await (isSetup ? setup(email, name, password) : login(email, password));
+      if (mfaToken) {
+        await loginMfa(mfaToken, code);
+      } else if (isSetup) {
+        await setup(email, name, password);
+      } else {
+        const r = await login(email, password);
+        if (r.mfaToken) { setMfaToken(r.mfaToken); setCode(''); }
+      }
     } catch (e: any) {
+      if (mfaToken && /expired/.test(e?.message ?? '')) { setMfaToken(''); setPassword(''); }
       setErr(e?.message ?? 'Failed');
     } finally {
       setBusy(false);
@@ -103,7 +115,22 @@ export default function Login() {
   return (
     <div className="login-wrap">
       <div className="login-card">
-        <div className="brand"><MailLogo size={30} />Seamless</div>
+        <div className="brand"><MailLogo size={30} /><span className="app-name">{cachedAppName()}</span></div>
+        {mfaToken ? (
+          <>
+            <p style={{ color: 'var(--md-text-soft)', fontSize: 13, marginTop: 0 }}>
+              Enter the 6-digit code from your authenticator app, or one of your recovery codes.
+            </p>
+            <div className="field">
+              <label>Code</label>
+              <input className="text-input" inputMode="numeric" autoComplete="one-time-code" value={code} autoFocus
+                onChange={(e) => setCode(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && code && submit()} />
+            </div>
+            <button className="btn primary" style={{ width: '100%', justifyContent: 'center', padding: '9px 0' }} disabled={busy || !code} onClick={submit}>Verify</button>
+            <button className="btn ghost" style={{ width: '100%', justifyContent: 'center', marginTop: 6 }} onClick={() => { setMfaToken(''); setErr(''); }}>Back</button>
+            <div className="login-err">{err}</div>
+          </>
+        ) : (<>
         <p style={{ color: 'var(--md-text-soft)', fontSize: 13, marginTop: 0 }}>
           {isSetup ? 'First run — create the admin account for this instance.' : 'Sign in to open your mail.'}
         </p>
@@ -146,6 +173,7 @@ export default function Login() {
           {isSetup ? 'Create & open' : 'Sign in'}
         </button>
         <div className="login-err">{err}</div>
+        </>)}
 
         {isSetup && restored && (
           <div style={{ marginTop: 12 }}>

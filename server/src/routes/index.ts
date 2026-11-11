@@ -23,6 +23,9 @@ import { register as tracking } from './tracking.ts';
 import { register as push } from './push.ts';
 import { register as jmap } from './jmap.ts';
 import { register as notifications } from './notifications.ts';
+import { register as categories } from './categories.ts';
+import { register as templates } from './templates.ts';
+import { register as bulk } from './bulk.ts';
 import { sessionToken } from '../auth/sessions.ts';
 
 export { sessionUser, type SessionUser } from './util.ts';
@@ -63,4 +66,7 @@ export function registerRoutes(app: FastifyInstance): void {
   push(app);
   jmap(app);
   notifications(app);
+  categories(app);
+  templates(app);
+  bulk(app);
 }

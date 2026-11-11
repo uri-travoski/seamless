@@ -67,7 +67,7 @@ export async function handleMethodCall(userId: number, call: MethodCall): Promis
   try {
     switch (name) {
       case 'Mailbox/get':
-        return [[name, { accountId: 'unified', state: await currentState(), list: await listMailboxes(userId), notFound: [] }, tag]];
+        return [[name, { accountId: 'unified', state: await currentState(), list: await listMailboxes(userId, args?.scope), notFound: [] }, tag]];
 
       case 'Email/query': {
         const res = await queryEmails(userId, {

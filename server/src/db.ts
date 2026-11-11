@@ -578,6 +578,88 @@ CREATE TABLE notification_mutes (
 );
 `,
   },
+  {
+    id: 9,
+    sql: `
+-- T1 F-07: mailbox categories (Unified is virtual; Work/Personal/Disposable are built in)
+CREATE TABLE mailbox_categories (
+  id SERIAL PRIMARY KEY,
+  user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  key TEXT NOT NULL,
+  name TEXT NOT NULL,
+  icon TEXT NOT NULL DEFAULT 'folder',
+  color TEXT NOT NULL DEFAULT '#2f7ed8',
+  sort_order INTEGER NOT NULL DEFAULT 0,
+  builtin BOOLEAN NOT NULL DEFAULT false,
+  created_at BIGINT NOT NULL,
+  UNIQUE (user_id, key)
+);
+CREATE TABLE mailbox_category_members (
+  category_id INTEGER NOT NULL REFERENCES mailbox_categories(id) ON DELETE CASCADE,
+  account_id INTEGER NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
+  PRIMARY KEY (category_id, account_id)
+);
+CREATE INDEX mcm_account ON mailbox_category_members(account_id);
+INSERT INTO mailbox_categories(user_id, key, name, icon, color, sort_order, builtin, created_at)
+SELECT u.id, b.key, b.name, b.icon, b.color, b.ord, true, (extract(epoch FROM now()) * 1000)::bigint
+FROM users u CROSS JOIN (VALUES
+  ('work', 'Work', 'briefcase', '#2f7ed8', 1),
+  ('personal', 'Personal', 'house', '#3f9c56', 2),
+  ('disposable', 'Disposable', 'timer', '#b26a00', 3)
+) AS b(key, name, icon, color, ord)
+ON CONFLICT (user_id, key) DO NOTHING;
+`,
+  },
+  {
+    id: 10,
+    sql: `
+-- T1 F-11: label organisation (parent_id + sort already exist since migration 2)
+ALTER TABLE labels ADD COLUMN sidebar_visibility TEXT NOT NULL DEFAULT 'always'
+  CHECK (sidebar_visibility IN ('always','unread','hidden'));
+CREATE INDEX labels_parent ON labels(parent_id);
+`,
+  },
+  {
+    id: 11,
+    sql: `
+-- T1 F-12: reusable templates with placeholders
+CREATE TABLE templates (
+  id SERIAL PRIMARY KEY,
+  user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  name TEXT NOT NULL,
+  category TEXT NOT NULL DEFAULT '',
+  subject TEXT NOT NULL DEFAULT '',
+  body_html TEXT NOT NULL,
+  account_id INTEGER REFERENCES accounts(id) ON DELETE SET NULL,
+  shortcut TEXT,
+  use_count INTEGER NOT NULL DEFAULT 0,
+  created_at BIGINT NOT NULL,
+  updated_at BIGINT NOT NULL
+);
+CREATE INDEX templates_user ON templates(user_id);
+CREATE UNIQUE INDEX templates_shortcut ON templates(user_id, shortcut) WHERE shortcut IS NOT NULL AND shortcut <> '';
+`,
+  },
+  {
+    id: 12,
+    sql: `
+-- T1 F-15: per-send tracking records (optionally one token per recipient) + open classification
+CREATE TABLE tracked_sends (
+  token TEXT PRIMARY KEY,
+  user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  message_id INTEGER REFERENCES messages(id) ON DELETE SET NULL,
+  group_token TEXT,              -- per-recipient copies point at the sent copy's token
+  recipient TEXT,                -- null = whole message
+  subject TEXT NOT NULL DEFAULT '',
+  sent_at BIGINT NOT NULL
+);
+CREATE INDEX tracked_group ON tracked_sends(group_token);
+ALTER TABLE tracking_opens
+  ADD COLUMN IF NOT EXISTS country TEXT,
+  ADD COLUMN IF NOT EXISTS client TEXT,
+  ADD COLUMN IF NOT EXISTS proxied BOOLEAN NOT NULL DEFAULT false;
+`,
+  },
 ];
 
 /** Run `fn` in one transaction. Events emitted through the client are only turned into

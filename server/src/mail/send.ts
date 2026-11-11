@@ -3,7 +3,7 @@ import MailComposer from 'nodemailer/lib/mail-composer/index.js';
 import fs from 'node:fs';
 import path from 'node:path';
 import type { ComposePayload } from '@seamless/shared';
-import { one, run, insertId } from '../db.ts';
+import { q, one, run, insertId } from '../db.ts';
 import { decrypt, randomToken, sha256 } from '../crypto.ts';
 import { config } from '../config.ts';
 import { putBlob } from '../s3.ts';
@@ -76,12 +76,41 @@ export async function smtpTransport(acct: AccountRow) {
   });
 }
 
-interface BuildOpts { draft?: boolean; date?: Date; messageId?: string }
+interface BuildOpts { draft?: boolean; date?: Date; messageId?: string; trackingToken?: string | null }
+
+/**
+ * Should this message carry a tracking pixel at all? Never when every recipient is one of
+ * your own mailboxes, and never when any recipient's domain is on your no-track list.
+ */
+export async function trackingAllowed(userId: number, payload: ComposePayload): Promise<boolean> {
+  if (!payload.track) return false;
+  const rcpts = [...payload.to, ...payload.cc, ...payload.bcc].map((a) => a.email.trim().toLowerCase()).filter(Boolean);
+  if (rcpts.length === 0) return false;
+  const own = new Set<string>();
+  for (const a of await q<{ email: string; aliases: string }>('SELECT email, aliases FROM accounts WHERE user_id = ?', [userId])) {
+    own.add(a.email.toLowerCase());
+    for (const al of JSON.parse(a.aliases) as string[]) own.add(al.toLowerCase());
+  }
+  if (rcpts.every((r) => own.has(r))) return false;
+  const settings = await one<{ settings_json: string }>('SELECT settings_json FROM users WHERE id = ?', [userId]);
+  let noTrack: string[] = [];
+  try { noTrack = (JSON.parse(settings?.settings_json ?? '{}').noTrackDomains ?? []).map((d: string) => d.trim().toLowerCase().replace(/^@/, '')).filter(Boolean); } catch { /* none */ }
+  if (rcpts.some((r) => noTrack.includes(r.split('@')[1] ?? ''))) return false;
+  return true;
+}
+
+async function recordTrackedSend(userId: number, token: string, subject: string, sentAt: number, opts: { groupToken?: string; recipient?: string } = {}): Promise<void> {
+  await run(`INSERT INTO tracked_sends(token, user_id, group_token, recipient, subject, sent_at) VALUES (?,?,?,?,?,?)
+             ON CONFLICT (token) DO NOTHING`, [token, userId, opts.groupToken ?? null, opts.recipient ?? null, subject, sentAt]);
+}
 
 async function buildRaw(payload: ComposePayload, acct: AccountRow, extraFlags: BuildOpts): Promise<{ raw: Buffer; trackingToken: string | null }> {
   let html = payload.html || '<p></p>';
   let trackingToken: string | null = null;
-  if (payload.track && !extraFlags.draft) {
+  if (extraFlags.trackingToken !== undefined) {
+    trackingToken = extraFlags.trackingToken;
+    if (trackingToken) html = insertTrackingPixel(html, trackingToken);
+  } else if (payload.track && !extraFlags.draft) {
     trackingToken = randomToken(16);
     html = insertTrackingPixel(html, trackingToken);
   }
@@ -118,6 +147,8 @@ async function buildRaw(payload: ComposePayload, acct: AccountRow, extraFlags: B
     attachments,
     date: extraFlags.date,
     messageId: extraFlags.messageId,
+    // drafts remember the compose toolbar's tracking toggle
+    headers: extraFlags.draft ? { 'X-Seamless-Track': payload.track ? '1' : '0' } : undefined,
   });
   const raw = await new Promise<Buffer>((resolve, reject) =>
     composer.compile().build((err, message) => (err ? reject(err) : resolve(message))),
@@ -127,11 +158,33 @@ async function buildRaw(payload: ComposePayload, acct: AccountRow, extraFlags: B
 
 export async function sendEmail(userId: number, payload: ComposePayload): Promise<{ trackingToken: string | null }> {
   const acct = await getAccount(userId, payload.accountId);
-  const { raw, trackingToken } = await buildRaw(payload, acct, {});
-
-  const transport = await smtpTransport(acct);
+  const track = await trackingAllowed(userId, payload);
   const envelopeTo = [...payload.to, ...payload.cc, ...payload.bcc].map((a) => a.email);
-  await transport.sendMail({ envelope: { from: payload.fromEmail, to: envelopeTo }, raw });
+  const transport = await smtpTransport(acct);
+  const now = Date.now();
+  let raw: Buffer;
+  let trackingToken: string | null = null;
+
+  if (track && payload.perRecipientTracking && envelopeTo.length > 1) {
+    // one copy per recipient, each with its own pixel and Message-ID; headers stay the same
+    // so everyone still sees the full To/Cc. The Sent copy carries the group token.
+    trackingToken = randomToken(16);
+    await recordTrackedSend(userId, trackingToken, payload.subject, now);
+    const host = new URL(config.publicUrl).hostname;
+    for (const rcpt of envelopeTo) {
+      const t = randomToken(16);
+      const copy = await buildRaw(payload, acct, { trackingToken: t, messageId: `<${randomToken(12)}@${host}>` });
+      await recordTrackedSend(userId, t, payload.subject, now, { groupToken: trackingToken, recipient: rcpt });
+      await transport.sendMail({ envelope: { from: payload.fromEmail, to: [rcpt] }, raw: copy.raw });
+    }
+    raw = (await buildRaw(payload, acct, { trackingToken })).raw;
+  } else {
+    const built = await buildRaw(payload, acct, { trackingToken: track ? randomToken(16) : null });
+    raw = built.raw;
+    trackingToken = built.trackingToken;
+    if (trackingToken) await recordTrackedSend(userId, trackingToken, payload.subject, now);
+    await transport.sendMail({ envelope: { from: payload.fromEmail, to: envelopeTo }, raw });
+  }
 
   // copy to the account's Sent mailbox via IMAP APPEND
   if (acct.sent_copy) {
@@ -166,7 +219,9 @@ export async function scheduleEmail(userId: number, payload: ComposePayload, sen
   if (!Number.isFinite(sendAt) || sendAt <= Date.now()) throw new Error('Scheduled time must be in the future');
   const acct = await getAccount(userId, payload.accountId);
   const messageId = `<sched-${randomToken(10)}@${new URL(config.publicUrl).hostname}>`;
-  const { raw, trackingToken } = await buildRaw(payload, acct, { date: new Date(sendAt), messageId });
+  const track = await trackingAllowed(userId, payload);
+  const { raw, trackingToken } = await buildRaw(payload, acct, { date: new Date(sendAt), messageId, trackingToken: track ? randomToken(16) : null });
+  if (trackingToken) await recordTrackedSend(userId, trackingToken, payload.subject, sendAt);
 
   const key = `scheduled/${acct.id}/${sha256(raw)}.eml`;
   await putBlob(key, raw);

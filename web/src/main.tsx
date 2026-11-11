@@ -3,6 +3,9 @@ import { createRoot } from 'react-dom/client';
 import { IconContext } from '@phosphor-icons/react';
 import App from './App.tsx';
 import './styles/app.css';
+import { applyCachedAppearance } from './state/session.ts';
+
+applyCachedAppearance();
 
 if ('serviceWorker' in navigator && !import.meta.env.DEV) {
   window.addEventListener('load', () => {

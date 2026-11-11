@@ -124,6 +124,7 @@ export async function getEmailBody(userId: number, emailId: string, allowRemote:
       deliveredTo: row.delivered_to,
       messageId: row.message_id,
       listUnsubscribe: (parsed.headers.get('list-unsubscribe') as string | undefined) ?? null,
+      seamlessTrack: parsed.headers.has('x-seamless-track') ? String(parsed.headers.get('x-seamless-track')) === '1' : null,
     },
     tracking,
   };

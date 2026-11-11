@@ -1,6 +1,6 @@
 /**
  * Search query language:
- *   from:foo to:bar label:Work in:inbox is:unread is:starred has:attachment
+ *   from:foo to:bar label:Work in:inbox is:unread is:starred has:attachment category:work
  *   before:2026-01-31 after:2026-01-01 "quoted phrase" free words
  * Everything unprefixed becomes a Postgres tsquery over subject/body/from/to.
  */
@@ -9,6 +9,7 @@ export interface ParsedSearch {
   from: string | null;
   to: string | null;
   label: string | null;
+  category: string | null;    // mailbox category key or name (T1 F-07)
   inRole: string | null;
   unread: boolean | null;
   starred: boolean | null;
@@ -34,7 +35,7 @@ function ftsEscape(term: string): string {
 
 export function parseSearch(query: string): ParsedSearch {
   const out: ParsedSearch = {
-    fts: null, from: null, to: null, label: null, inRole: null,
+    fts: null, from: null, to: null, label: null, category: null, inRole: null,
     unread: null, starred: null, hasAttachment: null, before: null, after: null,
   };
   const ftsTerms: string[] = [];
@@ -49,7 +50,13 @@ export function parseSearch(query: string): ParsedSearch {
         case 'from': out.from = val; continue;
         case 'to': out.to = val; continue;
         case 'label': out.label = val; continue;
-        case 'in': out.inRole = val.toLowerCase(); continue;
+        case 'category': out.category = val; continue;
+        case 'in': {
+          // UI names: Spam = junk, Bin = trash
+          const r = val.toLowerCase();
+          out.inRole = r === 'spam' ? 'junk' : r === 'bin' ? 'trash' : r;
+          continue;
+        }
         case 'is':
           if (val === 'unread') out.unread = true;
           else if (val === 'read') out.unread = false;

@@ -3,13 +3,17 @@ import { q, one, run, bumpState, currentState } from '../db.ts';
 import { parseSearch } from './searchparse.ts';
 import { enqueueOp } from '../imap/sync.ts';
 import { deleteMessageRow } from './ingest.ts';
+import { scopeAccountIds, categoryIdByName } from './categories.ts';
 
 const UNIFIED_ROLES: MailboxRole[] = ['inbox', 'drafts', 'sent', 'scheduled', 'archive', 'junk', 'trash'];
 const UNIFIED_NAMES: Record<string, string> = {
   inbox: 'Inbox', drafts: 'Drafts', sent: 'Sent', scheduled: 'Scheduled', archive: 'Archive', junk: 'Junk', trash: 'Trash',
 };
 
-export async function listMailboxes(userId: number): Promise<ApiMailbox[]> {
+/** Mailboxes for the sidebar. The unified role folders (u:inbox, ...) count only the
+ *  accounts inside `scope`; per-account folders are always listed in full. */
+export async function listMailboxes(userId: number, scope?: string): Promise<ApiMailbox[]> {
+  const inScope = await scopeAccountIds(userId, scope);
   const counts = await q<{ mailbox_id: number; total: number; unread: number }>(`
     SELECT m.mailbox_id, COUNT(*) AS total, COUNT(*) FILTER (WHERE m.unread) AS unread
     FROM messages m WHERE m.user_id = ? GROUP BY m.mailbox_id
@@ -28,7 +32,7 @@ export async function listMailboxes(userId: number): Promise<ApiMailbox[]> {
   const roleTotals = new Map<string, { total: number; unread: number }>();
   for (const r of rows) {
     const c = byId.get(r.id) ?? { total: 0, unread: 0 };
-    if (r.role) {
+    if (r.role && (inScope === null || inScope.includes(r.account_id))) {
       const agg = roleTotals.get(r.role) ?? { total: 0, unread: 0 };
       agg.total += c.total; agg.unread += c.unread ?? 0;
       roleTotals.set(r.role, agg);
@@ -70,10 +74,17 @@ export async function rowToApi(r: MsgRow): Promise<ApiEmail> {
   const labels = await q<{ label_id: number }>('SELECT label_id FROM message_labels WHERE message_id = ?', [r.id]);
   let openCount = -1;
   let lastOpenAt: string | null = null;
+  let autoOpenCount = 0;
   if (r.tracking_token) {
-    const t = await one<{ c: number; last: number | null }>(
-      'SELECT COUNT(*) AS c, MAX(ts) AS last FROM tracking_opens WHERE token = ?', [r.tracking_token]);
+    // the sent copy's token, plus any per-recipient copies sent alongside it (T1 F-15);
+    // proxy/scanner opens are kept apart from the real ones
+    const t = await one<{ c: number; auto: number; last: number | null }>(`
+      SELECT COUNT(*) FILTER (WHERE NOT proxied) AS c, COUNT(*) FILTER (WHERE proxied) AS auto,
+             MAX(ts) FILTER (WHERE NOT proxied) AS last
+      FROM tracking_opens
+      WHERE token = ? OR token IN (SELECT token FROM tracked_sends WHERE group_token = ?)`, [r.tracking_token, r.tracking_token]);
     openCount = t?.c ?? 0;
+    autoOpenCount = t?.auto ?? 0;
     lastOpenAt = t?.last ? new Date(t.last).toISOString() : null;
   }
   // For untracked (inbound) rows, surface whether your tracked reply elsewhere in
@@ -83,8 +94,8 @@ export async function rowToApi(r: MsgRow): Promise<ApiEmail> {
   if (!r.tracking_token) {
     const ta = await one<{ c: number; last: number | null }>(
       `SELECT COUNT(t.id) AS c, MAX(t.ts) AS last
-       FROM messages sm JOIN tracking_opens t ON t.token = sm.tracking_token
-       WHERE sm.thread_id = ? AND sm.tracking_token IS NOT NULL`, [r.thread_id]);
+       FROM messages sm JOIN tracking_opens t ON t.token = sm.tracking_token AND NOT t.proxied
+       WHERE sm.thread_id = ? AND sm.user_id = ? AND sm.tracking_token IS NOT NULL`, [r.thread_id, r.user_id]);
     if (ta && ta.c > 0) { threadOpenCount = ta.c; threadOpenAt = new Date(ta.last!).toISOString(); }
   }
   const hasNote = !!(await one('SELECT 1 FROM notes WHERE user_id = ? AND email_id = ?', [r.user_id, `m${r.id}`]));
@@ -115,6 +126,7 @@ export async function rowToApi(r: MsgRow): Promise<ApiEmail> {
     hasAttachment: r.has_attachments,
     hasNote,
     openCount,
+    autoOpenCount,
     lastOpenAt,
     threadOpenCount,
     threadOpenAt,
@@ -160,6 +172,9 @@ export async function queryEmails(userId: number, req: EmailQueryRequest): Promi
   const params: unknown[] = [userId];
   const f = req.filter ?? {};
 
+  const scoped = await scopeAccountIds(userId, f.scope);
+  if (scoped !== null) { where.push('m.account_id = ANY(?::int[])'); params.push(scoped); }
+
   if (f.inMailbox) {
     if (f.inMailbox.startsWith('mb:')) {
       where.push('m.mailbox_id = ?');
@@ -192,6 +207,11 @@ export async function queryEmails(userId: number, req: EmailQueryRequest): Promi
       params.push(p.label);
     }
     if (p.inRole) { where.push('mb.role = ?'); params.push(p.inRole); }
+    if (p.category) {
+      const cid = await categoryIdByName(userId, p.category);
+      const ids = cid ? await scopeAccountIds(userId, { kind: 'category', id: cid }) : [];
+      where.push('m.account_id = ANY(?::int[])'); params.push(ids ?? []);
+    }
     if (p.unread !== null) where.push(`m.unread = ${p.unread ? 'true' : 'false'}`);
     if (p.starred) where.push('m.flagged = true');
     if (p.hasAttachment) where.push('m.has_attachments = true');

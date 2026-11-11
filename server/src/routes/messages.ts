@@ -6,6 +6,7 @@ import { buildOriginalPage } from '../mail/original.ts';
 import { getMsgRow, setNote } from '../mail/store.ts';
 import { broadcast } from '../ws.ts';
 import { uid } from './util.ts';
+import { openReport } from '../mail/tracking.ts';
 
 export function register(app: FastifyInstance): void {
   // ---- message body / blobs ----
@@ -20,6 +21,13 @@ export function register(app: FastifyInstance): void {
     const t = await getTracking(uid(req), (req.params as any).id);
     if (!t) return reply.code(404).send({ error: 'not tracked' });
     return t;
+  });
+
+  /** Full open report: summary, every open (recipient, client, proxied flag), for the report page. */
+  app.get('/api/message/:id/opens', async (req, reply) => {
+    const r = await openReport(uid(req), (req.params as any).id);
+    if (!r) return reply.code(404).send({ error: 'not tracked' });
+    return r;
   });
 
   app.get('/api/blob/:id/:partId', async (req, reply) => {

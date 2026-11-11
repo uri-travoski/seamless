@@ -33,6 +33,11 @@ export interface ApiLabel {
   retentionDays?: number | null;
   protected?: boolean;
   autoMarkRead?: boolean;
+  sort?: number;
+  parentId?: number | null;                          // nesting (T1 F-11)
+  sidebarVisibility?: 'always' | 'unread' | 'hidden';
+  total?: number;                                    // messages carrying it (outside Bin/Spam)
+  unread?: number;
 }
 
 export interface ApiRule {
@@ -118,7 +123,8 @@ export interface ApiEmail {
   size: number;
   hasAttachment: boolean;
   hasNote: boolean;        // a personal note is attached (private, never sent)
-  openCount: number;       // tracking pixel opens (own sent mail), -1 = not tracked
+  openCount: number;       // real tracking-pixel opens (own sent mail), -1 = not tracked
+  autoOpenCount?: number;  // probable automatic opens (mail privacy proxies, scanners) — not in openCount
   lastOpenAt: string | null;
   threadOpenCount: number; // opens on your tracked reply elsewhere in this thread, -1 = none
   threadOpenAt: string | null;
@@ -156,11 +162,12 @@ export interface ApiEmailBody {
   hasBlockedRemote: boolean;
   note: string;              // personal note body ('' = none)
   attachments: ApiAttachmentMeta[];
-  headers: { deliveredTo: string | null; messageId: string | null; listUnsubscribe: string | null };
+  headers: { deliveredTo: string | null; messageId: string | null; listUnsubscribe: string | null; seamlessTrack?: boolean | null };
   tracking: TrackingInfo | null;
 }
 
 export interface EmailQueryFilter {
+  scope?: ScopeId;           // T1: unified | category:<id> | account:<id> (default unified)
   inMailbox?: string;        // "mb:<id>" or "u:<role>"
   label?: number;
   text?: string;             // search query language
@@ -202,6 +209,7 @@ export interface ComposePayload {
   replyToEmailId?: string;   // our row id, to set $answered
   attachmentIds: string[];   // uploaded temp attachment ids
   track: boolean;
+  perRecipientTracking?: boolean; // separate copy + token per recipient (T1 F-15, default off)
   draftId?: string;          // existing draft row id to replace
 }
 
@@ -279,6 +287,81 @@ export interface ApiDecision {
   createdAt: string;
 }
 
+// ---- mailbox categories + scope (T1 F-07/F-08) ----
+
+/** 'unified' | 'category:<id>' | 'account:<id>' */
+export type ScopeId = string;
+
+export interface ApiCategory {
+  id: number;
+  key: string;               // 'work' | 'personal' | 'disposable' | slug for custom
+  name: string;
+  icon: string;
+  color: string;
+  sortOrder: number;
+  builtin: boolean;
+  accountIds: number[];
+  unread: number;            // inbox unread across member mailboxes
+}
+
+export interface ApiCategoryMailbox {
+  id: number;
+  name: string;
+  email: string;
+  color: string;
+  enabled: boolean;
+  unread: number;
+  categoryIds: number[];
+}
+
+export interface ApiCategoryOverview {
+  unifiedUnread: number;
+  categories: ApiCategory[];
+  mailboxes: ApiCategoryMailbox[];
+}
+
+export interface TestStep {
+  step: 'dns' | 'tcp' | 'tls' | 'auth' | 'folders' | 'send';
+  ok: boolean;
+  ms: number;
+  detail: string;
+}
+
+// ---- templates (T1 F-12) ----
+
+export interface ApiTemplate {
+  id: number;
+  name: string;
+  category: string;
+  subject: string;
+  bodyHtml: string;
+  accountId: number | null;
+  shortcut: string | null;
+  useCount: number;
+  updatedAt: number;
+}
+
+// ---- open report (T1 F-15) ----
+
+export interface ApiOpen {
+  ts: number;
+  recipient: string | null;
+  client: string;
+  ip: string;
+  country: string | null;
+  proxied: boolean;
+}
+
+export interface ApiOpenReport {
+  emailId: string;
+  subject: string;
+  sentAt: number | null;
+  to: ApiAddress[];
+  perRecipient: boolean;
+  summary: { total: number; real: number; firstAt: number | null; lastAt: number | null; uniqueDevices: number };
+  opens: ApiOpen[];
+}
+
 // ---- events + notifications (T0 F-04, T1 F-13/F-14) ----
 
 export type EventType =
@@ -341,3 +424,5 @@ export interface WsMessage {
   from?: string;
   subject?: string;
 }
+
+export * from './templates.ts';
