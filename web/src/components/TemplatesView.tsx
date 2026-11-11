@@ -7,9 +7,10 @@ import { useEditor, EditorContent } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
 import Underline from '@tiptap/extension-underline';
 import Link from '@tiptap/extension-link';
-import { TEMPLATE_PLACEHOLDERS, type ApiTemplate } from '@seamless/shared';
+import { TEMPLATE_PLACEHOLDERS, hasAiPlaceholders, type ApiTemplate, type ApiBusiness } from '@seamless/shared';
 import { useTemplates } from '../state/templates.ts';
 import { useCompose } from '../state/compose.ts';
+import { api } from '../api/client.ts';
 import { toast } from '../toast.ts';
 import { NO_AUTOFILL } from '../state/ui.ts';
 import { TemplateIcon, PencilIcon, TrashIcon, ComposeIcon, PlusSimpleIcon, BoldIcon, ItalicIcon, UnderlineIcon, BulletListIcon, LinkIcon } from '../icons.tsx';
@@ -22,6 +23,11 @@ function TemplateEditor({ value, onSave, onCancel }: { value: Editing; onSave: (
   const [busy, setBusy] = useState(false);
   const editor = useEditor({ extensions: [StarterKit, Underline, Link.configure({ openOnClick: false })], content: value.bodyHtml || '<p></p>' });
   const accounts = identities.filter((i) => !i.isAlias);
+  const [businesses, setBusinesses] = useState<ApiBusiness[]>([]);
+  useEffect(() => { api.get<ApiBusiness[]>('/api/businesses').then(setBusinesses).catch(() => {}); }, []);
+  const [bodyTick, setBodyTick] = useState(0);
+  useEffect(() => { editor?.on('update', () => setBodyTick((n) => n + 1)); }, [editor]);
+  const aiInBody = useMemo(() => hasAiPlaceholders(t.subject ?? '', editor?.getHTML() ?? t.bodyHtml), [t.subject, t.bodyHtml, editor, bodyTick]);
 
   const insert = (token: string) => editor?.chain().focus().insertContent(token).run();
   const save = async () => {
@@ -46,6 +52,28 @@ function TemplateEditor({ value, onSave, onCancel }: { value: Editing; onSave: (
           {accounts.map((a) => <option key={a.accountId} value={a.accountId}>{a.name ? `${a.name} <${a.email}>` : a.email}</option>)}
         </select>
       </div>
+      <div className="field-row">
+        <div className="field"><label>Business</label>
+          <select className="text-input" value={t.businessId ?? ''} onChange={(e) => setT({ ...t, businessId: e.target.value ? Number(e.target.value) : null })}>
+            <option value="">Any business</option>
+            {businesses.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
+          </select>
+        </div>
+        <div className="field" style={{ maxWidth: 180 }}><label>Kind</label>
+          <select className="text-input" value={t.kind ?? 'reply'} onChange={(e) => setT({ ...t, kind: e.target.value as 'reply' | 'marketing' })}>
+            <option value="reply">Reply</option>
+            <option value="marketing">Marketing (adds unsubscribe)</option>
+          </select>
+        </div>
+      </div>
+      <div className="field-row">
+        <label className="check"><input type="checkbox" checked={!!t.pinned} onChange={(e) => setT({ ...t, pinned: e.target.checked })} /> Pin as a quick reply</label>
+        {t.pinned && <label className="check">Order <input className="text-input compact" type="number" style={{ width: 70 }} value={t.pinOrder ?? 0} onChange={(e) => setT({ ...t, pinOrder: Number(e.target.value) })} /></label>}
+        <label className="check" title="Clicking the chip sends at once (with undo). Not possible with {{ai:}} parts.">
+          <input type="checkbox" disabled={aiInBody} checked={!!t.sendDirect && !aiInBody} onChange={(e) => setT({ ...t, sendDirect: e.target.checked })} /> Safe to send directly
+        </label>
+      </div>
+      {aiInBody && <div className="dim">This template has {'{{ai: …}}'} parts: AI writes them when you reply and you always review before sending.</div>}
       <div className="field"><label>Body</label>
         <div className="tpl-body">
           <div className="editor-toolbar">
@@ -61,7 +89,7 @@ function TemplateEditor({ value, onSave, onCancel }: { value: Editing; onSave: (
       <div className="placeholder-help">
         <span className="dim">Insert:</span>
         {TEMPLATE_PLACEHOLDERS.map((p) => (
-          <button key={p.token} className="chip-choice" title={p.help} onClick={() => insert(p.token === '{{?Question}}' ? '{{?Your question}}' : p.token)}>{p.token}</button>
+          <button key={p.token} className="chip-choice" title={p.help} onClick={() => insert(p.token === '{{?Question}}' ? '{{?Your question}}' : p.token === '{{ai: "instruction"}}' ? '{{ai: "Write two friendly sentences about…"}}' : p.token)}>{p.token}</button>
         ))}
       </div>
       <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
@@ -143,7 +171,7 @@ export default function TemplatesView({ embedded = false }: { embedded?: boolean
               <div className="tpl-head">
                 <div>
                   <h2 className="tpl-title">{current.name}</h2>
-                  <div className="dim">{current.category || 'General'}{current.shortcut ? ` · ${current.shortcut}` : ''} · used {current.useCount}×</div>
+                  <div className="dim">{current.category || 'General'}{current.shortcut ? ` · ${current.shortcut}` : ''}{current.pinned ? ' · pinned' : ''}{current.sendDirect ? ' · sends directly' : ''}{current.kind === 'marketing' ? ' · marketing' : ''} · used {current.useCount}×</div>
                 </div>
                 <div style={{ flex: 1 }} />
                 <button className="btn primary" onClick={() => void openTemplate(current)}><ComposeIcon size={15} /> Use</button>

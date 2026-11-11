@@ -4,7 +4,8 @@ import type { ApiEmail, ApiEmailBody } from '@seamless/shared';
 import { useMail } from '../state/mail.ts';
 import { useSession } from '../state/session.ts';
 import { useCompose } from '../state/compose.ts';
-import { fetchBody, api, saveNote, fetchTracking } from '../api/client.ts';
+import { useTemplates } from '../state/templates.ts';
+import { matchIdentity, fetchBody, api, saveNote, fetchTracking } from '../api/client.ts';
 import type { TrackingInfo } from '@seamless/shared';
 import { cache } from '../api/cache.ts';
 import { toast } from '../toast.ts';
@@ -455,6 +456,7 @@ function MessageCard({ email, expanded, onToggle }: { email: ApiEmail; expanded:
               ))}
             </div>
           )}
+          {!email.keywords.$draft && <QuickReplies email={email} />}
           <div className="card-actions">
             {email.keywords.$draft ? (
               <button className="btn" onClick={() => body && void openDraft(email, body)}><PencilIcon /> Edit draft</button>
@@ -489,6 +491,36 @@ function ToolbarMore({ email }: { email: ApiEmail }) {
     <div className="label-menu" ref={ref}>
       <button className={`icon-btn ${open ? 'active' : ''}`} title="More actions" aria-haspopup="menu" onClick={() => setOpen((v) => !v)}><KebabIcon /></button>
       {open && <div className="dropdown" role="menu"><EmailMenuItems email={email} close={() => setOpen(false)} /></div>}
+    </div>
+  );
+}
+
+/** Pinned templates as one-click reply chips (F-31): this identity's business, or no business. */
+function QuickReplies({ email }: { email: ApiEmail }) {
+  const templates = useTemplates((st) => st.list);
+  const openReply = useCompose((st) => st.openReply);
+  const identities = useCompose((st) => st.identities);
+  const [bizId, setBizId] = useState<number | null | undefined>(undefined);
+  useEffect(() => { if (!useTemplates.getState().loaded) void useTemplates.getState().refresh(); }, []);
+  useEffect(() => {
+    let live = true;
+    setBizId(undefined);
+    matchIdentity(email.id).then((i) => { if (live) setBizId(i?.businessId ?? null); }).catch(() => { if (live) setBizId(null); });
+    return () => { live = false; };
+  }, [email.id, identities.length]);
+  if (bizId === undefined) return null;
+  const chips = templates
+    .filter((t) => t.pinned && (t.kind ?? 'reply') === 'reply' && (t.businessId == null || t.businessId === bizId))
+    .sort((a, b) => (a.pinOrder ?? 0) - (b.pinOrder ?? 0) || a.name.localeCompare(b.name))
+    .slice(0, 5);
+  if (chips.length === 0) return null;
+  return (
+    <div className="quick-replies" aria-label="Quick replies">
+      <span className="dim">Quick reply:</span>
+      {chips.map((t) => (
+        <button key={t.id} className="chip-choice" title={t.sendDirect && !t.hasAi ? 'Sends straight away (you can undo)' : 'Opens a reply for you to review'}
+          onClick={() => void openReply(email, 'reply', t)}>{t.name}{t.sendDirect && !t.hasAi ? ' ➤' : ''}</button>
+      ))}
     </div>
   );
 }

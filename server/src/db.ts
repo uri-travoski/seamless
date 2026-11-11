@@ -974,6 +974,18 @@ INSERT INTO identities(user_id, account_id, email, display_name, is_default)
 ALTER TABLE contacts ADD COLUMN no_business_guard BOOLEAN NOT NULL DEFAULT false;
 `,
   },
+  {
+    id: 26,
+    sql: `
+-- T4 F-31: quick replies
+ALTER TABLE templates ADD COLUMN business_id INTEGER REFERENCES businesses ON DELETE SET NULL;
+ALTER TABLE templates ADD COLUMN pinned BOOLEAN NOT NULL DEFAULT false;
+ALTER TABLE templates ADD COLUMN pin_order INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE templates ADD COLUMN send_direct BOOLEAN NOT NULL DEFAULT false;
+ALTER TABLE templates ADD COLUMN last_used_at BIGINT;
+ALTER TABLE templates ADD COLUMN kind TEXT NOT NULL DEFAULT 'reply';
+`,
+  },
 ];
 
 /** Run `fn` in one transaction. Events emitted through the client are only turned into

@@ -60,6 +60,19 @@ The **eye** on the formatting toolbar turns open tracking on or off for this mes
 
 Placeholders fill themselves in: `{{recipient.first_name}}`, `{{recipient.name}}`, `{{recipient.email}}`, `{{sender.name}}`, `{{sender.business}}`, `{{date}}`, `{{date+7d}}` (any number of d/w/m/y), `{{subject}}`. Recipient placeholders wait until you send if the To field is still empty. `{{?Question}}` asks you when the template is inserted — e.g. `{{?Quote amount}}`.
 
+### More variables
+
+`{{original.subject}}`, `{{original.date}}` (the message you are replying to), `{{today}}`, `{{sender.first_name}}`, `{{business.name}}` (also `.short_name .phone .website .abn .address`) and `{{identity.name}}` / `{{identity.email}}` come from the From identity. When you reply through a quick reply, `{{recipient.*}}` is the person you are answering. A variable Seamless doesn't know stays visible and highlighted so you notice it.
+
+## Quick replies
+
+Pin a template (Templates → edit → **Pin as a quick reply**) and it appears as a chip under the message you are reading — up to five, in your pin order, only those for the business of the identity you would reply from (or with no business set). Click a chip to open a reply with the template filled in.
+
+- **Safe to send directly** turns the chip into a one-click send through the normal undo-send countdown. It only sends when the template has no AI parts and every variable filled in; the server checks this again.
+- **`{{ai: "write two friendly sentences about the timing"}}`** asks your AI *draft* provider (Settings → AI) to write that part from the conversation (one call per placeholder, 20 s limit). The result is highlighted so you can review it. A template with AI parts can **never** be sent directly. With no AI provider, or if the call fails, the placeholder is left highlighted for you to fill in.
+- **Kind: marketing** adds an unsubscribe line (`{{unsubscribe}}` where you put it, otherwise at the end): a link that emails the sending identity with the subject "unsubscribe". You handle those replies yourself — there is no automatic list management.
+- Each use counts towards the template's usage and "last used".
+
 ## AI draft
 
 When replying, **AI draft** writes a first draft of the reply for you (requires an AI *draft* provider under Settings > AI). Edit it before sending.

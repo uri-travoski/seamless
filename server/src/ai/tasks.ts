@@ -121,3 +121,14 @@ export async function draftReply(userId: number, emailId: string, instruction: s
     },
   ], { maxTokens: 800 });
 }
+
+/** Plain text of the last messages of a thread (for template AI fill). */
+export async function threadText(userId: number, threadId: string, maxMsgs = 6): Promise<string> {
+  const rows = await q<{ id: number; from_name: string; from_addr: string; date: number }>(`
+    SELECT m.id, m.from_name, m.from_addr, m.date FROM messages m JOIN mailboxes mb ON mb.id = m.mailbox_id
+    WHERE m.user_id = ? AND m.thread_id = ? AND (mb.role IS NULL OR mb.role NOT IN ('trash','junk'))
+    ORDER BY m.date DESC LIMIT ?`, [userId, threadId, maxMsgs]);
+  const parts: string[] = [];
+  for (const r of rows.reverse()) parts.push(`--- ${new Date(Number(r.date)).toISOString().slice(0, 16)} | ${r.from_name} <${r.from_addr}>\n${await messageText(r.id, 2500)}`);
+  return parts.join('\n\n');
+}

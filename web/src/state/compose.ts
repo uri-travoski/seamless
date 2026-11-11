@@ -1,8 +1,9 @@
 import { create } from 'zustand';
-import type { ApiBusiness, ComposePayload, ApiAddress, ApiEmail, ApiEmailBody, ApiIdentity, ApiTemplate } from '@seamless/shared';
+import type { ApiTemplateRender, ApiBusiness, ComposePayload, ApiAddress, ApiEmail, ApiEmailBody, ApiIdentity, ApiTemplate } from '@seamless/shared';
 import { fillTemplate } from './templates.ts';
-import { api, matchIdentity, fetchIdentities, fetchIdentitySignature, fetchBody } from '../api/client.ts';
+import { api, sendMail, undoSendApi, matchIdentity, fetchIdentities, fetchIdentitySignature, fetchBody } from '../api/client.ts';
 import { useSession } from './session.ts';
+import { toast, countdownToast } from '../toast.ts';
 
 export interface Draft {
   key: string;
@@ -30,7 +31,7 @@ interface ComposeState {
   loadIdentities: () => Promise<void>;
   openBlank: () => Promise<void>;
   openTemplate: (t: ApiTemplate) => Promise<void>;
-  openReply: (email: ApiEmail, mode: 'reply' | 'replyAll' | 'forward') => Promise<void>;
+  openReply: (email: ApiEmail, mode: 'reply' | 'replyAll' | 'forward', template?: ApiTemplate) => Promise<void>;
   openFromPayload: (p: ComposePayload) => void;
   openDraft: (email: ApiEmail, body: ApiEmailBody) => Promise<void>;
   update: (key: string, patch: Partial<Draft>) => void;
@@ -131,7 +132,7 @@ export const useCompose = create<ComposeState>((set, get) => ({
     });
   },
 
-  openReply: async (email, mode) => {
+  openReply: async (email, mode, template) => {
     let identity: ApiIdentity | null = null;
     try { identity = await matchIdentity(email.id); } catch { identity = get().identities[0] ?? null; }
     const own = new Set<string>();
@@ -158,7 +159,33 @@ export const useCompose = create<ComposeState>((set, get) => ({
       }
     }
 
-    const html = withSignature(await quotedBody(email), await signatureHtml(identity));
+    let html = withSignature(await quotedBody(email), await signatureHtml(identity));
+    if (template && mode !== 'forward') {
+      try {
+        const r = await api.post<ApiTemplateRender>(`/api/templates/${template.id}/render`, { emailId: email.id, identityId: identity?.id });
+        html = `${r.html}${html}`;
+        if (r.note) toast(r.note);
+        // confirm-free send: safe template, fully rendered, goes through the normal undo-send path
+        if (template.sendDirect && r.canSendDirect && identity && to.length > 0) {
+          const res = await sendMail({
+            accountId: identity.accountId, fromEmail: identity.email, identityId: identity.id, to, cc, bcc: [], subject,
+            html, inReplyTo: email.messageId ?? undefined, replyToEmailId: email.id, attachmentIds: [], track: false, quickReplyId: template.id,
+          });
+          if (res.queued && res.jobId && res.releaseAt) {
+            const jobId = res.jobId;
+            const stop = countdownToast((n) => `Sending “${template.name}” in ${n}s…`, res.releaseAt, async () => {
+              try {
+                const back = await undoSendApi(jobId);
+                stop();
+                get().openFromPayload(back.payload);
+                toast('Send cancelled — your message is back in the editor');
+              } catch { stop(); toast('Too late — it has already been sent', 'error'); }
+            });
+          } else toast('Message sent');
+          return;
+        }
+      } catch (e: any) { toast(e?.message ?? 'Could not fill the template', 'error'); }
+    }
     set({
       windows: [...get().windows, {
         key: `c${++counter}`,

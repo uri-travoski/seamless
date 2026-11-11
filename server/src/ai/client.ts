@@ -31,7 +31,7 @@ export async function getTaskProvider(userId: number, task: AiTask): Promise<Pro
 export async function chatComplete(
   provider: ProviderConfig,
   messages: { role: 'system' | 'user' | 'assistant'; content: string }[],
-  opts: { json?: boolean; maxTokens?: number } = {},
+  opts: { json?: boolean; maxTokens?: number; timeoutMs?: number } = {},
 ): Promise<string> {
   const res = await fetch(`${provider.baseUrl}/chat/completions`, {
     method: 'POST',
@@ -46,7 +46,7 @@ export async function chatComplete(
       max_tokens: opts.maxTokens ?? 1024,
       ...(opts.json ? { response_format: { type: 'json_object' } } : {}),
     }),
-    signal: AbortSignal.timeout(60_000),
+    signal: AbortSignal.timeout(opts.timeoutMs ?? 60_000),
   });
   if (!res.ok) {
     const text = await res.text().catch(() => '');

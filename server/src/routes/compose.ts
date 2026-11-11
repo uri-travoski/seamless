@@ -13,6 +13,7 @@ import { checkWrongBusiness } from '../business/guard.ts';
 import { renderSignature, signatureBlock } from '../business/signature.ts';
 import { getBusiness, cleanSigHtml } from '../business/businesses.ts';
 import { one } from '../db.ts';
+import { checkQuickReplySend } from '../templates/render.ts';
 import { emitEvent } from '../events/emit.ts';
 
 export function register(app: FastifyInstance): void {
@@ -26,6 +27,11 @@ export function register(app: FastifyInstance): void {
   });
 
   app.post('/api/send', async (req, reply) => {
+    const qr = (req.body as ComposePayload)?.quickReplyId;
+    if (qr != null) {
+      const bad = await checkQuickReplySend(uid(req), Number(qr), req.body as ComposePayload);
+      if (bad) return reply.code(400).send({ error: bad });
+    }
     try {
       const result = await queueSend(uid(req), req.body as ComposePayload);
       broadcast({ type: 'stateChange' }, uid(req));

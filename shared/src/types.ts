@@ -238,6 +238,7 @@ export interface ComposePayload {
   draftId?: string;          // existing draft row id to replace
   attachments?: { id: string; filename: string; size: number }[]; // so Undo can rebuild the chips
   followupDays?: number;     // T2 F-19: remind me if no reply in N days
+  quickReplyId?: number;     // T4 F-31: sent straight from a quick-reply chip (server re-checks it is safe to send directly)
 }
 
 export interface FilterCondition {
@@ -366,6 +367,26 @@ export interface ApiTemplate {
   shortcut: string | null;
   useCount: number;
   updatedAt: number;
+  /** T4 F-31 */
+  businessId?: number | null;
+  pinned?: boolean;
+  pinOrder?: number;
+  sendDirect?: boolean;
+  lastUsedAt?: number | null;
+  kind?: 'reply' | 'marketing';
+  hasAi?: boolean;
+}
+
+export interface ApiTemplateRender {
+  subject: string;
+  html: string;
+  /** every {{ai:}} placeholder was filled (or there were none) */
+  aiFilled: boolean;
+  /** placeholders left for the user (no AI provider / call failed) */
+  aiPending: number;
+  note?: string;
+  /** confirm-free send is allowed for this render */
+  canSendDirect: boolean;
 }
 
 // ---- open report (T1 F-15) ----

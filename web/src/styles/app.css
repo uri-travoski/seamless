@@ -1344,3 +1344,9 @@ kbd { font-family: var(--font-mono); font-size: 11.5px; padding: 1px 6px; border
 
 .disposable-chip { margin: 6px 0 10px; font-size: 13px; display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
 .disposable-chip .chip { padding: 2px 8px; border-radius: 999px; background: var(--color-accent-soft); color: var(--color-accent); font-weight: 600; }
+
+/* F-31 quick replies */
+.quick-replies { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin: 10px 0 0; }
+mark[data-ai-fill], mark[data-ai-pending], mark[data-unknown-var] { background: var(--md-blue-light); color: inherit; border-radius: 3px; padding: 0 2px; }
+mark[data-ai-pending], mark[data-unknown-var] { outline: 1px dashed var(--md-border-strong); }
+.check { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; }
