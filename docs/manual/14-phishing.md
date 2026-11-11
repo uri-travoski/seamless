@@ -34,3 +34,7 @@ A single serious sign makes a **high** warning; weaker signs make a **medium** o
 - Search for them with `risk:high` or `risk:medium`.
 
 Messages you sent, and drafts, are never checked.
+
+## Forwarded mail and ARC
+
+When a message was forwarded (for example through Google, Fastmail, iCloud, Outlook or your own push domain), the sender checks can fail only because of the forwarding. If the forwarder's ARC seal shows the original passed SPF or DMARC, Seamless does not raise the "failed sender checks" warning.
