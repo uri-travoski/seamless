@@ -4,6 +4,13 @@ Self-hosted, AI-native webmail. Multi-user, unified inbox across many IMAP accou
 
 ## Features
 
+- **Mailbox categories + switcher** — group mailboxes into Work / Personal / Disposable (or your own) and switch Unified ⇄ category ⇄ single mailbox from the top-right; every list, count and search follows the scope.
+- **Notifications centre** — bell with the latest six, a filterable paginated page, per-type in-app / push / digest settings, mailbox mutes, quiet hours. Built on an internal event bus.
+- **Open tracking that tells people from proxies** — eye toggle on the compose toolbar (on by default), per-recipient tracking, open report with client, time and proxy/scanner flagging.
+- **Templates** — placeholders (`{{recipient.first_name}}`, `{{date+7d}}`, `{{?Question}}`), picker in compose and `;shortcut` expansion.
+- **Gmail-style actions** — hover actions, right-click menu, bulk bar with "select all N matching", undo, and the full keyboard set (`?`).
+- **Themes** — Seamless (original), Rolltop (warm, serif) and Matrix; light/dark/system, accent colour, density.
+- **Security** — TOTP two-factor with recovery codes, session list/revoke with expiry, rate limits, CSP and security headers.
 - **Multi-user** — admin + member logins, per-user accounts, labels, filters, AI config, mail. First run creates the admin.
 - **AI classification cascade** — deterministic rules (raw headers first-class) → embedding similarity against your own labelled mail → LLM structured verdicts (real document? requires action? worth keeping? how long?) → human review lane. Every correction teaches it; repeated corrections become rule suggestions.
 - **Retention engine** — labels carry retention (protected / keep / delete-after-N-days); hourly sweep to recoverable Trash with dry-run default, countdown badges, full processing logs with auto-clear.

@@ -22,7 +22,7 @@ Each row shows, left to right:
 
 ### Account color dots
 
-Each account you connect gets its own color, set in **Settings > Accounts** (the same dot appears next to the account in the sidebar). In the unified inbox — where every account's mail is merged together — the colored dot at the very start of each row tells you at a glance which account a message arrived on. Hover the dot to see the account's email address.
+Each account you connect gets its own color, set in **Settings > Mailboxes** (the same dot appears next to the account in the sidebar). In the unified inbox — where every account's mail is merged together — the colored dot at the very start of each row tells you at a glance which account a message arrived on. Hover the dot to see the account's email address.
 
 ![Blue and purple account color dots marking two accounts in the message list](/manual/account-color-dots.png)
 
@@ -54,4 +54,33 @@ Open a message and add a **private note** — a personal reminder attached to th
 
 ## Moving & cleaning up
 
-From the reading-pane toolbar or bulk actions you can **Archive**, mark as **Junk**, **Delete** (to Trash), or **Mark unread**. Trash keeps deleted mail for a grace window; open **Trash** and use **Restore** to bring something back.
+Every message has the same set of actions in four places:
+
+- **Hover** a row: Archive, Delete, Mark read/unread, Report spam fade in on the right. On a phone, **swipe left** to archive and **swipe right** to toggle read.
+- **Right-click** a row: Reply, Reply all, Forward, Mark read/unread, Star, **Label ▸**, **Move to ▸**, Archive, Report spam, Delete, **Block sender**, **Create filter from this…**, Open report (tracked mail), Print, View original, Download .eml.
+- The **reading-pane toolbar** (the ⋮ button holds the full menu).
+- The **bulk bar** when rows are ticked. Tick the box at the top to select the page; a banner then offers **Select all N in this view** — the action then runs on the server across every matching message.
+
+Archive, Delete, Spam and Move show an **Undo** for 5 seconds (bulk actions too). Delete moves mail to the **Bin**; deleting from the Bin or Spam is permanent and asks first. **Block sender** makes a filter that sends their future mail to Spam.
+
+## Mailbox categories and the switcher
+
+The button in the top-right shows where you are — **Unified**, a category (**Work**, **Personal**, **Disposable**, or your own) or a single mailbox — with its unread count. Click it (or press **Ctrl+K**) for the list: categories first, then every mailbox A–Z. Type to filter, use the arrow keys and Enter. Shortcuts: **g u** Unified, **g w** Work, **g p** Personal, **g d** Disposable.
+
+Everything follows the scope: the list, folder counts, label counts, Starred and search. The choice is remembered and is part of the address (`/mail/work/inbox`), so a reload keeps it. Assign mailboxes to categories in **Settings > Mailboxes > Categories** (drag a mailbox onto a category; one mailbox can be in several).
+
+## Sidebar
+
+Inbox (with **Review** under it when the AI needs a decision), Starred, Drafts, Scheduled, Sent, **Templates**, **Spam**, **Bin**, then **More** (Archive). Labels follow, A–Z by default, nested under their parent. Reorder the folders and choose what lives under More in **Settings > Labels > Sidebar**. When the scope is a single mailbox, its own folders appear under **Folders**.
+
+## Labels
+
+**Settings > Labels** lists every label with its message count. Nest a label inside another, choose whether it shows in the sidebar **always**, **only if unread**, or is **hidden**, and sort the sidebar A–Z, manually or by count. Tick two labels to **merge** them (messages, rules, filters and AI memory all move to the one you keep), or tick several to delete them.
+
+## Keyboard shortcuts
+
+Press **?** for the full list (turn them off there or in Settings > General): **j/k** next/previous, **o**/Enter open, **u** back, **x** select, **e** archive, **#** delete, **!** spam, **s** star, **Shift+I/U** read/unread, **l** label, **v** move, **r/a/f** reply/all/forward, **c** compose, **/** search.
+
+## Themes
+
+**Settings > Appearance**: the **Seamless** theme is the original look; **Rolltop** is warm and paper-toned with serif titles; **Matrix** is neon on black. Pick light, dark or match the system, a custom accent colour, comfortable or compact rows, and a font.

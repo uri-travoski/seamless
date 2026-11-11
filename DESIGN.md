@@ -7,6 +7,15 @@ lets standard mobile and desktop mail clients connect to Seamless itself. Multi-
 
 **App name:** Seamless · **Icon:** provided SVG (voicemail-style "@" mark) → `web/public/icon.svg`, used for PWA manifest + favicon.
 
+> **Built vs planned (checked 2026-11-11).** Some of the design below is not built yet. Marked
+> *(planned)* where it appears:
+> - **pg-boss workers** *(planned)* — the code runs in-process schedulers (`mail/scheduler.ts`,
+>   `backup/schedule.ts`, the classifier/retention loops).
+> - **Gmail API / Microsoft Graph delta sync and send** *(planned)* — Gmail and Microsoft mailboxes
+>   sync and send over IMAP/SMTP with XOAUTH2 today.
+> - **Local ONNX embeddings (bge-small)** *(planned)* — embeddings come from a remote
+>   OpenAI-compatible endpoint configured under Settings → AI.
+
 ---
 
 ## 0. Decisions (locked 2026-07-11)
@@ -16,7 +25,7 @@ lets standard mobile and desktop mail clients connect to Seamless itself. Multi-
 | Codebase | Fresh repo at `~/Projects/Seamless`; port proven MailDeck modules (IMAP sync, S3 `.eml` store, threading, compose, virtual list, JMAP subset) |
 | External clients | Built-in IMAP4rev1 + SMTP-submission facade; Seamless is the system of record |
 | Database | Postgres 17 + pgvector (embeddings) + FTS (tsvector) |
-| AI | Pluggable OpenAI-compatible per task; default classifier `gemini-2.5-flash-lite`; embeddings local (bge-small, in-process ONNX) |
+| AI | Pluggable OpenAI-compatible per task; default classifier `gemini-2.5-flash-lite`; embeddings local (bge-small, in-process ONNX) *(planned — remote endpoint today)* |
 | Users | Multi-user from day one (roles: admin, member) |
 | Safe delete | Per-account toggle, default OFF; verify blob + checksum, grace window, move to origin Trash (modes: trash / expunge / archive) |
 | Gmail/MS auth | OAuth2 first-class; setup wizard walks through app registration; app-password + plain IMAP fallback (Apple/iCloud/traditional) |
@@ -34,7 +43,7 @@ Labels ×38, Settings, Preferences, Forwarding Out, AI Fallback). Importer treat
 │  HTTP :4900   REST/JMAP API · WS push · PWA static · CardDAV (/dav) · setup wizard · help pages     │
 │  IMAP :1993   facade — standard clients read Seamless's own store (app-password auth)               │
 │  SMTP :1587   submission facade — relays out via the owning account's real SMTP / Gmail API / Graph │
-│  Workers (pg-boss queues, same process or `--workers`):                                             │
+│  Workers (pg-boss queues — planned; in-process schedulers today):                                             │
 │    sync        per-account fetch (IMAP IDLE / Gmail API / MS Graph delta) → parse → S3 + Postgres   │
 │    classify    the cascade: rules → embeddings → LLM → review                                       │
 │    retention   nightly disposition sweep → recoverable Trash → purge                                │
@@ -57,8 +66,8 @@ Labels ×38, Settings, Preferences, Forwarding Out, AI Fallback). Importer treat
 
 | Provider | Sync | Send | Auth |
 |---|---|---|---|
-| Gmail | Gmail API (history/delta; labels readable) with IMAP XOAUTH2 fallback | Gmail API send / SMTP XOAUTH2 | OAuth2 (user's GCP app) |
-| Microsoft/Outlook | MS Graph delta with IMAP XOAUTH2 fallback | Graph sendMail / SMTP XOAUTH2 | OAuth2 (user's Azure app) |
+| Gmail | Gmail API (history/delta; labels readable) *(planned)*; IMAP XOAUTH2 today | Gmail API send / SMTP XOAUTH2 | OAuth2 (user's GCP app) |
+| Microsoft/Outlook | MS Graph delta *(planned)*; IMAP XOAUTH2 today | Graph sendMail / SMTP XOAUTH2 | OAuth2 (user's Azure app) |
 | Apple/iCloud | IMAP | SMTP | app-specific password |
 | Traditional | IMAP (IDLE) | SMTP | password |
 

@@ -11,7 +11,7 @@
 
 - Check the connection indicator says **Live**. If it says Offline, the connection is reconnecting.
 - Click the **fetch button** (cloud icon, left of Compose) to check all accounts now.
-- Confirm the account is enabled under Settings > Accounts.
+- Confirm the account is enabled under Settings > Mailboxes (its card shows a status pill — OK, Syncing, Error or Paused — and the last error).
 
 ## Images are not loading
 

@@ -1,6 +1,6 @@
 # Accounts & providers
 
-Add and manage mailboxes under **Settings > Accounts**. Each account syncs independently and merges into your unified inbox.
+Add and manage mailboxes under **Settings > Mailboxes**. Each mailbox syncs independently and merges into your unified inbox. **Add mailbox** opens a short wizard: address and colour → provider (detected from the address) → incoming → outgoing → **Test** (separate *Test incoming* and *Test outgoing* buttons that show each step: DNS, connect, TLS, sign-in, folders) → categories → identity (signature, aliases, Sent copy). A wrong password fails clearly at the *Sign in* step.
 
 ## IMAP / SMTP accounts
 

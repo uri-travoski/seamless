@@ -27,6 +27,7 @@ Plain words match the subject, body, and participants (full-text). Combine them 
 
 ## Notes
 
-- Search **excludes Trash and Junk** unless you ask for them with `in:trash` or `in:junk`.
+- Search **excludes Bin and Spam** unless you ask for them with `in:bin` / `in:spam` (or `in:trash` / `in:junk`).
+- `category:work` limits a search to the mailboxes in a category (any category name or key works, e.g. `category:personal is:unread`). Search also follows the scope picked in the top-right switcher.
 - Operators can be combined freely; everything is AND-ed together.
 - Clearing the box (the **x** or Escape) returns you to whatever mailbox you were in.

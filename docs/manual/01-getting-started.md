@@ -8,7 +8,7 @@ The very first account you create becomes the **admin**. Pick an email and passw
 
 ## Connect your first account
 
-Nothing shows up until you connect a mailbox. Open **Settings > Accounts > Add account** and enter your IMAP/SMTP details, or connect **Gmail** or **Microsoft** with OAuth. See **Accounts & providers** for the full walkthrough. Once connected, Seamless syncs in the background and mail appears within seconds.
+Nothing shows up until you connect a mailbox. Open **Settings > Mailboxes > Add mailbox** and enter your IMAP/SMTP details, or connect **Gmail** or **Microsoft** with OAuth. See **Accounts & providers** for the full walkthrough. Once connected, Seamless syncs in the background and mail appears within seconds.
 
 ## The layout
 
@@ -24,7 +24,7 @@ Two layouts are available (switch in **Settings > General**, or with the layout 
 ## The sidebar
 
 - **Compose** — start a new message. The small cloud button to its left **checks all accounts for new mail** on demand.
-- **Inbox, Starred, Scheduled, Drafts, Sent, Archive, Junk, Trash** — your unified mailboxes. Every connected account's Inbox is merged into one, and each account gets its own **color bar** down the left edge of a row so you can tell them apart.
+- **Inbox, Starred, Drafts, Scheduled, Sent, Templates, Spam, Bin** (Archive is under **More**) — your folders. Every connected account's Inbox is merged into one, and each account gets its own **color bar** down the left edge of a row so you can tell them apart.
 - **Review** — appears only when the AI is unsure about some mail and wants a quick decision from you.
 - **Labels** — your colored labels, across all accounts. Click the **+** on the right of the LABELS heading to add one; click the **color dot** in front of a label to recolor it.
 - **Accounts** — expand to see each account's own folders.

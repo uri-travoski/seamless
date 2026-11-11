@@ -23,7 +23,19 @@ Attach files with the paperclip button, or **drag and drop** them onto the compo
 
 ## Track opens
 
-Tick **Track opens** to embed an invisible pixel so you can see when the recipient opens the message. Opens then show as an eye badge on your sent mail (and, in a thread, on the inbox row of the reply). You can make tracking on-by-default in **Settings > General**. Note: many mail clients block remote images, so a tracked message may never register an open.
+The **eye** on the formatting toolbar turns open tracking on or off for this message (filled = on). It's on by default; change the default in **Settings > General**. Drafts and scheduled mail remember the setting.
+
+- Opens show as **👁 N** on your sent mail. Click it (or the notification) for the **open report**: total and real opens, first and last open, devices, a timeline, and every open with time (Perth), client and IP.
+- Apple Mail Privacy Protection, Gmail's image proxy and corporate scanners fetch the pixel without a person reading it. Those are marked **automatic** and left out of the real-open count.
+- **Track each recipient separately** (in the ⋮ menu by the Send button) sends every recipient their own copy with its own pixel, so the report shows *who* opened. Everyone still sees the full To/Cc.
+- Mail to your own mailboxes is never tracked, nor mail to domains on your **never track** list (Settings > General).
+- Many mail clients block images, so a tracked message may never register an open. Check Australian privacy and spam rules before tracking customers.
+
+## Templates
+
+**Templates** in the sidebar lists your templates by category. **Use** starts a new message from one; the toolbar's template button inserts one at the cursor; or type its **;shortcut** (e.g. `;quote`) followed by a space. **Save as template** is in the ⋮ menu by the Send button.
+
+Placeholders fill themselves in: `{{recipient.first_name}}`, `{{recipient.name}}`, `{{recipient.email}}`, `{{sender.name}}`, `{{sender.business}}`, `{{date}}`, `{{date+7d}}` (any number of d/w/m/y), `{{subject}}`. Recipient placeholders wait until you send if the To field is still empty. `{{?Question}}` asks you when the template is inserted — e.g. `{{?Quote amount}}`.
 
 ## AI draft
 
