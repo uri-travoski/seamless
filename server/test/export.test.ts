@@ -96,7 +96,7 @@ describe('portable export / import', () => {
     await expect(importExport(bad, PW, { mode: 'full', db })).rejects.toBeInstanceOf(ExportError);
     await expect(importExport(Buffer.from('hello'), PW, { mode: 'full', db })).rejects.toThrow(/not a Seamless export/);
     expect((await counts(db)).users).toBe(0);
-  });
+  }, 90_000); // several slow key derivations: can exceed 20 s when the whole suite loads the CPU
 
   it('refuses a full import into a database that already has users', async () => {
     await seed();
