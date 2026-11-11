@@ -1133,6 +1133,14 @@ CREATE TABLE webhook_allowlist (
 );
 `,
   },
+  {
+    id: 32,
+    sql: `
+-- T5.2 F-36: connector presets on top of webhooks (dms | bizbooks | todoist | vikunja | task-webhook)
+ALTER TABLE webhooks ADD COLUMN connector TEXT;
+ALTER TABLE webhooks ADD COLUMN connector_config_enc TEXT;
+`,
+  },
 ];
 
 /** Run `fn` in one transaction. Events emitted through the client are only turned into

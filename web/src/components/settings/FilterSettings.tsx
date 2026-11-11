@@ -22,6 +22,8 @@ export default function FilterSettings() {
   const labels = useMail((s) => s.labels);
   const [filters, setFilters] = useState<ApiFilter[]>([]);
   const [editing, setEditing] = useState<EditFilter | null>(null);
+  const [hooks, setHooks] = useState<{ id: number; name: string; connector: string | null }[]>([]);
+  useEffect(() => { void api.get<{ items: { id: number; name: string; connector: string | null }[] }>('/api/webhooks').then((r) => setHooks(r.items)).catch(() => {}); }, []);
 
   const load = () => void api.get<ApiFilter[]>('/api/filters').then(setFilters).catch(() => {});
   useEffect(load, []);
@@ -60,6 +62,10 @@ export default function FilterSettings() {
       case 'markRead': return 'mark read';
       case 'star': return 'star';
       case 'delete': return 'delete';
+      case 'send_to_webhook': return `send to webhook ${hooks.find((h) => h.id === Number(a.value))?.name ?? a.value}`;
+      case 'send_to_dms': return 'send to DMS';
+      case 'send_to_bizbooks': return 'send to BizBooks';
+      case 'create_task': return 'create task';
     }
   };
 
@@ -104,12 +110,23 @@ export default function FilterSettings() {
               <option value="label">add label</option>
               <option value="move">move to</option>
               <option value="delete">move to trash</option>
+              <option value="send_to_webhook">send to webhook</option>
+              <option value="send_to_dms">send to DMS</option>
+              <option value="send_to_bizbooks">send to BizBooks</option>
+              <option value="create_task">create task</option>
             </select>
             {a.type === 'label' && (
               <select className="text-input" style={{ width: 180 }} value={a.value ?? ''}
                 onChange={(ev) => setEditing({ ...e, actions: e.actions.map((x, j) => j === i ? { ...x, value: ev.target.value } : x) })}>
                 <option value="">choose label…</option>
                 {labels.map((l) => <option key={l.id} value={String(l.id)}>{l.name}</option>)}
+              </select>
+            )}
+            {a.type === 'send_to_webhook' && (
+              <select className="text-input" style={{ width: 180 }} value={a.value ?? ''}
+                onChange={(ev) => setEditing({ ...e, actions: e.actions.map((x, j) => j === i ? { ...x, value: ev.target.value } : x) })}>
+                <option value="">choose webhook…</option>
+                {hooks.filter((h) => !h.connector).map((h) => <option key={h.id} value={String(h.id)}>{h.name}</option>)}
               </select>
             )}
             {a.type === 'move' && (

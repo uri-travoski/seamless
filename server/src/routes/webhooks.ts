@@ -3,7 +3,7 @@ import type { FastifyInstance } from 'fastify';
 import { uid, isAdmin } from './util.ts';
 import {
   WebhookError, WEBHOOK_EVENT_TYPES, INCLUDE_LEVELS, initWebhooks, listWebhooks, createWebhook, updateWebhook, deleteWebhook, rotateSecret,
-  sendTestEvent, redeliver, listDeliveries, listAllowlist, addAllow, removeAllow, readBlob,
+  sendTestEvent, redeliver, listDeliveries, listAllowlist, addAllow, removeAllow, readBlob, sendMessageTo, connectorSummary,
 } from '../integrations/webhooks.ts';
 
 export function register(app: FastifyInstance): void {
@@ -25,6 +25,16 @@ export function register(app: FastifyInstance): void {
     return { items: await listDeliveries(uid(req), idOf(req), Number((req.query as any).limit) || 50) };
   }));
   app.post('/api/webhook-deliveries/:id/redeliver', async (req, reply) => guard(reply, async () => { await redeliver(uid(req), idOf(req)); return { ok: true }; }));
+
+  // connector buttons in the reading pane (only shown when the connector is set up)
+  app.get('/api/connectors', async (req) => connectorSummary(uid(req)));
+  app.post('/api/messages/:id/send-to/:kind', async (req, reply) => guard(reply, async () => {
+    const { id, kind } = req.params as any;
+    if (!['dms', 'bizbooks', 'tasks'].includes(kind)) throw new WebhookError(400, 'kind must be dms, bizbooks or tasks');
+    const rowId = Number(String(id).replace(/^m/, ''));
+    if (!rowId) throw new WebhookError(404, 'not found');
+    return sendMessageTo(uid(req), kind, rowId, Number(((req.body ?? {}) as any).webhookId) || undefined);
+  }));
 
   // admin-managed: local apps on the same host (DMS, BizBooks) need an entry here
   const admin = async (req: any, reply: any, fn: () => Promise<unknown>) => {

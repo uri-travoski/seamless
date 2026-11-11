@@ -166,6 +166,7 @@ export async function ingestMessage(args: IngestArgs): Promise<IngestResult | nu
     };
     filterActions = evaluateFilters(fmsg, await loadFilters(userId));
     await applyLocalFilterActions(rowId, filterActions);
+    await queueIntegrationActions(userId, rowId, filterActions).catch((err) => console.error('[connectors] rule action failed:', err?.message ?? err));  // never blocks ingest
   }
 
   await ingestInvites(userId, args.accountId, rowId, parsed);
@@ -174,6 +175,20 @@ export async function ingestMessage(args: IngestArgs): Promise<IngestResult | nu
   if (mailbox.role === 'sent') await resolvePendingFollowup(userId, rowId, messageId, threadId).catch(() => {});
   await bumpState();
   return { rowId, userId, parsed, filterActions, isInboxLive };
+}
+
+/** T5.2: send_to_webhook / send_to_dms / send_to_bizbooks / create_task rule actions → one queued delivery each (deduped). */
+async function queueIntegrationActions(userId: number, rowId: number, actions: { type: string; value?: string }[]): Promise<void> {
+  const seen = new Set<string>();
+  for (const a of actions) {
+    const kind = a.type === 'send_to_webhook' ? 'webhook' : a.type === 'send_to_dms' ? 'dms' : a.type === 'send_to_bizbooks' ? 'bizbooks' : a.type === 'create_task' ? 'tasks' : null;
+    if (!kind) continue;
+    const key = `${kind}:${a.value ?? ''}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    const { queueConnectorSend } = await import('../integrations/webhooks.ts');   // lazy: avoids an import cycle
+    await queueConnectorSend(userId, kind, rowId, Number(a.value) || undefined);
+  }
 }
 
 /** Apply label/flag filter actions: local DB write + IMAP flag propagation. Moves are handled by the caller. */

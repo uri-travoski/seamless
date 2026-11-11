@@ -528,6 +528,27 @@ function QuickReplies({ email }: { email: ApiEmail }) {
   );
 }
 
+/** T5.2: "Send to DMS / BizBooks" and "Create task" — only for connectors the user has set up. */
+function ConnectorButtons({ emailId }: { emailId: string }) {
+  const [has, setHas] = useState<{ dms: boolean; bizbooks: boolean; tasks: boolean } | null>(null);
+  const [busy, setBusy] = useState(false);
+  useEffect(() => { let live = true; api.get<{ dms: boolean; bizbooks: boolean; tasks: boolean }>('/api/connectors').then((r) => { if (live) setHas(r); }).catch(() => {}); return () => { live = false; }; }, []);
+  if (!has || !(has.dms || has.bizbooks || has.tasks)) return null;
+  const send = async (kind: 'dms' | 'bizbooks' | 'tasks') => {
+    setBusy(true);
+    try {
+      const r = await api.post<{ ok: boolean; message: string }>(`/api/messages/${emailId}/send-to/${kind}`, {});
+      toast(r.message, r.ok ? undefined : 'error');
+    } catch (e: any) { toast(e?.message ?? 'Could not send', 'error'); }
+    finally { setBusy(false); }
+  };
+  return <>
+    {has.dms && <button className="btn ghost" disabled={busy} onClick={() => void send('dms')}>Send to DMS</button>}
+    {has.bizbooks && <button className="btn ghost" disabled={busy} onClick={() => void send('bizbooks')}>Send to BizBooks</button>}
+    {has.tasks && <button className="btn ghost" disabled={busy} onClick={() => void send('tasks')}>Create task</button>}
+  </>;
+}
+
 export default function ReadingPane() {
   const selectedId = useMail((s) => s.selectedId);
   const threadIds = useMail((s) => s.threadIds);
@@ -603,6 +624,7 @@ export default function ReadingPane() {
         <ToolbarMore email={selected} />
         <button className={`icon-btn ${teachOpen ? 'active' : ''}`} title="Teach the AI about emails like this" onClick={() => setTeachOpen((v) => !v)}><SparkleIcon /></button>
         <div style={{ flex: 1 }} />
+        <ConnectorButtons emailId={selected.id} />
         <button className="btn ghost" disabled={summarizing} onClick={summarize}><SparkleIcon /> {summarizing ? 'Summarizing…' : 'Summarize'}</button>
       </div>
       </IconContext.Provider>

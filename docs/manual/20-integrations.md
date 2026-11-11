@@ -58,3 +58,27 @@ redirect it.
 
 If the receiver is genuinely on your own network (for example another app on the same server), an admin can add its
 host name, IP or CIDR range (such as `10.0.0.0/24`) under **Private-network allow-list**.
+
+## Connected apps (DMS, BizBooks, tasks)
+
+**Settings → Integrations → Connect an app** sets up a ready-made webhook for one of your own apps. Each needs its
+address and an API token (kept encrypted). If the app runs on your own network, an admin must add it to the
+**Private-network allow-list** first.
+
+| App | What it receives |
+|---|---|
+| **DMS** | The email's attachments plus a JSON description (sender, subject, date, message id) sent to `<address>/api/inbox/upload`. |
+| **BizBooks** | Supplier, ABN, total, GST, due date and invoice number, plus the PDF, sent to `<address>/api/bills-inbox`. The fields are read by your AI provider when you have one, otherwise by simple pattern matching. |
+| **Todoist / Vikunja / generic webhook** | A task titled with the email's subject, with a link back to the email and a due date when the AI finds one. |
+
+Once an app is connected, the reading pane shows **Send to DMS**, **Send to BizBooks** and **Create task** buttons, and a
+toast tells you whether it worked. A failed send is retried on the same schedule as webhooks; the **Deliveries** list
+shows what happened. An email with nothing to send (for example no attachment for the DMS) is reported and not retried.
+
+> The DMS and BizBooks addresses above are the shapes those apps must accept; see `docs/integrations/`.
+
+### Filter actions
+
+Filters (Settings → Filters) can now **send to webhook**, **send to DMS**, **send to BizBooks** or **create task** when
+new mail arrives. These queue a send in the background — they never slow down receiving mail — and run once per
+message even if several filters ask for the same thing. They are not applied when you use "run on existing mail".

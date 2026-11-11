@@ -4,7 +4,7 @@ import { api } from '../../api/client.ts';
 import { toast } from '../../toast.ts';
 import { useSession } from '../../state/session.ts';
 
-interface Hook { id: number; name: string; url: string; eventTypes: string[]; filterQuery: string | null; include: string; active: boolean; lastStatus: string | null }
+interface Hook { id: number; name: string; url: string; eventTypes: string[]; filterQuery: string | null; include: string; active: boolean; lastStatus: string | null; connector: string | null; connectorConfig: { baseUrl: string; projectId: string; hasToken: boolean } | null }
 interface Delivery { id: number; eventType: string | null; status: string; httpStatus: number | null; attempts: number; nextAttemptAt: number | null; lastError: string | null; requestBody: string | null; responseSnippet: string | null; createdAt: number }
 interface Listing { items: Hook[]; eventTypes: string[]; includeLevels: string[] }
 
@@ -59,6 +59,42 @@ function HookForm({ initial, listing, onSaved, onCancel }: { initial?: Hook; lis
         <select value={include} onChange={(e) => setInclude(e.target.value)}>{listing.includeLevels.map((l) => <option key={l} value={l}>{INCLUDE_HELP[l] ?? l}</option>)}</select></div>
       <label className="checkbox-line"><input type="checkbox" checked={active} onChange={(e) => setActive(e.target.checked)} />Active</label>
       <div><button className="btn primary" onClick={() => void save()}>{initial ? 'Save' : 'Create webhook'}</button>{' '}<button className="btn ghost" onClick={onCancel}>Cancel</button></div>
+    </div>
+  );
+}
+
+const CONNECTOR_LABELS: Record<string, string> = {
+  dms: 'DMS (documents)', bizbooks: 'BizBooks (bills inbox)', todoist: 'Todoist tasks', vikunja: 'Vikunja tasks', 'task-webhook': 'Generic task webhook',
+};
+
+/** Connector presets (T5.2): the app's address + token. Shown as buttons in the reading pane and as rule actions. */
+function ConnectorForm({ initial, onSaved, onCancel }: { initial?: Hook; onSaved: (secret?: string) => void; onCancel: () => void }) {
+  const [kind, setKind] = useState(initial?.connector ?? 'dms');
+  const [name, setName] = useState(initial?.name ?? '');
+  const [baseUrl, setBaseUrl] = useState(initial?.connectorConfig?.baseUrl ?? '');
+  const [token, setToken] = useState('');
+  const [projectId, setProjectId] = useState(initial?.connectorConfig?.projectId ?? '');
+  const [active, setActive] = useState(initial?.active ?? true);
+  const save = async () => {
+    const body = { name: name || CONNECTOR_LABELS[kind], connector: kind, connectorConfig: { baseUrl, projectId, ...(token ? { token } : {}) }, active };
+    try {
+      if (initial) { await api.put(`/api/webhooks/${initial.id}`, body); onSaved(); }
+      else { const r = await api.post<{ secret: string }>('/api/webhooks', body); onSaved(kind === 'task-webhook' ? r.secret : undefined); }   // only the generic task webhook is signed
+    } catch (e: any) { toast(e?.message ?? 'Could not save', 'error'); }
+  };
+  return (
+    <div className="dns-panel">
+      <div className="field"><label>App</label>
+        <select value={kind} disabled={!!initial} onChange={(e) => setKind(e.target.value)}>{Object.entries(CONNECTOR_LABELS).map(([k, l]) => <option key={k} value={k}>{l}</option>)}</select></div>
+      <div className="field"><label>Name</label><input className="text-input" value={name} onChange={(e) => setName(e.target.value)} placeholder={CONNECTOR_LABELS[kind]} /></div>
+      <div className="field"><label>{kind === 'todoist' ? 'Base URL (leave empty for Todoist)' : 'Base URL'}</label>
+        <input className="text-input" value={baseUrl} onChange={(e) => setBaseUrl(e.target.value)} placeholder="https://dms.example.com" /></div>
+      {kind !== 'task-webhook' && <div className="field"><label>API token{initial?.connectorConfig?.hasToken ? ' (leave empty to keep the saved one)' : ''}</label>
+        <input className="text-input" type="password" autoComplete="off" value={token} onChange={(e) => setToken(e.target.value)} /></div>}
+      {(kind === 'vikunja' || kind === 'todoist') && <div className="field"><label>Project id{kind === 'todoist' ? ' (optional)' : ''}</label>
+        <input className="text-input" value={projectId} onChange={(e) => setProjectId(e.target.value)} /></div>}
+      <label className="checkbox-line"><input type="checkbox" checked={active} onChange={(e) => setActive(e.target.checked)} />Active</label>
+      <div><button className="btn primary" onClick={() => void save()}>{initial ? 'Save' : 'Add app'}</button>{' '}<button className="btn ghost" onClick={onCancel}>Cancel</button></div>
     </div>
   );
 }
@@ -129,7 +165,7 @@ function Allowlist() {
 export default function IntegrationsSettings() {
   const isAdmin = useSession((s) => s.user?.role === 'admin');
   const [listing, setListing] = useState<Listing | null>(null);
-  const [editing, setEditing] = useState<Hook | 'new' | null>(null);
+  const [editing, setEditing] = useState<Hook | 'new' | 'new-app' | null>(null);
   const [secret, setSecret] = useState<string | null>(null);
   const [logFor, setLogFor] = useState<number | null>(null);
   const load = () => api.get<Listing>('/api/webhooks').then(setListing).catch(() => {});
@@ -150,12 +186,14 @@ export default function IntegrationsSettings() {
       <h3>Webhooks</h3>
       <p className="settings-desc">Send an event to your own URL when something happens — new mail, a lead, a failed send. Every request is signed so you can check it came from Seamless.</p>
       {secret && <SecretNotice secret={secret} onClose={() => setSecret(null)} />}
-      {listing.items.length === 0 && !editing && <p className="dim">No webhooks yet.</p>}
+      {listing.items.length === 0 && !editing && <p className="dim">No webhooks or connected apps yet.</p>}
       {listing.items.map((h) => (
         <div key={h.id} className="dns-panel">
           <strong>{h.name}</strong> {!h.active && <span className="dim">(off)</span>} {h.lastStatus && <span className="dim">· last: {h.lastStatus}</span>}
           <div className="dim"><code>{h.url}</code></div>
-          <div className="dim">{h.eventTypes.join(', ')}{h.filterQuery ? ` · only ${h.filterQuery}` : ''} · {h.include}</div>
+          {h.connector
+            ? <div className="dim">{CONNECTOR_LABELS[h.connector] ?? h.connector} · used by the reading-pane buttons and rule actions</div>
+            : <div className="dim">{h.eventTypes.join(', ')}{h.filterQuery ? ` · only ${h.filterQuery}` : ''} · {h.include}</div>}
           <div>
             <button className="btn-link" onClick={() => void test(h)}>Send test event</button>{' '}
             <button className="btn-link" onClick={() => setLogFor(logFor === h.id ? null : h.id)}>Deliveries</button>{' '}
@@ -163,15 +201,17 @@ export default function IntegrationsSettings() {
             <button className="btn-link" onClick={() => { if (confirm('Make a new secret? The old one stops working.')) void api.post<{ secret: string }>(`/api/webhooks/${h.id}/rotate`).then((r) => setSecret(r.secret)); }}>Rotate secret</button>{' '}
             <button className="btn-link" onClick={() => { if (confirm(`Delete “${h.name}” and its delivery log?`)) void api.del(`/api/webhooks/${h.id}`).then(load); }}>Delete</button>
           </div>
-          {editing && typeof editing === 'object' && editing.id === h.id && (
-            <HookForm initial={h} listing={listing} onCancel={() => setEditing(null)} onSaved={() => { setEditing(null); void load(); }} />
-          )}
+          {editing && typeof editing === 'object' && editing.id === h.id && (h.connector
+            ? <ConnectorForm initial={h} onCancel={() => setEditing(null)} onSaved={() => { setEditing(null); void load(); }} />
+            : <HookForm initial={h} listing={listing} onCancel={() => setEditing(null)} onSaved={() => { setEditing(null); void load(); }} />)}
           {logFor === h.id && <DeliveryLog hookId={h.id} />}
         </div>
       ))}
       {editing === 'new'
         ? <HookForm listing={listing} onCancel={() => setEditing(null)} onSaved={(s) => { setEditing(null); if (s) setSecret(s); void load(); }} />
-        : <button className="btn" onClick={() => setEditing('new')}>Add webhook</button>}
+        : editing === 'new-app'
+          ? <ConnectorForm onCancel={() => setEditing(null)} onSaved={(s) => { setEditing(null); if (s) setSecret(s); void load(); }} />
+          : <><button className="btn" onClick={() => setEditing('new')}>Add webhook</button>{' '}<button className="btn" onClick={() => setEditing('new-app')}>Connect an app (DMS, BizBooks, tasks)</button></>}
       {isAdmin && <Allowlist />}
     </>
   );

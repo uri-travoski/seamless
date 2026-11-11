@@ -278,8 +278,8 @@ export interface FilterCondition {
 }
 
 export interface FilterAction {
-  type: 'move' | 'label' | 'markRead' | 'star' | 'delete';
-  value?: string;            // mailbox role for move, label id for label
+  type: 'move' | 'label' | 'markRead' | 'star' | 'delete' | 'send_to_webhook' | 'send_to_dms' | 'send_to_bizbooks' | 'create_task';
+  value?: string;            // mailbox role for move, label id for label, webhook id for send_to_webhook (T5.2: the DMS/BizBooks/task actions use the first connector of that kind unless a webhook id is given)
 }
 
 export interface ApiFilter {

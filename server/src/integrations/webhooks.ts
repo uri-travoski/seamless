@@ -18,6 +18,7 @@ import { getMsgRow, queryEmails, rowToApi } from '../mail/store.ts';
 import { getParsed } from '../mail/body.ts';
 import { getBlob } from '../s3.ts';
 import { safeRequest, SsrfError, validAllowEntry } from './ssrf.ts';
+import { CONNECTORS, isConnector, connectorUrl, buildConnectorRequest, ConnectorSkip, type Connector, type ConnectorConfig } from './connectors.ts';
 
 export class WebhookError extends Error { constructor(public status: number, msg: string) { super(msg); } }
 
@@ -35,6 +36,7 @@ export const WEBHOOK_EVENT_TYPES = ALL_EVENT_TYPES.filter((t) => t !== 'webhook.
 interface HookRow {
   id: number; user_id: number; name: string; url: string; secret_enc: string; event_types: string[];
   filter_query: string | null; include: Include; active: boolean; created_at: number | string;
+  connector: string | null; connector_config_enc: string | null;
 }
 interface DeliveryRow {
   id: number | string; webhook_id: number; event_id: number | string; status: string; http_status: number | null; attempts: number;
@@ -44,6 +46,7 @@ interface DeliveryRow {
 export interface ApiWebhook {
   id: number; name: string; url: string; eventTypes: string[]; filterQuery: string | null; include: Include; active: boolean; createdAt: number;
   lastStatus: string | null;
+  connector: Connector | null; connectorConfig: { baseUrl: string; projectId: string; hasToken: boolean } | null;
 }
 export interface ApiDelivery {
   id: number; webhookId: number; eventId: number; eventType: string | null; status: string; httpStatus: number | null; attempts: number;
@@ -53,7 +56,14 @@ export interface ApiDelivery {
 const hookToApi = (r: HookRow & { last_status?: string | null }): ApiWebhook => ({
   id: r.id, name: r.name, url: r.url, eventTypes: r.event_types, filterQuery: r.filter_query, include: r.include,
   active: r.active, createdAt: Number(r.created_at), lastStatus: r.last_status ?? null,
+  connector: isConnector(r.connector) ? r.connector : null,
+  connectorConfig: isConnector(r.connector) ? (() => { const c = readCfg(r.connector_config_enc); return { baseUrl: c.baseUrl ?? '', projectId: c.projectId ?? '', hasToken: !!c.token }; })() : null,
 });
+
+function readCfg(enc: string | null): ConnectorConfig {
+  if (!enc) return {};
+  try { return JSON.parse(decrypt(enc)) as ConnectorConfig; } catch { return {}; }
+}
 
 const newSecret = () => `whsec_${randomToken(24)}`;
 
@@ -66,12 +76,31 @@ export async function listWebhooks(userId: number): Promise<ApiWebhook[]> {
   return rows.map(hookToApi);
 }
 
-export interface WebhookInput { name?: string; url?: string; eventTypes?: string[]; filterQuery?: string | null; include?: string; active?: boolean }
+export interface WebhookInput { connector?: string | null; connectorConfig?: ConnectorConfig; name?: string; url?: string; eventTypes?: string[]; filterQuery?: string | null; include?: string; active?: boolean }
 
-function validate(b: WebhookInput, cur?: HookRow): { name: string; url: string; eventTypes: string[]; filterQuery: string | null; include: Include; active: boolean } {
+type Valid = { name: string; url: string; eventTypes: string[]; filterQuery: string | null; include: Include; active: boolean; connector: Connector | null; cfgEnc: string | null };
+
+function validate(b: WebhookInput, cur?: HookRow): Valid {
   const name = String(b.name ?? cur?.name ?? '').trim().slice(0, 80);
-  const url = String(b.url ?? cur?.url ?? '').trim();
   if (!name) throw new WebhookError(400, 'name required');
+  const kind = cur ? cur.connector : (b.connector ?? null);
+  if (kind) {
+    if (!isConnector(kind)) throw new WebhookError(400, `connector must be one of ${CONNECTORS.join(', ')}`);
+    const old = readCfg(cur?.connector_config_enc ?? null);
+    const inp = b.connectorConfig ?? {};
+    const cfg: ConnectorConfig = {
+      baseUrl: String(inp.baseUrl ?? old.baseUrl ?? '').trim(), projectId: String(inp.projectId ?? old.projectId ?? '').trim(),
+      token: inp.token ? String(inp.token) : old.token,
+    };
+    if (kind !== 'todoist' && !cfg.baseUrl) throw new WebhookError(400, 'enter the base URL of the app');
+    if (kind === 'vikunja' && !cfg.projectId) throw new WebhookError(400, 'enter the Vikunja project id');
+    if (kind !== 'task-webhook' && !cfg.token) throw new WebhookError(400, 'enter the API token');
+    const url = connectorUrl(kind, cfg);
+    try { const u = new URL(url); if (u.protocol !== 'http:' && u.protocol !== 'https:') throw 0; } catch { throw new WebhookError(400, 'enter a full URL, like https://example.com'); }
+    // connectors run from the reading pane or a rule action; subscribing to events is optional
+    return { name, url, eventTypes: [], filterQuery: null, include: 'metadata', active: b.active ?? cur?.active ?? true, connector: kind, cfgEnc: encrypt(JSON.stringify(cfg)) };
+  }
+  const url = String(b.url ?? cur?.url ?? '').trim();
   let u: URL;
   try { u = new URL(url); } catch { throw new WebhookError(400, 'enter a full URL, like https://example.com/hook'); }
   if (u.protocol !== 'http:' && u.protocol !== 'https:') throw new WebhookError(400, 'only http and https URLs are allowed');
@@ -83,7 +112,7 @@ function validate(b: WebhookInput, cur?: HookRow): { name: string; url: string; 
   if (!INCLUDE_LEVELS.includes(include)) throw new WebhookError(400, 'include must be metadata, body, attachments or raw');
   const fq = b.filterQuery !== undefined ? b.filterQuery : cur?.filter_query ?? null;
   const filterQuery = fq && String(fq).trim() ? String(fq).trim().slice(0, 500) : null;
-  return { name, url, eventTypes: [...new Set(eventTypes)], filterQuery, include, active: b.active ?? cur?.active ?? true };
+  return { name, url, eventTypes: [...new Set(eventTypes)], filterQuery, include, active: b.active ?? cur?.active ?? true, connector: null, cfgEnc: null };
 }
 
 /** Returns the webhook and its signing secret — the only time the secret is visible. */
@@ -91,8 +120,8 @@ export async function createWebhook(userId: number, b: WebhookInput): Promise<Ap
   const v = validate(b);
   const secret = newSecret();
   const id = await insertId(
-    `INSERT INTO webhooks(user_id, name, url, secret_enc, event_types, filter_query, include, active, created_at) VALUES (?,?,?,?,?::text[],?,?,?,?)`,
-    [userId, v.name, v.url, encrypt(secret), v.eventTypes, v.filterQuery, v.include, v.active, Date.now()]);
+    `INSERT INTO webhooks(user_id, name, url, secret_enc, event_types, filter_query, include, active, created_at, connector, connector_config_enc) VALUES (?,?,?,?,?::text[],?,?,?,?,?,?)`,
+    [userId, v.name, v.url, encrypt(secret), v.eventTypes, v.filterQuery, v.include, v.active, Date.now(), v.connector, v.cfgEnc]);
   return { ...(await getWebhook(userId, id)), secret };
 }
 
@@ -106,8 +135,8 @@ export async function updateWebhook(userId: number, id: number, b: WebhookInput)
   const cur = await one<HookRow>('SELECT * FROM webhooks WHERE id = ? AND user_id = ?', [id, userId]);
   if (!cur) throw new WebhookError(404, 'not found');
   const v = validate(b, cur);
-  await run('UPDATE webhooks SET name=?, url=?, event_types=?::text[], filter_query=?, include=?, active=? WHERE id=? AND user_id=?',
-    [v.name, v.url, v.eventTypes, v.filterQuery, v.include, v.active, id, userId]);
+  await run('UPDATE webhooks SET name=?, url=?, event_types=?::text[], filter_query=?, include=?, active=?, connector_config_enc=COALESCE(?, connector_config_enc) WHERE id=? AND user_id=?',
+    [v.name, v.url, v.eventTypes, v.filterQuery, v.include, v.active, v.cfgEnc, id, userId]);
   return getWebhook(userId, id);
 }
 
@@ -191,10 +220,10 @@ export async function dispatch(ev: EventRow): Promise<number> {
   return n;
 }
 
-async function createDelivery(webhookId: number, eventId: number, runAt = Date.now()): Promise<number> {
+async function createDelivery(webhookId: number, eventId: number, runAt = Date.now(), enqueue = true): Promise<number> {
   const id = await insertId('INSERT INTO webhook_deliveries(webhook_id, event_id, status, next_attempt_at, created_at) VALUES (?,?,?,?,?)',
     [webhookId, eventId, 'pending', runAt, Date.now()]);
-  await enqueueJob(null, 'webhook.deliver', runAt, { deliveryId: id });
+  if (enqueue) await enqueueJob(null, 'webhook.deliver', runAt, { deliveryId: id });
   return id;
 }
 
@@ -249,21 +278,33 @@ export async function deliverOnce(deliveryId: number, now = Date.now()): Promise
   }
   ev.created_at = Number(ev.created_at); ev.id = Number(ev.id);
 
-  const body = JSON.stringify({ id: `evt_${ev.id}`, type: ev.type, created_at: ev.created_at, data: await eventData(h, ev, now) });
-  const ts = String(Math.floor(now / 1000));
-  let httpStatus: number | null = null, snippet = '', error: string | null = null;
+  let body = '', httpStatus: number | null = null, snippet = '', error: string | null = null;
   try {
-    const res = await safeRequest(h.url, {
-      method: 'POST', body, timeoutMs: 10_000, allow: await allowValues(), maxResponseBytes: SNIPPET_MAX,
-      headers: {
+    let reqUrl = h.url, method = 'POST', headers: Record<string, string>, payload: string | Buffer;
+    if (h.connector) {
+      const secret = decrypt(h.secret_enc);
+      const built = await buildConnectorRequest(h as any, readCfg(h.connector_config_enc), ev, (ts, b) => ({
+        'X-Seamless-Event': ev.type, 'X-Seamless-Delivery': String(d.id), 'X-Seamless-Timestamp': ts, 'X-Seamless-Signature': signature(secret, ts, b),
+      }), now);
+      reqUrl = built.url; method = built.method; headers = { ...built.headers, 'X-Seamless-Delivery': String(d.id) }; payload = built.body; body = built.summary;
+    } else {
+      body = JSON.stringify({ id: `evt_${ev.id}`, type: ev.type, created_at: ev.created_at, data: await eventData(h, ev, now) });
+      const ts = String(Math.floor(now / 1000));
+      payload = body;
+      headers = {
         'Content-Type': 'application/json', 'User-Agent': 'Seamless-Webhooks/1',
         'X-Seamless-Event': ev.type, 'X-Seamless-Delivery': String(d.id), 'X-Seamless-Timestamp': ts,
         'X-Seamless-Signature': signature(decrypt(h.secret_enc), ts, body),
-      },
-    });
+      };
+    }
+    const res = await safeRequest(reqUrl, { method, body: payload, timeoutMs: 10_000, allow: await allowValues(), maxResponseBytes: SNIPPET_MAX, headers });
     httpStatus = res.status; snippet = res.text.slice(0, SNIPPET_MAX);
     if (res.status < 200 || res.status > 299) error = `HTTP ${res.status}`;
   } catch (e: any) {
+    if (e instanceof ConnectorSkip) {
+      await run("UPDATE webhook_deliveries SET status='giving_up', next_attempt_at=NULL, attempts=?, last_error=? WHERE id=?", [attempts, e.message, d.id]);
+      return 'giving_up';
+    }
     error = e instanceof SsrfError ? `blocked: ${e.message}` : String(e?.message ?? e).slice(0, 300);
   }
   const keep = body.length > REQUEST_BODY_KEEP ? `${body.slice(0, REQUEST_BODY_KEEP)}… (${body.length} bytes)` : body;
@@ -325,4 +366,45 @@ export function initWebhooks(): void {
   inited = true;
   subscribeEvents(async (ev) => { await dispatch(ev); });
   registerJob('webhook.deliver', async (job) => { await deliverOnce(Number(job.payload.deliveryId)); });
+}
+
+// ---- connectors: reading-pane buttons and rule actions ----
+
+async function connectorHooks(userId: number) {
+  return q<HookRow>('SELECT * FROM webhooks WHERE user_id = ? AND connector IS NOT NULL AND active = true ORDER BY id', [userId]);
+}
+/** Pick the target: an explicit webhook id, else the first active one of that kind ("tasks" = any task connector). */
+async function pickHook(userId: number, kind: 'dms' | 'bizbooks' | 'tasks' | 'webhook', webhookId?: number): Promise<HookRow | undefined> {
+  const hooks = await connectorHooks(userId);
+  if (webhookId) return hooks.find((h) => h.id === webhookId);
+  return hooks.find((h) => kind === 'tasks' ? ['todoist', 'vikunja', 'task-webhook'].includes(h.connector!) : h.connector === kind);
+}
+
+/** Queue one delivery of `rowId` to a connector (or to a plain webhook, as a message.send event). Returns the delivery id. */
+export async function queueConnectorSend(userId: number, kind: 'dms' | 'bizbooks' | 'tasks' | 'webhook', rowId: number, webhookId?: number, runNow = false): Promise<{ deliveryId: number; webhookId: number; name: string } | null> {
+  let h: HookRow | undefined;
+  if (kind === 'webhook') h = (await one<HookRow>('SELECT * FROM webhooks WHERE id = ? AND user_id = ? AND active = true', [webhookId ?? 0, userId])) ?? undefined;
+  else h = await pickHook(userId, kind, webhookId);
+  if (!h) return null;
+  const evId = await insertId('INSERT INTO events(user_id, type, subject_type, subject_id, payload, created_at) VALUES (?,?,?,?,?::jsonb,?)',
+    [userId, 'connector.send', 'message', String(rowId), JSON.stringify({ messageId: rowId }), Date.now()]);
+  const deliveryId = await createDelivery(h.id, evId, Date.now(), !runNow);   // runNow: deliverOnce schedules its own retry
+  if (runNow) await deliverOnce(deliveryId);
+  return { deliveryId, webhookId: h.id, name: h.name };
+}
+
+/** Reading-pane button: send now and report the outcome for the toast. Retries stay queued if it failed. */
+export async function sendMessageTo(userId: number, kind: 'dms' | 'bizbooks' | 'tasks', rowId: number, webhookId?: number): Promise<{ ok: boolean; status: string; message: string; name: string }> {
+  if (!(await getMsgRow(userId, `m${rowId}`).catch(() => undefined))) throw new WebhookError(404, 'not found');
+  const r = await queueConnectorSend(userId, kind, rowId, webhookId, true);
+  if (!r) throw new WebhookError(400, `no ${kind === 'tasks' ? 'task app' : kind.toUpperCase()} connector is set up (Settings → Integrations)`);
+  const d = (await listDeliveries(userId, r.webhookId, 5)).find((x) => x.id === r.deliveryId)!;
+  const ok = d.status === 'ok';
+  return { ok, status: d.status, name: r.name, message: ok ? `Sent to ${r.name}` : `${r.name}: ${d.lastError ?? d.status}${d.status === 'failed' ? ' (will retry)' : ''}` };
+}
+
+/** The connectors a user has set up, for showing the reading-pane buttons. */
+export async function connectorSummary(userId: number): Promise<{ dms: boolean; bizbooks: boolean; tasks: boolean }> {
+  const hooks = await connectorHooks(userId);
+  return { dms: hooks.some((h) => h.connector === 'dms'), bizbooks: hooks.some((h) => h.connector === 'bizbooks'), tasks: hooks.some((h) => ['todoist', 'vikunja', 'task-webhook'].includes(h.connector!)) };
 }
