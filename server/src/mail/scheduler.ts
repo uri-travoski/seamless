@@ -57,6 +57,18 @@ async function deliverOne(row: SchedRow): Promise<void> {
   syncManager.kick(acct.id);
 }
 
+const reportedFailures = new Set<number>();
+
+async function reportScheduledFailure(row: SchedRow, error: string): Promise<void> {
+  try {
+    const acct = await one<{ user_id: number }>('SELECT user_id FROM accounts WHERE id = ?', [row.account_id]);
+    if (!acct) return;
+    const { emitEvent } = await import('../events/emit.ts');
+    await emitEvent(acct.user_id, 'send.failed', { type: 'scheduled', id: row.id },
+      { accountId: row.account_id, subject: `scheduled message #${row.id}`, error: `${error} (will keep retrying)`, scheduledId: row.id });
+  } catch { /* reporting must never break the scheduler */ }
+}
+
 /** Deliver every scheduled send whose time has passed. Exported for the scheduler loop and tests. */
 export async function processDueSends(now = Date.now()): Promise<number> {
   const due = await q<SchedRow>('SELECT * FROM scheduled_sends WHERE send_at <= ? ORDER BY send_at', [now]);
@@ -68,7 +80,12 @@ export async function processDueSends(now = Date.now()): Promise<number> {
       sent++;
       console.log(`[scheduler] delivered scheduled send #${row.id}`);
     } catch (err: any) {
-      // leave the row in place; retry next tick (SMTP flaky, S3 hiccup, etc.)
+      // leave the row in place; retry next tick (SMTP flaky, S3 hiccup, etc.) — tell the
+      // user once per scheduled send, not on every retry
+      if (!reportedFailures.has(row.id)) {
+        reportedFailures.add(row.id);
+        void reportScheduledFailure(row, err?.message ?? String(err));
+      }
       console.error(`[scheduler] send #${row.id} failed, will retry: ${err?.message ?? err}`);
     }
   }

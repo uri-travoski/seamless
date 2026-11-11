@@ -279,8 +279,62 @@ export interface ApiDecision {
   createdAt: string;
 }
 
+// ---- events + notifications (T0 F-04, T1 F-13/F-14) ----
+
+export type EventType =
+  | 'mail.received' | 'mail.opened' | 'mail.bounced'
+  | 'send.failed' | 'send.sent'
+  | 'reminder.due' | 'snooze.woke' | 'followup.due'
+  | 'sync.failed' | 'oauth.expiring'
+  | 'backup.failed' | 'backup.ok'
+  | 'storage.migration.done' | 'storage.migration.failed'
+  | 'disposable.received' | 'lead.captured' | 'assignment.changed'
+  | 'security.login' | 'security.2fa_changed';
+
+/** UI filter groups on the notifications page (each maps to one or more event types). */
+export const NOTIFICATION_GROUPS: { id: string; name: string; types: EventType[] }[] = [
+  { id: 'mail', name: 'New mail', types: ['mail.received', 'disposable.received'] },
+  { id: 'opened', name: 'Opened', types: ['mail.opened'] },
+  { id: 'reminders', name: 'Reminders', types: ['reminder.due'] },
+  { id: 'followups', name: 'Follow-ups', types: ['followup.due'] },
+  { id: 'snooze', name: 'Snooze', types: ['snooze.woke'] },
+  { id: 'send', name: 'Send failures', types: ['send.failed', 'mail.bounced'] },
+  { id: 'sync', name: 'Sync errors', types: ['sync.failed', 'oauth.expiring'] },
+  { id: 'backup', name: 'Backups', types: ['backup.failed', 'backup.ok', 'storage.migration.done', 'storage.migration.failed'] },
+  { id: 'security', name: 'Security', types: ['security.login', 'security.2fa_changed'] },
+  { id: 'leads', name: 'Leads', types: ['lead.captured'] },
+  { id: 'assignments', name: 'Assignments', types: ['assignment.changed'] },
+];
+
+export interface ApiNotification {
+  id: number;
+  type: EventType;
+  title: string;
+  body: string;
+  link: string | null;       // in-app route, e.g. /mail/msg/m123/opens
+  accountId: number | null;
+  accountColor: string | null;
+  count: number;             // grouped repeats ("Opened 5x")
+  read: boolean;
+  createdAt: number;         // epoch ms
+  updatedAt: number;
+}
+
+export interface ApiNotificationPage {
+  items: ApiNotification[];
+  total: number;
+  unread: number;
+}
+
+export interface ApiNotificationPref {
+  type: EventType;
+  inApp: boolean;
+  push: boolean;
+  emailDigest: boolean;
+}
+
 export interface WsMessage {
-  type: 'stateChange' | 'newMail' | 'counts';
+  type: 'stateChange' | 'newMail' | 'counts' | 'notifications';
   state?: string;
   accountId?: number;
   mailboxRole?: MailboxRole;

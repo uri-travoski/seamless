@@ -27,8 +27,16 @@ export interface NewMailEvent {
   aiCategorize: boolean;
 }
 
+export interface SyncStatus {
+  state: 'connecting' | 'ok' | 'error' | 'paused';
+  lastSyncAt: number | null;
+  lastError: string;
+  failures: number;
+}
+
 class AccountSyncer extends EventEmitter {
   private running = false;
+  status: SyncStatus = { state: 'connecting', lastSyncAt: null, lastError: '', failures: 0 };
   private waker: (() => void) | null = null;
   private client: ImapFlow | null = null;
 
@@ -75,6 +83,7 @@ class AccountSyncer extends EventEmitter {
         while (this.running && client.usable) {
           await this.flushOps(client);
           const inboxPath = await this.syncAllMailboxes(client);
+          this.status = { state: 'ok', lastSyncAt: Date.now(), lastError: '', failures: 0 };
           this.emit('synced', this.account.id);
           // idle on INBOX until event, op kick, or poll timeout
           if (this.running && client.usable && inboxPath) {
@@ -94,6 +103,10 @@ class AccountSyncer extends EventEmitter {
       } catch (err: any) {
         this.log(`error: ${err?.message ?? err}`);
         if (!this.running) break;
+        const failures = this.status.failures + 1;
+        this.status = { ...this.status, state: 'error', lastError: String(err?.message ?? err), failures };
+        // one blip is normal (server restart, network); report from the second in a row
+        if (failures === 2) this.emit('syncFailed', { accountId: this.account.id, userId: this.account.user_id, email: this.account.email, error: this.status.lastError });
         await new Promise((r) => setTimeout(r, backoff));
         backoff = Math.min(backoff * 2, 60_000);
       }
@@ -354,6 +367,7 @@ class SyncManager extends EventEmitter {
     syncer.on('newMail', (ev) => this.emit('newMail', ev));
     syncer.on('changed', (userId) => this.emit('changed', userId));
     syncer.on('synced', (id) => this.emit('synced', id));
+    syncer.on('syncFailed', (ev) => this.emit('syncFailed', ev));
     this.syncers.set(acct.id, syncer);
     syncer.start();
   }
@@ -372,6 +386,11 @@ class SyncManager extends EventEmitter {
   kick(accountId?: number): void {
     if (accountId !== undefined) this.syncers.get(accountId)?.kick();
     else for (const s of this.syncers.values()) s.kick();
+  }
+
+  /** Live status for Settings → Mailboxes ('paused' = disabled or not running). */
+  status(accountId: number): SyncStatus {
+    return this.syncers.get(accountId)?.status ?? { state: 'paused', lastSyncAt: null, lastError: '', failures: 0 };
   }
 
   /** Kick every running syncer belonging to one user; returns how many were kicked. */

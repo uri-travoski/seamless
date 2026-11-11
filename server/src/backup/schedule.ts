@@ -2,6 +2,7 @@ import { q, one, getSetting, setSetting } from '../db.ts';
 import { config } from '../config.ts';
 import { plog } from '../classify/settings.ts';
 import { notifyUser } from '../push.ts';
+import { emitToAdmins } from '../events/emit.ts';
 import { smtpTransport } from '../mail/send.ts';
 import type { AccountRow } from '../imap/sync.ts';
 import { createBackup, verifyBackup, pruneBackups, listBackups, type BackupSummary } from './engine.ts';
@@ -207,6 +208,7 @@ export async function runBackup(opts: { store?: BlobStore; appVersion?: string }
     await plog(null, 'backup', `backup ok: ${manifest.rows} rows, ${(manifest.bytes / 1024).toFixed(0)} KB -> ${manifest.key}`, {
       meta: { key: manifest.key, rows: manifest.rows, bytes: manifest.bytes, pruned, ms: Date.now() - started },
     });
+    await emitToAdmins('backup.ok', { type: 'backup', id: manifest.key }, { rows: manifest.rows, bytes: manifest.bytes }).catch(() => {});
     return { ok: true, key: manifest.key, rows: manifest.rows, bytes: manifest.bytes };
   } catch (err: any) {
     const message = err?.message ?? String(err);
@@ -218,6 +220,7 @@ export async function runBackup(opts: { store?: BlobStore; appVersion?: string }
 
     const cfg = await getBackupConfig().catch(() => DEFAULTS);
     await alert('Seamless backup failed', `The scheduled backup did not complete.\n\n${message}`, cfg);
+    await emitToAdmins('backup.failed', { type: 'backup', id: started }, { error: message }).catch(() => {});
     return { ok: false, error: message };
   } finally {
     running = false;

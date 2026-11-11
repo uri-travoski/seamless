@@ -488,7 +488,132 @@ ALTER TABLE processor_notes ADD COLUMN IF NOT EXISTS embedding vector;
 ALTER TABLE processor_notes ADD COLUMN IF NOT EXISTS embed_dim INTEGER;
 `,
   },
+  {
+    id: 7,
+    sql: `
+-- T0 F-01: sessions expire (30 d idle / 90 d absolute) and can be listed + revoked
+ALTER TABLE sessions
+  ADD COLUMN last_seen_at BIGINT,
+  ADD COLUMN expires_at BIGINT,
+  ADD COLUMN ip TEXT NOT NULL DEFAULT '',
+  ADD COLUMN user_agent TEXT NOT NULL DEFAULT '',
+  ADD COLUMN label TEXT NOT NULL DEFAULT '';
+UPDATE sessions SET last_seen_at = created_at,
+  expires_at = LEAST(created_at + 7776000000, (extract(epoch FROM now()) * 1000)::bigint + 2592000000);
+CREATE INDEX sessions_user ON sessions(user_id);
+
+-- T0 F-02: second factor (TOTP now; WebAuthn columns reserved for passkeys)
+CREATE TABLE user_mfa (
+  id SERIAL PRIMARY KEY,
+  user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  kind TEXT NOT NULL CHECK (kind IN ('totp','webauthn')),
+  label TEXT NOT NULL DEFAULT '',
+  secret_enc TEXT,
+  credential_id TEXT,
+  public_key TEXT,
+  sign_count BIGINT DEFAULT 0,
+  confirmed BOOLEAN NOT NULL DEFAULT false,
+  last_step BIGINT,                 -- last accepted TOTP time step (replay guard)
+  created_at BIGINT NOT NULL,
+  last_used_at BIGINT
+);
+CREATE INDEX user_mfa_user ON user_mfa(user_id);
+CREATE TABLE user_recovery_codes (
+  user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  code_hash TEXT NOT NULL,
+  used_at BIGINT,
+  PRIMARY KEY (user_id, code_hash)
+);
+`,
+  },
+  {
+    id: 8,
+    sql: `
+-- T0 F-04: one event bus feeds notifications (now), webhooks (T5) and the audit log (T6)
+CREATE TABLE events (
+  id BIGSERIAL PRIMARY KEY,
+  user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  type TEXT NOT NULL,
+  subject_type TEXT,
+  subject_id TEXT,
+  payload JSONB NOT NULL DEFAULT '{}',
+  created_at BIGINT NOT NULL
+);
+CREATE INDEX events_user_time ON events(user_id, created_at DESC);
+CREATE INDEX events_type ON events(type);
+
+CREATE TABLE notifications (
+  id BIGSERIAL PRIMARY KEY,
+  user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  event_id BIGINT REFERENCES events(id) ON DELETE SET NULL,
+  type TEXT NOT NULL,
+  title TEXT NOT NULL,
+  body TEXT NOT NULL DEFAULT '',
+  link TEXT,
+  account_id INTEGER REFERENCES accounts(id) ON DELETE SET NULL,
+  group_key TEXT,
+  count INTEGER NOT NULL DEFAULT 1,
+  read_at BIGINT,
+  created_at BIGINT NOT NULL,
+  updated_at BIGINT NOT NULL
+);
+CREATE INDEX notif_user_time ON notifications(user_id, created_at DESC);
+CREATE INDEX notif_user_unread ON notifications(user_id) WHERE read_at IS NULL;
+CREATE UNIQUE INDEX notif_group_open ON notifications(user_id, group_key) WHERE read_at IS NULL AND group_key IS NOT NULL;
+
+CREATE TABLE notification_prefs (
+  user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  type TEXT NOT NULL,
+  in_app BOOLEAN NOT NULL DEFAULT true,
+  push BOOLEAN NOT NULL DEFAULT false,
+  email_digest BOOLEAN NOT NULL DEFAULT false,
+  PRIMARY KEY (user_id, type)
+);
+
+-- a muted mailbox still records events, but raises no notifications
+CREATE TABLE notification_mutes (
+  user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  account_id INTEGER NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
+  PRIMARY KEY (user_id, account_id)
+);
+`,
+  },
 ];
+
+/** Run `fn` in one transaction. Events emitted through the client are only turned into
+ *  notifications after COMMIT, so a rollback leaves neither an event nor a notification. */
+export async function withTransaction<T>(fn: (client: pg.PoolClient) => Promise<T>): Promise<T> {
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    const out = await fn(client);
+    await client.query('COMMIT');
+    const after = afterCommit.get(client) ?? [];
+    afterCommit.delete(client);
+    for (const cb of after) await cb();
+    return out;
+  } catch (err) {
+    afterCommit.delete(client);
+    await client.query('ROLLBACK').catch(() => {});
+    throw err;
+  } finally {
+    client.release();
+  }
+}
+
+const afterCommit = new WeakMap<pg.PoolClient, (() => Promise<void>)[]>();
+
+/** Queue work to run once `client`'s transaction commits (dropped on rollback). */
+export function onCommit(client: pg.PoolClient, cb: () => Promise<void>): void {
+  const list = afterCommit.get(client) ?? [];
+  list.push(cb);
+  afterCommit.set(client, list);
+}
+
+/** Same `?` placeholder style as q(), against a transaction client. */
+export async function clientQuery<T = any>(client: pg.PoolClient, sql: string, params: unknown[] = []): Promise<T[]> {
+  return (await client.query(ph(sql), params as any[])).rows as T[];
+}
 
 export async function migrate(): Promise<void> {
   await pool.query('CREATE TABLE IF NOT EXISTS schema_migrations (id INTEGER PRIMARY KEY, applied_at BIGINT NOT NULL)');

@@ -22,16 +22,18 @@ import { register as help } from './help.ts';
 import { register as tracking } from './tracking.ts';
 import { register as push } from './push.ts';
 import { register as jmap } from './jmap.ts';
+import { register as notifications } from './notifications.ts';
+import { sessionToken } from '../auth/sessions.ts';
 
 export { sessionUser, type SessionUser } from './util.ts';
 
 // /api/setup/{backups,restore} are public on purpose: after a total loss the database
 // is empty, so there is no account to authenticate with. Both refuse once a user exists.
-const PUBLIC_PATHS = [/^\/t\//, /^\/api\/(login|setup|me)$/, /^\/api\/setup\/(backups|restore)$/, /^\/(?!api|jmap)/];
+const PUBLIC_PATHS = [/^\/t\//, /^\/api\/(login|login\/mfa|setup|me)$/, /^\/api\/setup\/(backups|restore)$/, /^\/(?!api|jmap)/];
 
 export function registerRoutes(app: FastifyInstance): void {
   app.addHook('preHandler', async (req, reply) => {
-    const su = await sessionUser(req.cookies.smsession);
+    const su = await sessionUser(sessionToken(req));
     (req as any).sessionUser = su;
     if (PUBLIC_PATHS.some((re) => re.test(req.url))) return;
     if (!su) {
@@ -60,4 +62,5 @@ export function registerRoutes(app: FastifyInstance): void {
   tracking(app);
   push(app);
   jmap(app);
+  notifications(app);
 }

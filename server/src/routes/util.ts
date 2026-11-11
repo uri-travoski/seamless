@@ -1,9 +1,8 @@
 /** Helpers shared by the route modules. */
 import type { FastifyRequest } from 'fastify';
 import fs from 'node:fs';
-import { one, run } from '../db.ts';
-import { randomToken } from '../crypto.ts';
 import { type AccountRow } from '../imap/sync.ts';
+export { sessionUser, makeSession, type SessionUser } from '../auth/sessions.ts';
 
 export const pkgVersion = (() => {
   try {
@@ -12,15 +11,6 @@ export const pkgVersion = (() => {
     return 'unknown';
   }
 })();
-
-export interface SessionUser { userId: number; role: 'admin' | 'member' }
-
-export async function sessionUser(token: string | undefined): Promise<SessionUser | null> {
-  if (!token) return null;
-  const row = await one<{ user_id: number; role: 'admin' | 'member' }>(
-    'SELECT s.user_id, u.role FROM sessions s JOIN users u ON u.id = s.user_id WHERE s.token = ?', [token]);
-  return row ? { userId: row.user_id, role: row.role } : null;
-}
 
 export function uid(req: FastifyRequest): number {
   return (req as any).sessionUser.userId as number;
@@ -40,10 +30,4 @@ export function accountToApi(r: AccountRow) {
     safeDeleteEnabled: !!r.safe_delete_enabled, safeDeleteMode: r.safe_delete_mode ?? 'trash',
     safeDeleteGraceDays: r.safe_delete_grace_days ?? 30,
   };
-}
-
-export async function makeSession(reply: any, userId: number): Promise<void> {
-  const token = randomToken(24);
-  await run('INSERT INTO sessions(token, user_id, created_at) VALUES (?,?,?)', [token, userId, Date.now()]);
-  reply.setCookie('smsession', token, { path: '/', httpOnly: true, sameSite: 'lax', maxAge: 60 * 60 * 24 * 90 });
 }

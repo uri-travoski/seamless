@@ -12,7 +12,7 @@ import { ensureBucket } from './s3.ts';
 import { registerRoutes, sessionUser } from './routes/index.ts';
 import { syncManager, type NewMailEvent } from './imap/sync.ts';
 import { addClient, broadcast } from './ws.ts';
-import { initPush, notifyUser } from './push.ts';
+import { initPush } from './push.ts';
 import { categorizeEmail } from './ai/tasks.ts';
 import { startScheduler, onScheduledSend } from './mail/scheduler.ts';
 import { setScheduleCanceller } from './mail/store.ts';
@@ -27,6 +27,9 @@ import { registerCardDav } from './facade/carddav.ts';
 import { startContactHarvest } from './contacts.ts';
 import { startBackupScheduler } from './backup/schedule.ts';
 import { initMailStore } from './backup/mailref.ts';
+import { emitEvent, startEventPrune } from './events/emit.ts';
+import { pruneExpiredSessions, sessionToken } from './auth/sessions.ts';
+import { registerSecurityHeaders } from './security/headers.ts';
 
 const pkg = JSON.parse(fs.readFileSync(new URL('../../package.json', import.meta.url), 'utf8')) as { version: string };
 
@@ -35,6 +38,7 @@ await migrate();
 const app = Fastify({ logger: false, bodyLimit: 60 * 1024 * 1024, trustProxy: true });
 
 await app.register(cookie);
+await registerSecurityHeaders(app);
 await app.register(multipart, { limits: { fileSize: 50 * 1024 * 1024 } });
 await app.register(websocket);
 
@@ -43,7 +47,7 @@ registerCardDav(app);
 
 app.register(async (instance) => {
   instance.get('/api/ws', { websocket: true }, async (socket, req) => {
-    const su = await sessionUser((req as any).cookies?.smsession);
+    const su = await sessionUser(sessionToken(req as any));
     if (!su) { (socket as any).close(); return; }
     addClient(socket as any, su.userId);
   });
@@ -76,12 +80,19 @@ syncManager.on('changed', (userId: number) => {
 syncManager.on('newMail', (ev: NewMailEvent) => {
   broadcast({ type: 'newMail', accountId: ev.accountId, from: ev.from, subject: ev.subject, mailboxRole: 'inbox' }, ev.userId);
   kickClassifier();
-  void notifyUser(ev.userId, ev.from || 'New mail', ev.subject || '(no subject)', `mail-${ev.rowId}`);
+  // in-app notification + push (per the user's notification prefs) via the event bus
+  void emitEvent(ev.userId, 'mail.received', { type: 'message', id: ev.rowId },
+    { messageId: ev.rowId, accountId: ev.accountId, from: ev.from, subject: ev.subject })
+    .catch((err) => console.error('[events] mail.received failed:', err?.message ?? err));
   if (ev.aiCategorize) {
     categorizeEmail(ev.userId, ev.rowId)
       .then(async (label) => { if (label) broadcast({ type: 'stateChange', state: await currentState() }, ev.userId); })
       .catch((err) => console.error('[ai] categorize failed:', err?.message ?? err));
   }
+});
+
+syncManager.on('syncFailed', (ev: { accountId: number; userId: number; email: string; error: string }) => {
+  void emitEvent(ev.userId, 'sync.failed', { type: 'account', id: ev.accountId }, ev).catch(() => {});
 });
 
 // where the mail blobs live: a bucket named in the environment wins, otherwise use the one
@@ -111,6 +122,8 @@ startSafeDelete();
 startContactHarvest();
 startForwarding();
 startBackupScheduler(pkg.version);
+startEventPrune();
+setInterval(() => { void pruneExpiredSessions().catch(() => {}); }, 6 * 3_600_000);
 startImapFacade();
 startSmtpFacade();
 

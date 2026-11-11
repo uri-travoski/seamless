@@ -9,6 +9,7 @@ import { getMsgRow } from '../mail/store.ts';
 import { listIdentities } from '../jmap/api.ts';
 import { broadcast } from '../ws.ts';
 import { uid } from './util.ts';
+import { emitEvent } from '../events/emit.ts';
 
 export function register(app: FastifyInstance): void {
   // ---- compose ----
@@ -26,6 +27,8 @@ export function register(app: FastifyInstance): void {
       broadcast({ type: 'stateChange' }, uid(req));
       return { ok: true, ...result };
     } catch (err: any) {
+      const p = req.body as ComposePayload;
+      await emitEvent(uid(req), 'send.failed', null, { subject: p?.subject ?? '', accountId: p?.accountId ?? null, error: err?.message ?? 'send failed' }).catch(() => {});
       return reply.code(502).send({ error: err?.message ?? 'send failed' });
     }
   });
