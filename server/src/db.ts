@@ -967,6 +967,13 @@ INSERT INTO identities(user_id, account_id, email, display_name, is_default)
   ON CONFLICT DO NOTHING;
 `,
   },
+  {
+    id: 25,
+    sql: `
+-- T4 F-30: wrong-business guard can be switched off per contact.
+ALTER TABLE contacts ADD COLUMN no_business_guard BOOLEAN NOT NULL DEFAULT false;
+`,
+  },
 ];
 
 /** Run `fn` in one transaction. Events emitted through the client are only turned into

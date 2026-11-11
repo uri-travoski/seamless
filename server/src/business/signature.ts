@@ -26,3 +26,7 @@ export function renderSignature(identity: SigIdentity, business: SigBusiness | n
   if (business?.disclaimer_html) html += `<div class="disclaimer">${business.disclaimer_html}</div>`;
   return html;
 }
+
+/** Marker so the compose editor can swap the signature block when the From identity changes. */
+export const SIGNATURE_ATTR = 'data-seamless-signature';
+export const signatureBlock = (html: string) => (html ? `<div ${SIGNATURE_ATTR}>${html}</div>` : '');

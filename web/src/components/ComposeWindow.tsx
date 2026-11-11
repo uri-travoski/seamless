@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { Fragment, useCallback, useEffect, useRef, useState } from 'react';
 import { createDisposableAddress } from './settings/DisposableSettings.tsx';
 import type { ReactNode } from 'react';
 import { useEditor, EditorContent } from '@tiptap/react';
@@ -11,14 +11,15 @@ import Highlight from '@tiptap/extension-highlight';
 import TextAlign from '@tiptap/extension-text-align';
 import Image from '@tiptap/extension-image';
 import Placeholder from '@tiptap/extension-placeholder';
-import { renderTemplate, hasRecipientTokens, type ComposePayload, type ApiTemplate } from '@seamless/shared';
+import { renderTemplate, hasRecipientTokens, type ApiIdentity, type ComposePayload, type ApiTemplate } from '@seamless/shared';
 import { useTemplates, fillTemplate } from '../state/templates.ts';
 import { NO_AUTOFILL } from '../state/ui.ts';
 import { useCompose, type Draft } from '../state/compose.ts';
 import { FollowupChoices } from './FollowupMenu.tsx';
 import AddressField from './AddressField.tsx';
 import { useMail } from '../state/mail.ts';
-import { sendMail, undoSendApi, saveDraftApi, scheduleMail, uploadFile, api } from '../api/client.ts';
+import { Node as TipNode } from '@tiptap/core';
+import { checkCompose, fetchIdentitySignature, sendMail, undoSendApi, saveDraftApi, scheduleMail, uploadFile, api } from '../api/client.ts';
 import { toast, countdownToast } from '../toast.ts';
 import {
   MinimizeIcon, MaximizeIcon, RestoreIcon, CloseIcon, UndoIcon, RedoIcon, BoldIcon, ItalicIcon,
@@ -49,10 +50,32 @@ function fmtSize(bytes: number): string {
   return bytes < 1024 * 1024 ? `${(bytes / 1024).toFixed(0)} KB` : `${(bytes / 1024 / 1024).toFixed(1)} MB`;
 }
 
+/** The signature block: a div marked data-seamless-signature so it survives the editor and can be swapped. */
+const SignatureBlock = TipNode.create({
+  name: 'signatureBlock',
+  group: 'block',
+  content: 'block+',
+  defining: true,
+  parseHTML() { return [{ tag: 'div[data-seamless-signature]' }]; },
+  renderHTML() { return ['div', { 'data-seamless-signature': '' }, 0]; },
+});
+
+/** Replace (or append) the signature block in editor html. */
+function swapSignature(html: string, sig: string): string {
+  const doc = new DOMParser().parseFromString(`<body>${html}</body>`, 'text/html');
+  const cur = doc.body.querySelector('[data-seamless-signature]');
+  const tpl = doc.createElement('template');
+  tpl.innerHTML = sig;
+  if (cur) { if (sig) cur.replaceWith(tpl.content); else cur.remove(); }
+  else if (sig) doc.body.appendChild(tpl.content);
+  return doc.body.innerHTML;
+}
+
 export default function ComposeWindow({ draft }: { draft: Draft }) {
   const update = useCompose((s) => s.update);
   const close = useCompose((s) => s.close);
   const identities = useCompose((s) => s.identities);
+  const businesses = useCompose((s) => s.businesses);
   const [showCcBcc, setShowCcBcc] = useState(draft.cc.length > 0 || draft.bcc.length > 0);
   const [sending, setSending] = useState(false);
   const [aiBusy, setAiBusy] = useState(false);
@@ -68,7 +91,7 @@ export default function ComposeWindow({ draft }: { draft: Draft }) {
       const d = await createDisposableAddress({ domain: domains[0].domain, generator: 'words', label });
       await useCompose.getState().loadIdentities();
       const identity = useCompose.getState().identities.find((i) => i.email === d.address) ?? null;
-      update(draft.key, { identity });
+      void changeIdentity(identity);
       void navigator.clipboard?.writeText(d.address).catch(() => {});
       toast(`Sending from ${d.address} (copied)`);
     } catch (e: any) { toast(e?.message ?? 'Could not create an address', 'error'); }
@@ -123,6 +146,7 @@ export default function ComposeWindow({ draft }: { draft: Draft }) {
       Highlight.configure({ multicolor: true }),
       TextAlign.configure({ types: ['heading', 'paragraph'] }),
       Image.configure({ allowBase64: true }),
+      SignatureBlock,
       Placeholder.configure({ placeholder: 'Write your message…' }),
     ],
     content: draft.initialHtml,
@@ -141,6 +165,7 @@ export default function ComposeWindow({ draft }: { draft: Draft }) {
     return {
     accountId: draft.identity?.accountId ?? 0,
     fromEmail: draft.identity?.email ?? '',
+    identityId: draft.identity?.id,
     to: draft.to, cc: draft.cc, bcc: draft.bcc,
     subject,
     html,
@@ -155,11 +180,35 @@ export default function ComposeWindow({ draft }: { draft: Draft }) {
   };
   }, [draft, editor]);
 
+  /** Swap the From identity and its signature block. */
+  const changeIdentity = async (identity: ApiIdentity | null) => {
+    update(draft.key, { identity });
+    if (!editor || !identity?.id) return;
+    try {
+      const { html } = await fetchIdentitySignature(identity.id);
+      editor.commands.setContent(swapSignature(editor.getHTML(), html));
+    } catch { /* keep the old signature */ }
+  };
+
   const doSend = async () => {
     if (!draft.identity) { toast('Add an account first (Settings > Accounts)', 'error'); return; }
     if (draft.to.length === 0) { toast('Add at least one recipient', 'error'); return; }
     setSending(true);
     try {
+      // wrong-business guard: you usually write to this client from another business
+      if (draft.identity.id) {
+        const { warnings } = await checkCompose({ identityId: draft.identity.id, to: draft.to, cc: draft.cc, bcc: draft.bcc }).catch(() => ({ warnings: [] }));
+        if (warnings.length > 0) {
+          const w = warnings[0];
+          const switchTo = w.switchIdentityId ? identities.find((i) => i.id === w.switchIdentityId) : null;
+          if (switchTo && window.confirm(`${w.message}\n\nOK = Switch to ${w.usualBusiness}\nCancel = choose "Send anyway" next`)) {
+            await changeIdentity(switchTo);
+            setSending(false);
+            return;
+          }
+          if (!window.confirm(`${w.message}\n\nSend anyway?`)) { setSending(false); return; }
+        }
+      }
       const res = await sendMail(payload(true));
       if (res.queued && res.jobId && res.releaseAt) {
         const jobId = res.jobId;
@@ -278,19 +327,27 @@ export default function ComposeWindow({ draft }: { draft: Draft }) {
       <div className="compose-body">
         <div className="compose-row">
           <span className="lbl">From</span>
+          {(() => {
+            const biz = businesses.find((b) => b.id === draft.identity?.businessId);
+            return biz ? <span className="biz-chip" title={biz.name} style={{ background: biz.brandColor }} /> : null;
+          })()}
           <select
             value={draft.identity ? `${draft.identity.accountId}|${draft.identity.email}` : ''}
             onChange={(e) => {
               const [accountId, email] = e.target.value.split('|');
-              const identity = identities.find((i) => i.accountId === Number(accountId) && i.email === email) ?? null;
-              update(draft.key, { identity });
+              void changeIdentity(identities.find((i) => i.accountId === Number(accountId) && i.email === email) ?? null);
             }}
           >
-            {identities.map((i) => (
-              <option key={`${i.accountId}|${i.email}`} value={`${i.accountId}|${i.email}`}>
-                {i.name ? `${i.name} <${i.email}>` : i.email}{i.isAlias ? ' (alias)' : ''}
-              </option>
-            ))}
+            {[...businesses.map((b) => ({ key: String(b.id), label: b.name, items: identities.filter((i) => i.businessId === b.id) })),
+              { key: 'none', label: '', items: identities.filter((i) => !i.businessId || !businesses.some((b) => b.id === i.businessId)) }]
+              .filter((g) => g.items.length > 0)
+              .map((g) => {
+                const opts = g.items.map((i) => (
+                  <option key={`${i.accountId}|${i.email}`} value={`${i.accountId}|${i.email}`}>
+                    {i.name ? `${i.name} <${i.email}>` : i.email}{i.isAlias ? ' (alias)' : ''}
+                  </option>));
+                return g.label ? <optgroup key={g.key} label={g.label}>{opts}</optgroup> : <Fragment key={g.key}>{opts}</Fragment>;
+              })}
           </select>
           <button className="cc-toggle" title="Create a throw-away address on your own domain and send from it" onClick={() => void makeDisposable()}>Use a disposable address</button>
           <div style={{ flex: 1 }} />

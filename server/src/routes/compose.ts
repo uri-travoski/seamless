@@ -9,6 +9,10 @@ import { matchReplyIdentity } from '../mail/replyfrom.ts';
 import { getMsgRow } from '../mail/store.ts';
 import { broadcast } from '../ws.ts';
 import { uid } from './util.ts';
+import { checkWrongBusiness } from '../business/guard.ts';
+import { renderSignature, signatureBlock } from '../business/signature.ts';
+import { getBusiness, cleanSigHtml } from '../business/businesses.ts';
+import { one } from '../db.ts';
 import { emitEvent } from '../events/emit.ts';
 
 export function register(app: FastifyInstance): void {
@@ -65,6 +69,23 @@ export function register(app: FastifyInstance): void {
     }
   });
 
+  /** Pre-send checks (wrong-business guard). */
+  app.post('/api/compose/check', async (req) => {
+    const b = (req.body ?? {}) as { identityId?: number; to?: { email: string }[]; cc?: { email: string }[]; bcc?: { email: string }[] };
+    const rcpts = [...(b.to ?? []), ...(b.cc ?? []), ...(b.bcc ?? [])].map((a) => String(a?.email ?? ''));
+    return { warnings: await checkWrongBusiness(uid(req), b.identityId, rcpts) };
+  });
+
+  /** The identity's rendered signature as a replaceable block (logo shown through our logo URL; the server turns it into a CID on send). */
+  app.get('/api/identities/:id/signature', async (req, reply) => {
+    const ident = await one<any>('SELECT * FROM identities WHERE id = ? AND user_id = ?', [Number((req.params as any).id), uid(req)]);
+    if (!ident) return reply.code(404).send({ error: 'not found' });
+    const business = ident.business_id ? (await getBusiness(uid(req), ident.business_id)) ?? null : null;
+    let html = cleanSigHtml(renderSignature({ email: ident.email, display_name: ident.display_name, signature_html: ident.signature_html }, business));
+    if (business) html = html.replace(new RegExp(`cid:logo-${business.id}`, 'g'), `/api/businesses/${business.id}/logo`);
+    return { html: signatureBlock(html) };
+  });
+
   app.post('/api/identity/match', async (req, reply) => {
     const { emailId } = req.body as { emailId: string };
     const row = await getMsgRow(uid(req), emailId);
@@ -76,13 +97,18 @@ export function register(app: FastifyInstance): void {
       aliases: [...JSON.parse(a.aliases), ...disposables.filter((d) => d.account_id === a.id).map((d) => d.address)] as string[],
     }));
     if (accounts.length === 0) return reply.code(400).send({ error: 'no accounts' });
-    return matchReplyIdentity({
+    const match = matchReplyIdentity({
       deliveredTo: row.delivered_to,
       to: JSON.parse(row.to_json),
       cc: JSON.parse(row.cc_json),
       owningAccountId: row.account_id,
       accounts,
     });
+    // attach the identity record (business, signature, reply-to …); disposable addresses have none
+    const ident = await one<any>('SELECT * FROM identities WHERE user_id = ? AND account_id = ? AND lower(email) = lower(?)', [uid(req), match.accountId, match.email]);
+    if (!ident) return match;
+    return { ...match, name: ident.display_name, id: ident.id, businessId: ident.business_id, isDefault: ident.is_default,
+      signatureHtml: ident.signature_html, replyTo: ident.reply_to, bccSelf: ident.bcc_self, transportId: ident.transport_id };
   });
 
 }

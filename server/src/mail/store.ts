@@ -234,6 +234,12 @@ export async function queryEmails(userId: number, req: EmailQueryRequest): Promi
       const ids = cid ? await scopeAccountIds(userId, { kind: 'category', id: cid }) : [];
       where.push('m.account_id = ANY(?::int[])'); params.push(ids ?? []);
     }
+    if (p.business) {
+      where.push(`EXISTS (SELECT 1 FROM identities bi JOIN businesses bz ON bz.id = bi.business_id
+        WHERE bz.user_id = ? AND lower(bz.name) = lower(?) AND bi.user_id = bz.user_id
+          AND (bi.account_id = m.account_id OR lower(bi.email) = lower(m.delivered_to)))`);
+      params.push(userId, p.business);
+    }
     if (p.unread !== null) where.push(`m.unread = ${p.unread ? 'true' : 'false'}`);
     if (p.starred) where.push('m.flagged = true');
     if (p.hasAttachment) where.push('m.has_attachments = true');

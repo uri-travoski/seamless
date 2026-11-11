@@ -224,6 +224,7 @@ export interface ApiBusiness {
 export interface ComposePayload {
   accountId: number;
   fromEmail: string;
+  identityId?: number;       // T4 F-30: sending identity (name, reply-to, bcc-self, transport); absent = legacy fromEmail
   to: ApiAddress[];
   cc: ApiAddress[];
   bcc: ApiAddress[];

@@ -40,8 +40,12 @@ export async function loadTransport(userId: number, id: number): Promise<{ trans
   return { transport: buildTransport(row.kind, JSON.parse(decrypt(row.config_enc))), row };
 }
 
-/** The account's chosen transport, else its own SMTP settings. */
-export async function transportForAccount(userId: number, acct: AccountRow): Promise<ResolvedTransport> {
+/** The identity's transport override, else the account's chosen transport, else its own SMTP settings. */
+export async function transportForAccount(userId: number, acct: AccountRow, identityTransportId?: number | null): Promise<ResolvedTransport> {
+  if (identityTransportId) {
+    const loaded = await loadTransport(userId, identityTransportId);
+    if (loaded) return { transport: loaded.transport, transportId: loaded.row.id, fallbackId: loaded.row.fallback_id };
+  }
   if (acct.outbound_transport_id) {
     const loaded = await loadTransport(userId, acct.outbound_transport_id);
     if (loaded) return { transport: loaded.transport, transportId: loaded.row.id, fallbackId: loaded.row.fallback_id };

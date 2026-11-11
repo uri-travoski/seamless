@@ -28,7 +28,7 @@ async function deliverOne(row: SchedRow): Promise<void> {
   const raw = await getBlob(row.s3_key);
   const envelopeTo = JSON.parse(row.envelope_to) as string[];
 
-  await sendWithFallback(acct.user_id, await transportForAccount(acct.user_id, acct), raw, { from: row.envelope_from, to: envelopeTo }, { subject: '', accountId: acct.id });
+  await sendWithFallback(acct.user_id, await transportForAccount(acct.user_id, acct, (await one<{ transport_id: number | null }>('SELECT transport_id FROM identities WHERE account_id = ? AND lower(email) = lower(?)', [acct.id, row.envelope_from]))?.transport_id), raw, { from: row.envelope_from, to: envelopeTo }, { subject: '', accountId: acct.id });
 
   // remove the message from the Scheduled folder (local row + IMAP expunge)
   if (row.message_id) {

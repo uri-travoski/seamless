@@ -1,7 +1,7 @@
 import { create } from 'zustand';
-import type { ComposePayload, ApiAddress, ApiEmail, ApiEmailBody, ApiIdentity, ApiTemplate } from '@seamless/shared';
+import type { ApiBusiness, ComposePayload, ApiAddress, ApiEmail, ApiEmailBody, ApiIdentity, ApiTemplate } from '@seamless/shared';
 import { fillTemplate } from './templates.ts';
-import { matchIdentity, fetchIdentities, fetchBody } from '../api/client.ts';
+import { api, matchIdentity, fetchIdentities, fetchIdentitySignature, fetchBody } from '../api/client.ts';
 import { useSession } from './session.ts';
 
 export interface Draft {
@@ -26,8 +26,9 @@ export interface Draft {
 interface ComposeState {
   windows: Draft[];
   identities: ApiIdentity[];
+  businesses: ApiBusiness[];
   loadIdentities: () => Promise<void>;
-  openBlank: () => void;
+  openBlank: () => Promise<void>;
   openTemplate: (t: ApiTemplate) => Promise<void>;
   openReply: (email: ApiEmail, mode: 'reply' | 'replyAll' | 'forward') => Promise<void>;
   openFromPayload: (p: ComposePayload) => void;
@@ -37,6 +38,19 @@ interface ComposeState {
 }
 
 let counter = 0;
+
+/** The identity's signature as a replaceable block ('' when it has none or is a disposable address). */
+async function signatureHtml(identity: ApiIdentity | null): Promise<string> {
+  if (!identity?.id) return '';
+  try { return (await fetchIdentitySignature(identity.id)).html; } catch { return ''; }
+}
+
+/** Put the signature after the first (empty) paragraph so quoted text stays below it. */
+function withSignature(html: string, sig: string): string {
+  if (!sig) return html;
+  const m = /^<p><\/p>/.exec(html);
+  return m ? `<p></p>${sig}${html.slice(m[0].length)}` : `${html}${sig}`;
+}
 
 function quoteHeader(email: ApiEmail): string {
   const from = email.from[0];
@@ -61,18 +75,21 @@ async function quotedBody(email: ApiEmail): Promise<string> {
 export const useCompose = create<ComposeState>((set, get) => ({
   windows: [],
   identities: [],
+  businesses: [],
 
   loadIdentities: async () => {
     try { set({ identities: await fetchIdentities() }); } catch { /* offline */ }
+    try { set({ businesses: await api.get<ApiBusiness[]>('/api/businesses') }); } catch { /* offline */ }
   },
 
-  openBlank: () => {
+  openBlank: async () => {
     const identities = get().identities;
+    const sig = await signatureHtml(identities[0] ?? null);
     set({
       windows: [...get().windows, {
         key: `c${++counter}`,
         identity: identities[0] ?? null,
-        to: [], cc: [], bcc: [], subject: '', initialHtml: '<p></p>',
+        to: [], cc: [], bcc: [], subject: '', initialHtml: withSignature('<p></p>', sig),
         attachments: [], track: useSession.getState().settings.trackByDefault,
         perRecipientTracking: useSession.getState().settings.perRecipientTracking,
         minimized: false, maximized: false,
@@ -141,7 +158,7 @@ export const useCompose = create<ComposeState>((set, get) => ({
       }
     }
 
-    const html = await quotedBody(email);
+    const html = withSignature(await quotedBody(email), await signatureHtml(identity));
     set({
       windows: [...get().windows, {
         key: `c${++counter}`,

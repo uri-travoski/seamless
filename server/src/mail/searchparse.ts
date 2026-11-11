@@ -1,6 +1,6 @@
 /**
  * Search query language:
- *   from:foo to:bar label:Work in:inbox is:unread is:starred has:attachment category:work
+ *   from:foo to:bar label:Work in:inbox is:unread is:starred has:attachment category:work business:"Name"
  *   before:2026-01-31 after:2026-01-01 "quoted phrase" free words
  * Everything unprefixed becomes a Postgres tsquery over subject/body/from/to.
  */
@@ -15,6 +15,7 @@ export interface ParsedSearch {
   starred: boolean | null;
   hasAttachment: boolean | null;
   disposable: 'any' | number | null; // T3 F-25: is:disposable / disposable:<id>
+  business: string | null;    // T4 F-30: business:"Name"
   risk: 'high' | 'medium' | null; // T2 F-20: risk:high / risk:medium
   before: number | null;      // epoch ms
   after: number | null;
@@ -38,7 +39,7 @@ function ftsEscape(term: string): string {
 export function parseSearch(query: string): ParsedSearch {
   const out: ParsedSearch = {
     fts: null, from: null, to: null, label: null, category: null, inRole: null,
-    unread: null, starred: null, hasAttachment: null, disposable: null, risk: null, before: null, after: null,
+    unread: null, starred: null, hasAttachment: null, disposable: null, business: null, risk: null, before: null, after: null,
   };
   const ftsTerms: string[] = [];
   // tokens: key:"quoted value" | key:value | "quoted phrase" | word
@@ -53,6 +54,7 @@ export function parseSearch(query: string): ParsedSearch {
         case 'to': out.to = val; continue;
         case 'label': out.label = val; continue;
         case 'category': out.category = val; continue;
+        case 'business': out.business = val; continue;
         case 'in': {
           // UI names: Spam = junk, Bin = trash
           const r = val.toLowerCase();

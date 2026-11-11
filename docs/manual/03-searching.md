@@ -15,6 +15,7 @@ Plain words match the subject, body, and participants (full-text). Combine them 
 - `is:unread` — only unread mail.
 - `is:starred` — only starred mail.
 - `has:attachment` — only messages with attachments.
+- `business:"Office Cleaners R Us"` — mail for one of your businesses: messages in a mailbox that has an address in that business, or delivered to one of the business's addresses (see "Businesses").
 - `risk:high` or `risk:medium` — messages with a phishing warning (see "Phishing and lookalike warnings").
 - `before:2026-07-01` and `after:2026-06-01` — date range (YYYY-MM-DD).
 - `"exact phrase"` — match the words together, in order.

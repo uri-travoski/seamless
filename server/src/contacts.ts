@@ -77,7 +77,7 @@ export function startContactHarvest(): void {
 export interface ContactRow {
   id: number; display_name: string; org: string; notes: string;
   sent_count: number; received_count: number; last_interaction_at: number | null;
-  auto_created: boolean; hidden: boolean; updated_at: number;
+  auto_created: boolean; hidden: boolean; updated_at: number; no_business_guard: boolean;
   emails?: string[];
 }
 

@@ -12,7 +12,7 @@ export function register(app: FastifyInstance): void {
       id: c.id, displayName: c.display_name, org: c.org, notes: c.notes, emails: c.emails,
       sentCount: c.sent_count, receivedCount: c.received_count,
       lastInteractionAt: c.last_interaction_at ? new Date(c.last_interaction_at).toISOString() : null,
-      autoCreated: c.auto_created, hidden: c.hidden,
+      autoCreated: c.auto_created, hidden: c.hidden, noBusinessGuard: c.no_business_guard,
     }));
   });
 
@@ -20,6 +20,9 @@ export function register(app: FastifyInstance): void {
     const b = req.body as any;
     await run('UPDATE contacts SET display_name = ?, org = ?, notes = ?, hidden = ?, auto_created = false, updated_at = ? WHERE id = ? AND user_id = ?',
       [b.displayName ?? '', b.org ?? '', b.notes ?? '', !!b.hidden, Date.now(), Number((req.params as any).id), uid(req)]);
+    if (typeof b.noBusinessGuard === 'boolean') {
+      await run('UPDATE contacts SET no_business_guard = ? WHERE id = ? AND user_id = ?', [b.noBusinessGuard, Number((req.params as any).id), uid(req)]);
+    }
     return { ok: true };
   });
 
