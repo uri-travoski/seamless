@@ -29,10 +29,8 @@ Two layouts are available (switch in **Settings > Appearance**, or with the layo
 - **Review** — appears only when the AI is unsure about some mail and wants a quick decision from you.
 - **Labels** — your colored labels, across all accounts. Click the **+** on the right of the LABELS heading to add one; click the **color dot** in front of a label to recolor it.
 - **Folders** — when the switcher shows a single mailbox, that mailbox's own folders appear here.
-- **Footer bar** (bottom, left to right):
-  - **Settings** (gear).
+- **Footer bar** (bottom): Settings, Log out and *check all mailboxes for new mail* now live in the **menu** at the top-right. The footer holds:
   - **Space used** by whatever the switcher shows — just the size, e.g. *23GB* or *1.4TB*, at the far left of the footer. Hover it for the message count.
-  - **Refresh** — checks every mailbox for new mail now.
   - **Show/hide sidebar** — shrinks the sidebar to icons.
 
 **Help** (this manual) and the **keyboard shortcuts** list are in **Settings**, next to **Log out** at the bottom of the settings menu. Press **?** anywhere for the shortcuts.
