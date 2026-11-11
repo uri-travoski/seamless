@@ -786,6 +786,29 @@ CREATE TABLE pop3_seen (
 );
 `,
   },
+  {
+    id: 19,
+    sql: `
+-- T3 F-24: push inbound (Cloudflare Email Routing Worker -> signed POST). messages.delivered_to already exists.
+CREATE TABLE push_inboxes (
+  token TEXT PRIMARY KEY,
+  account_id INTEGER NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
+  secret_enc TEXT NOT NULL,
+  domains TEXT[] NOT NULL DEFAULT '{}',
+  catch_all BOOLEAN NOT NULL DEFAULT true,
+  unknown_policy TEXT NOT NULL DEFAULT 'deliver' CHECK (unknown_policy IN ('deliver','reject')),
+  created_at BIGINT NOT NULL
+);
+CREATE INDEX push_inboxes_account ON push_inboxes(account_id);
+CREATE TABLE push_seen (
+  account_id INTEGER NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
+  dedupe_key TEXT NOT NULL,
+  message_row_id INTEGER,
+  created_at BIGINT NOT NULL,
+  PRIMARY KEY (account_id, dedupe_key)
+);
+`,
+  },
 ];
 
 /** Run `fn` in one transaction. Events emitted through the client are only turned into

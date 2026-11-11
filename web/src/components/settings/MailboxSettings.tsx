@@ -9,6 +9,7 @@ import { api } from '../../api/client.ts';
 import { toast } from '../../toast.ts';
 import { useMail } from '../../state/mail.ts';
 import { useCompose } from '../../state/compose.ts';
+import PushInboxSetup, { PushPanel } from './PushInboxSetup.tsx';
 import { OauthSection, SafeDeletePanel, GmailLearnPanel } from './AccountSettings.tsx';
 import { CategoryGlyph, CATEGORY_ICON_NAMES } from '../CategoryGlyph.tsx';
 import { CheckIcon, CloseIcon, WarningIcon, PlusSimpleIcon, CaretUpIcon, CaretDownIcon, TrashIcon, PencilIcon, DragIcon } from '../../icons.tsx';
@@ -356,6 +357,7 @@ function ago(ms: number | null): string {
 function providerName(a: any): string {
   if (a.kind === 'gmail') return 'Gmail (OAuth)';
   if (a.kind === 'microsoft') return 'Microsoft (OAuth)';
+  if (a.inboundKind === 'push') return `Push · ${(a.email ?? '').split('@')[1] ?? 'own domain'}`;
   if (a.inboundKind === 'pop3') return `POP3 · ${a.pop3Host}`;
   return detectPreset(a.email)?.name ?? `IMAP · ${a.imapHost}`;
 }
@@ -464,7 +466,8 @@ export default function MailboxSettings() {
   const [tab, setTab] = useState<'mailboxes' | 'categories'>('mailboxes');
   const [accounts, setAccounts] = useState<any[]>([]);
   const [form, setForm] = useState<Form | null>(null);
-  const [panel, setPanel] = useState<{ kind: 'safe' | 'learn'; id: number } | null>(null);
+  const [panel, setPanel] = useState<{ kind: 'safe' | 'learn' | 'push'; id: number } | null>(null);
+  const [pushSetup, setPushSetup] = useState(false);
 
   const load = () => {
     void api.get<any[]>('/api/accounts').then(setAccounts).catch(() => {});
@@ -499,6 +502,10 @@ export default function MailboxSettings() {
     load();
     void useMail.getState().boot();
   };
+
+  if (pushSetup) {
+    return <PushInboxSetup onDone={(saved) => { setPushSetup(false); if (saved) { load(); setTimeout(() => { void useMail.getState().boot(); void useCompose.getState().loadIdentities(); }, 1200); } }} />;
+  }
 
   if (form) {
     return <Wizard initial={form} categories={categories} onDone={(saved) => {
@@ -538,18 +545,21 @@ export default function MailboxSettings() {
                   </div>
                   <div className="mbx-actions">
                     <button className="btn" onClick={() => edit(a)}>Edit</button>
+                    {a.inboundKind === 'push' && <button className="btn ghost" onClick={() => setPanel(panel?.kind === 'push' && panel.id === a.id ? null : { kind: 'push', id: a.id })}>Cloudflare setup</button>}
                     <button className="btn ghost" onClick={() => setPanel(panel?.kind === 'safe' && panel.id === a.id ? null : { kind: 'safe', id: a.id })}>Safe delete</button>
                     {a.kind === 'gmail' && <button className="btn ghost" onClick={() => setPanel(panel?.kind === 'learn' && panel.id === a.id ? null : { kind: 'learn', id: a.id })}>Learn</button>}
                     <button className="btn ghost danger" onClick={() => void remove(a)}>Remove</button>
                   </div>
                   {panel?.id === a.id && panel?.kind === 'safe' && <SafeDeletePanel account={a} onClose={() => setPanel(null)} onSaved={load} />}
+                  {panel?.id === a.id && panel?.kind === 'push' && <PushPanel accountId={a.id} onClose={() => setPanel(null)} />}
                   {panel?.id === a.id && panel?.kind === 'learn' && <GmailLearnPanel account={a} onClose={() => setPanel(null)} />}
                 </div>
               );
             })}
             {accounts.length === 0 && <div className="empty-state"><p>No mailboxes yet.</p></div>}
           </div>
-          <button className="btn primary" onClick={() => edit()}><PlusSimpleIcon size={15} /> Add mailbox</button>
+          <button className="btn primary" onClick={() => edit()}><PlusSimpleIcon size={15} /> Add mailbox</button>{' '}
+          <button className="btn" onClick={() => setPushSetup(true)}>Own domain (Cloudflare Email Routing)</button>
         </>
       )}
     </div>

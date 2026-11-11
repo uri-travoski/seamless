@@ -3,7 +3,7 @@ import Fastify, { type FastifyInstance } from 'fastify';
 import cookie from '@fastify/cookie';
 import { registerRoutes } from '../src/routes/index.ts';
 import { registerSecurityHeaders } from '../src/security/headers.ts';
-import { authLimiter, pixelLimiter, pixelDedupe } from '../src/security/ratelimit.ts';
+import { authLimiter, pixelLimiter, pixelDedupe, ingestFailLimiter, ingestLimiter } from '../src/security/ratelimit.ts';
 
 export async function makeApp(): Promise<FastifyInstance> {
   const app = Fastify({ logger: false });
@@ -15,7 +15,7 @@ export async function makeApp(): Promise<FastifyInstance> {
 }
 
 export function resetLimiters(): void {
-  authLimiter.clear(); pixelLimiter.clear(); pixelDedupe.clear();
+  authLimiter.clear(); pixelLimiter.clear(); pixelDedupe.clear(); ingestFailLimiter.clear(); ingestLimiter.clear();
 }
 
 /** Log in through the API and return the session cookie header value. */

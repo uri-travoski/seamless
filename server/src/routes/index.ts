@@ -32,13 +32,15 @@ import { register as followups } from './followups.ts';
 import { register as risk } from './risk.ts';
 import { register as health } from './health.ts';
 import { register as transports } from './transports.ts';
+import { register as ingest } from './ingest.ts';
+import { register as pushInboxes } from './pushInboxes.ts';
 import { sessionToken } from '../auth/sessions.ts';
 
 export { sessionUser, type SessionUser } from './util.ts';
 
 // /api/setup/{backups,restore} are public on purpose: after a total loss the database
 // is empty, so there is no account to authenticate with. Both refuse once a user exists.
-const PUBLIC_PATHS = [/^\/t\//, /^\/api\/(login|login\/mfa|setup|me)$/, /^\/api\/setup\/(backups|restore)$/, /^\/(?!api|jmap)/];
+const PUBLIC_PATHS = [/^\/t\//, /^\/api\/(login|login\/mfa|setup|me)$/, /^\/api\/setup\/(backups|restore)$/, /^\/api\/ingest\/[A-Za-z0-9_-]+(\?.*)?$/, /^\/(?!api|jmap)/];
 
 export function registerRoutes(app: FastifyInstance): void {
   app.addHook('preHandler', async (req, reply) => {
@@ -81,4 +83,6 @@ export function registerRoutes(app: FastifyInstance): void {
   risk(app);
   health(app);
   transports(app);
+  ingest(app);
+  pushInboxes(app);
 }

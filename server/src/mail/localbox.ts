@@ -44,7 +44,7 @@ export async function localMailboxId(accountId: number, role: string): Promise<n
 /** Store a raw message in a local mailbox (by role). Live inbox mail runs filters, risk, etc. like IMAP mail. */
 export async function ingestLocal(
   accountId: number, role: string, raw: Buffer,
-  opts: { isLive?: boolean; flags?: string[]; internalDate?: Date } = {},
+  opts: { isLive?: boolean; flags?: string[]; internalDate?: Date; deliveredTo?: string | null } = {},
 ): Promise<IngestResult | null> {
   const mailboxId = await localMailboxId(accountId, role);
   if (!mailboxId) return null;
@@ -52,7 +52,7 @@ export async function ingestLocal(
   if (role === 'drafts') flags.add('\\Draft');
   const result = await ingestMessage({
     accountId, mailboxId, uid: await nextLocalUid(mailboxId), raw, flags,
-    internalDate: opts.internalDate ?? new Date(), isLive: !!opts.isLive,
+    internalDate: opts.internalDate ?? new Date(), isLive: !!opts.isLive, deliveredTo: opts.deliveredTo ?? null,
   });
   if (result?.isInboxLive) {
     // filter move/delete actions apply locally (IMAP accounts queue a server-side move instead)

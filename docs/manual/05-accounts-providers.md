@@ -71,6 +71,32 @@ For providers that only offer POP3: **Settings → Mailboxes → Add a mailbox**
 - Choose how POP3 mailboxes send under **Sending** (the mailbox's own SMTP or a sending service).
 - Port 110 upgrades to TLS (STLS) when the server offers it.
 
+## Your own domain via Cloudflare
+
+If your domain's DNS is on Cloudflare you can receive its mail in Seamless without running a mail server.
+Cloudflare Email Routing hands every message to a small Worker (in the repo: `workers/inbound/`), which posts it,
+signed, to your Seamless server.
+
+1. **Settings → Mailboxes → Own domain (Cloudflare Email Routing).** Enter a name, your main address, the domain(s)
+   and the outbound transport to send with (see *Sending through a provider*).
+2. Seamless shows the **endpoint, token and secret**. The secret is displayed **once** — copy it. *Rotate secret*
+   (on the mailbox's *Cloudflare setup* button) issues a new one; update the Worker afterwards.
+3. Follow the on-screen steps: copy the `wrangler.toml` values, run `npx wrangler secret put SECRETS` and
+   `npx wrangler deploy` in `workers/inbound/`, then in Cloudflare → Email Routing set the catch-all to
+   *Send to a Worker* → `seamless-inbound`.
+4. **Send test** posts a signed message to your own endpoint and files it in the Inbox. It proves the endpoint and
+   secret work; to prove the whole path, send a real email to an address on the domain after deploying.
+
+Safety nets: each post is signed (HMAC-SHA256, 5-minute clock window) and de-duplicated; the Worker retries three
+times (1 s, 4 s, 16 s) and, if Seamless is unreachable, forwards the message to `FALLBACK_ADDRESS`. The envelope
+recipient is stored with each message (used by *delivered to* filters and, later, disposable addresses).
+Your server must be reachable from the internet at `PUBLIC_URL`.
+
+### Option B: Stalwart
+
+Prefer to host the mail server yourself? Run [Stalwart](https://stalw.art) (or any IMAP server), create the
+mailboxes there, and add it in Seamless as an ordinary **IMAP / SMTP account**. No extra code is needed.
+
 ## Managing accounts
 
 Edit an account any time, disable it to pause syncing, or remove it. Removing an account stops its sync and deletes its rows from Seamless (your mail stays on the origin server).

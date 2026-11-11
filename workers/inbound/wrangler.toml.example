@@ -1,0 +1,19 @@
+# Copy to wrangler.toml and fill in. Deploy: `npx wrangler deploy` (Seamless never deploys this for you).
+name = "seamless-inbound"
+main = "src/index.ts"
+compatibility_date = "2024-11-01"
+
+[vars]
+SEAMLESS_URL = "https://mail.example.com"
+# domain or full address -> inbox token (shown in Seamless when you add the mailbox)
+ROUTES = '{"example.com":"<token>"}'
+FALLBACK_ADDRESS = "you@gmail.com"   # must be a verified Email Routing destination
+MAX_BYTES = "26214400"
+
+# Secrets (not in this file):  npx wrangler secret put SECRETS
+#   value: {"<token>":"<secret>"}
+
+# Optional: keep a copy of every raw message in R2 before posting
+# [[r2_buckets]]
+# binding = "SPOOL"
+# bucket_name = "seamless-inbound-spool"

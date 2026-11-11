@@ -55,6 +55,7 @@ export interface IngestArgs {
   raw: Buffer;
   flags: Set<string>;
   internalDate: Date | null;
+  deliveredTo?: string | null; // envelope recipient when the transport knows it (push inbound)
   isLive: boolean; // true for freshly arrived mail (filters + AI apply), false for backfill
 }
 
@@ -87,9 +88,12 @@ export async function ingestMessage(args: IngestArgs): Promise<IngestResult | nu
   const references = parsed.references ? (Array.isArray(parsed.references) ? parsed.references : [parsed.references]) : [];
   const messageId = parsed.messageId ?? null;
   const threadId = await assignThreadId(userId, { messageId, inReplyTo: parsed.inReplyTo ?? null, references });
-  const deliveredTo =
-    (parsed.headers.get('delivered-to') as string | undefined) ??
-    (parsed.headers.get('x-original-to') as string | undefined) ?? null;
+  const headerText = (name: string): string | null => {
+    const v = parsed.headers.get(name) as unknown;
+    if (typeof v === 'string') return v;
+    return (v as { text?: string } | undefined)?.text ?? null; // mailparser returns address-like headers as objects
+  };
+  const deliveredTo = args.deliveredTo ?? headerText('delivered-to') ?? headerText('x-original-to');
   const atts = attachmentMeta(parsed);
   const bodyText = parsed.text ?? textSnippet(parsed);
   const date = (parsed.date ?? args.internalDate ?? new Date()).getTime();

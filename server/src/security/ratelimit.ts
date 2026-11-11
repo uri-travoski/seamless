@@ -45,3 +45,9 @@ export const pixelLimiter = new RateLimiter(30, 60_000);
 
 /** Same IP hitting the same pixel within 60 s: stored once more but not re-broadcast. */
 export const pixelDedupe = new RateLimiter(1, 60_000);
+
+/** Push-inbound endpoint: 20 bad signatures per 15 minutes per IP+token, then 429. */
+export const ingestFailLimiter = new RateLimiter(20, 15 * 60_000);
+
+/** Push-inbound endpoint: 600 accepted posts per minute per token. */
+export const ingestLimiter = new RateLimiter(600, 60_000);
