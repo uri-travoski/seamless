@@ -521,16 +521,16 @@ export default function ReadingPane() {
       <IconContext.Provider value={{ weight: 'regular', size: 18 }}>
       <div className="read-toolbar">
         <button className="icon-btn" title="Back to list (u)" onClick={() => void select(null)}><BackIcon /></button>
-        {inBin
-          ? <button className="icon-btn" title={selected.mailboxRole === 'junk' ? 'Not spam' : 'Restore to Inbox'} onClick={() => (selected.mailboxRole === 'junk' ? actions.notSpam(selected.id) : actions.restore(selected.id))}><RestoreMailIcon /></button>
-          : <button className="icon-btn" title="Archive (e)" onClick={() => actions.archive(selected.id)}><ArchiveIcon /></button>}
-        {selected.mailboxRole !== 'junk' && <button className="icon-btn" title="Report spam (!)" onClick={() => actions.spam(selected.id)}><JunkIcon /></button>}
-        <button className="icon-btn" title={inBin ? 'Delete forever' : 'Delete (#)'} onClick={() => actions.trash(selected.id)}><TrashIcon /></button>
         <span className="tb-sep" />
         <button className="icon-btn" title="Mark unread (Shift+U)" onClick={() => { markRead(selected.id, false); void select(null); }}><EnvelopeIcon /></button>
         <button className={`icon-btn ${selected.keywords.$flagged ? 'active' : ''}`} title="Star (s)" onClick={() => actions.star(selected.id)}><StarIcon weight={selected.keywords.$flagged ? 'fill' : 'regular'} /></button>
         <LabelPicker value={selected.labelIds} onChange={(ids) => applyLabels(selected.id, ids)} />
         {selected.mailboxRole === 'inbox' && <SnoozeButton onPick={(at) => void actions.snooze(selected.id, at)} />}
+        {inBin
+          ? <button className="icon-btn" title={selected.mailboxRole === 'junk' ? 'Not spam' : 'Restore to Inbox'} onClick={() => (selected.mailboxRole === 'junk' ? actions.notSpam(selected.id) : actions.restore(selected.id))}><RestoreMailIcon /></button>
+          : <button className="icon-btn" title="Archive (e)" onClick={() => actions.archive(selected.id)}><ArchiveIcon /></button>}
+        {selected.mailboxRole !== 'junk' && <button className="icon-btn" title="Report spam (!)" onClick={() => actions.spam(selected.id)}><JunkIcon /></button>}
+        <button className="icon-btn" title={inBin ? 'Delete forever' : 'Delete (#)'} onClick={() => actions.trash(selected.id)}><TrashIcon /></button>
         <span className="tb-sep" />
         {!selected.keywords.$draft && <>
           <button className="icon-btn" title="Reply (r)" onClick={() => actions.reply(selected.id)}><ReplyIcon /></button>

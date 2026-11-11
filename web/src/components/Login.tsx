@@ -15,6 +15,7 @@ export default function Login() {
   const [confirm, setConfirm] = useState('');
   const [err, setErr] = useState('');
   const [busy, setBusy] = useState(false);
+  const [showPw, setShowPw] = useState(false);
   const [mfaToken, setMfaToken] = useState('');
   const [code, setCode] = useState('');
   const loginMfa = useSession((s) => s.loginMfa);
@@ -115,7 +116,7 @@ export default function Login() {
   return (
     <div className="login-wrap">
       <div className="login-card">
-        <div className="brand"><MailLogo size={30} /><span className="app-name">{cachedAppName()}</span></div>
+        <div className="brand"><MailLogo size="1.65em" /><span className="app-name">{cachedAppName()}</span></div>
         {mfaToken ? (
           <>
             <p style={{ color: 'var(--md-text-soft)', fontSize: 13, marginTop: 0 }}>
@@ -132,11 +133,12 @@ export default function Login() {
           </>
         ) : (<>
         <p style={{ color: 'var(--md-text-soft)', fontSize: 13, marginTop: 0 }}>
-          {isSetup ? 'First run — create the admin account for this instance.' : 'Please Sign In.'}
+          {isSetup ? 'First run — create the admin account for this instance.' : 'Sign in to your account'}
         </p>
         <div className="field">
-          <input
-            className="text-input" type="email" value={email} autoFocus placeholder="Email" aria-label="Email" 
+          <label htmlFor="login-email">Email</label>
+          <input id="login-email"
+            className="text-input" type="email" value={email} autoFocus placeholder="name@example.com" aria-label="Email" 
             onChange={(e) => setEmail(e.target.value)}
             onKeyDown={(e) => e.key === 'Enter' && !isSetup && canSubmit && submit()}
           />
@@ -151,11 +153,19 @@ export default function Login() {
           </div>
         )}
         <div className="field">
-          <input
-            className="text-input" type="password" value={password} placeholder="Password" aria-label="Password" 
-            onChange={(e) => setPassword(e.target.value)}
-            onKeyDown={(e) => e.key === 'Enter' && !isSetup && canSubmit && submit()}
-          />
+          <label htmlFor="login-password">Password</label>
+          <div className="pw-wrap">
+            <input id="login-password"
+              className="text-input" type={showPw ? 'text' : 'password'} value={password} placeholder="••••••••" aria-label="Password"
+              onChange={(e) => setPassword(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && !isSetup && canSubmit && submit()}
+            />
+            <button type="button" className="pw-toggle" aria-label="Toggle password visibility" onClick={() => setShowPw((v) => !v)}>
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" /><circle cx="12" cy="12" r="3" />
+              </svg>
+            </button>
+          </div>
         </div>
         {isSetup && (
           <div className="field">
