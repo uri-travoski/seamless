@@ -19,9 +19,41 @@ export interface RiskInput {
   firstTimeSender: boolean;
   knownContact: boolean;          // the exact address is someone you have written to / heard from
   trusted: boolean;               // address or domain in trusted_senders → skip everything
+  arcPass?: boolean;              // a known forwarder's ARC chain vouches for the original (F-29)
 }
 export interface RiskReason { code: string; severity: 'medium' | 'high'; text: string }
 export type RiskLevel = 'none' | 'medium' | 'high';
+
+// ---------- ARC (F-29) ----------
+
+export const ARC_FORWARDERS = ['google.com', 'cloudflare.net', 'outlook.com', 'icloud.com', 'fastmail.com'];
+
+/**
+ * True when the message carries an ARC chain sealed by a known forwarder (or one of the user's own
+ * push domains) whose ARC-Authentication-Results show dmarc=pass or spf=pass.
+ * `headers` are raw header lines ("Name: value"), as in mailparser's `headerLines[].line`.
+ */
+export function arcVouches(headers: string[], extraDomains: string[] = []): boolean {
+  const trusted = [...ARC_FORWARDERS, ...extraDomains.map((d) => d.toLowerCase())];
+  const unfold = (l: string) => l.replace(/\r?\n[ \t]+/g, ' ');
+  const seals = new Map<number, string>();   // instance -> d=
+  const results = new Map<number, string>(); // instance -> ARC-Authentication-Results value
+  for (const raw of headers) {
+    const line = unfold(raw);
+    const name = line.slice(0, line.indexOf(':')).trim().toLowerCase();
+    const value = line.slice(line.indexOf(':') + 1);
+    const inst = Number(value.match(/\bi\s*=\s*(\d+)/)?.[1]);
+    if (!inst) continue;
+    if (name === 'arc-seal') { const d = value.match(/\bd\s*=\s*([^\s;]+)/)?.[1]; if (d) seals.set(inst, d.toLowerCase()); }
+    else if (name === 'arc-authentication-results') results.set(inst, value);
+  }
+  for (const [inst, d] of seals) {
+    const ok = trusted.some((t) => d === t || d.endsWith('.' + t));
+    const res = results.get(inst);
+    if (ok && res && /\b(dmarc|spf)\s*=\s*pass\b/i.test(res)) return true;
+  }
+  return false;
+}
 
 // ---------- domain helpers ----------
 
@@ -75,6 +107,7 @@ const ARCHIVE_EXT = /\.(zip|7z|rar)$/i;
 
 const authFail: Rule = (i) => {
   const { spf, dkim, dmarc } = i.auth;
+  if (i.arcPass) return null;
   if (dmarc === 'fail' || (spf === 'fail' && dkim === 'fail')) {
     return { code: 'auth_fail', severity: 'high', text: 'This message failed the sender checks (SPF/DKIM/DMARC), so it may not really come from who it says.' };
   }
@@ -196,7 +229,11 @@ export async function assessAndStore(userId: number, rowId: number, parsed: Pars
 
   const auth = parseAuth(parsed);
   const replyTo = (Array.isArray(parsed.replyTo) ? parsed.replyTo[0] : parsed.replyTo)?.value?.map((v: { address?: string }) => (v.address ?? '').toLowerCase()).filter(Boolean) ?? [];
+  const pushDomains = (await q<{ d: string }>(
+    `SELECT unnest(p.domains) AS d FROM push_inboxes p JOIN accounts a ON a.id = p.account_id WHERE a.user_id = ?`, [userId])).map((r) => r.d);
+  const arcPass = arcVouches((parsed.headerLines ?? []).filter((h) => h.key.startsWith('arc-')).map((h) => h.line), pushDomains);
   const result = assessRisk({
+    arcPass,
     fromAddr, fromName: fromObj?.name ?? '', replyTo,
     auth: { spf: auth.spf?.result.toLowerCase(), dkim: auth.dkim?.result.toLowerCase(), dmarc: auth.dmarc?.result.toLowerCase() },
     subject: parsed.subject ?? '', text: parsed.text ?? '', html: typeof parsed.html === 'string' ? parsed.html : null,

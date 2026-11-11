@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, afterAll } from 'vitest';
 import { resetDb, TEST_USER, makeUser, makeAccount, makeMailbox, ingest, rawEmail } from './helpers.ts';
 import { makeApp, resetLimiters, login } from './app.ts';
-import { assessRisk, registrable, skeleton, damerau, type RiskInput } from '../src/mail/risk.ts';
+import { arcVouches, assessRisk, registrable, skeleton, damerau, type RiskInput } from '../src/mail/risk.ts';
 import { q, one, run } from '../src/db.ts';
 import { getEmails, queryEmails } from '../src/mail/store.ts';
 
@@ -22,6 +22,29 @@ describe('F-20 helpers', () => {
     expect(skeleton('pаypal.com')).toBe(skeleton('paypal.com'));       // Cyrillic а
     expect(skeleton('0fficecleaners.com.au')).toBe(skeleton('officecleaners.com.au'));
     expect(damerau('paypal', 'paypla')).toBe(1);
+  });
+});
+
+describe('F-29 ARC awareness', () => {
+  const chain = (d: string, res: string) => [
+    `ARC-Seal: i=1; a=rsa-sha256; t=1; cv=none; d=${d}; s=arc; b=abc`,
+    `ARC-Authentication-Results: i=1; mx.${d}; ${res}`,
+  ];
+  it('known forwarder with dmarc/spf pass vouches', () => {
+    expect(arcVouches(chain('google.com', 'spf=pass smtp.mailfrom=a@b.test; dmarc=pass header.from=b.test'))).toBe(true);
+    expect(arcVouches(chain('fastmail.com', 'spf=pass'))).toBe(true);
+  });
+  it('unknown sealer, failing results or missing chain do not vouch', () => {
+    expect(arcVouches(chain('evil.test', 'dmarc=pass'))).toBe(false);
+    expect(arcVouches(chain('google.com', 'spf=fail; dmarc=fail'))).toBe(false);
+    expect(arcVouches([])).toBe(false);
+  });
+  it('the user’s own push domains count', () => {
+    expect(arcVouches(chain('mail.demo-domain.test', 'dmarc=pass'), ['demo-domain.test'])).toBe(true);
+  });
+  it('arcPass suppresses auth_fail', () => {
+    expect(codes(base({ auth: { dmarc: 'fail' }, arcPass: true }))).not.toContain('auth_fail');
+    expect(codes(base({ auth: { dmarc: 'fail' }, arcPass: false }))).toContain('auth_fail');
   });
 });
 
