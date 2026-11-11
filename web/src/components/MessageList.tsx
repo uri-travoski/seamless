@@ -89,18 +89,18 @@ function RowActions({ email }: { email: ApiEmail }) {
   const stop = (fn: () => void) => (e: React.MouseEvent) => { e.stopPropagation(); fn(); };
   return (
     <span className="row-actions" onClick={(e) => e.stopPropagation()}>
-      {inBin || inSpam
-        ? <button className="icon-btn" title={inSpam ? 'Not spam' : 'Restore to Inbox'} onClick={stop(() => (inSpam ? actions.notSpam(email.id) : actions.restore(email.id)))}><InboxIcon size={17} /></button>
-        : <button className="icon-btn" title="Archive (e)" onClick={stop(() => actions.archive(email.id))}><ArchiveIcon size={17} /></button>}
-      <button className="icon-btn" title={inBin || inSpam ? 'Delete forever' : 'Delete (#)'} onClick={stop(() => actions.trash(email.id))}><TrashIcon size={17} /></button>
       <button className="icon-btn" title={unread ? 'Mark read (Shift+I)' : 'Mark unread (Shift+U)'} onClick={stop(() => actions.markRead(email.id, unread))}>
         {unread ? <EnvelopeOpenIcon size={17} /> : <EnvelopeIcon size={17} />}
       </button>
-      {!inSpam && <button className="icon-btn" title="Report spam (!)" onClick={stop(() => actions.spam(email.id))}><JunkIcon size={17} /></button>}
       {email.mailboxRole === 'inbox' && (
         <button className="icon-btn" title="Snooze (b)" aria-label="Snooze"
           onClick={(e) => { e.stopPropagation(); const r = e.currentTarget.getBoundingClientRect(); useUi.getState().set({ snoozeFor: { id: email.id, x: r.left - 180, y: r.bottom + 4 } }); }}><SnoozeIcon size={17} /></button>
       )}
+      {inBin || inSpam
+        ? <button className="icon-btn" title={inSpam ? 'Not spam' : 'Restore to Inbox'} onClick={stop(() => (inSpam ? actions.notSpam(email.id) : actions.restore(email.id)))}><InboxIcon size={17} /></button>
+        : <button className="icon-btn" title="Archive (e)" onClick={stop(() => actions.archive(email.id))}><ArchiveIcon size={17} /></button>}
+      {!inSpam && <button className="icon-btn" title="Report spam (!)" onClick={stop(() => actions.spam(email.id))}><JunkIcon size={17} /></button>}
+      <button className="icon-btn" title={inBin || inSpam ? 'Delete forever' : 'Delete (#)'} onClick={stop(() => actions.trash(email.id))}><TrashIcon size={17} /></button>
     </span>
   );
 }
