@@ -30,6 +30,20 @@ recipients, text and attachments. Once the time is up the message goes out and c
 Change the delay (Off, 5, 10, 20 or 30 seconds) in **Settings > General > Sending and snoozing**. Scheduled
 (send-later) messages aren't delayed. If the server restarts while a message is being held, it is still sent once.
 
+## Follow-up reminders
+
+Ask to be told if nobody answers.
+
+- **While writing:** the **⋮** menu in the compose window > **Remind me if no reply…** > 1, 2, 3 days, 1 week or your own
+  number of days. A small "Remind in 2d" tag shows in the footer.
+- **On something you already sent:** open the message in **Sent** (or right-click it) > **Follow up…**.
+- When the time comes: if someone you wrote to has replied, nothing happens. Otherwise you get a **No reply from Bob**
+  notification (or "Opened 3× but no reply from Bob" if you tracked it). The sent message shows a banner with
+  **Follow up now** (opens a reply) and **Remind me again**.
+- **Waiting for reply** (sidebar, under *More*) lists every sent message that still has a reminder.
+- Only a reply from one of the people you wrote to counts — a reply from someone else doesn't. **Cancel reminder** is in the
+  banner and the right-click menu.
+
 ## Track opens
 
 The **eye** on the formatting toolbar turns open tracking on or off for this message (filled = on). It's on by default; change the default in **Settings > General**. Drafts and scheduled mail remember the setting.

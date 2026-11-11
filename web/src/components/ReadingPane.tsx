@@ -8,6 +8,7 @@ import type { TrackingInfo } from '@seamless/shared';
 import { cache } from '../api/cache.ts';
 import { toast } from '../toast.ts';
 import SnoozeButton from './SnoozeMenu.tsx';
+import { FollowupBanner } from './FollowupMenu.tsx';
 import LabelPicker from './LabelPicker.tsx';
 import { readableTextOn } from './LabelColorPicker.tsx';
 import { EmailMenuItems } from './EmailMenu.tsx';
@@ -342,6 +343,7 @@ function MessageCard({ email, expanded, onToggle }: { email: ApiEmail; expanded:
                 onChange={(e) => setNoteDraft(e.target.value)} onBlur={() => void persistNote(noteDraft)} />
             </div>
           )}
+          <FollowupBanner email={email} />
           {email.openCount >= 0 && (
             <div className="track-wrap">
               <button className={`track-banner ${email.openCount > 0 ? 'clickable' : ''}`}

@@ -5,6 +5,7 @@ import { sha256 } from '../crypto.ts';
 import { putBlob } from '../s3.ts';
 import { config } from '../config.ts';
 import { assignThreadId } from './threading.ts';
+import { resolvePendingFollowup } from './followups.ts';
 import { evaluateFilters, loadFilters, type FilterableMessage } from './filters.ts';
 
 export function addressList(obj: AddressObject | AddressObject[] | undefined): ApiAddress[] {
@@ -146,6 +147,7 @@ export async function ingestMessage(args: IngestArgs): Promise<IngestResult | nu
     await applyLocalFilterActions(rowId, filterActions);
   }
 
+  if (mailbox.role === 'sent') await resolvePendingFollowup(userId, rowId, messageId, threadId).catch(() => {});
   await bumpState();
   return { rowId, userId, parsed, filterActions, isInboxLive };
 }

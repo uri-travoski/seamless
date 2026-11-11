@@ -17,6 +17,7 @@ import { categorizeEmail } from './ai/tasks.ts';
 import { startScheduler, onScheduledSend } from './mail/scheduler.ts';
 import { startJobRunner } from './jobs/runner.ts';
 import { wakeOnReply } from './mail/snooze.ts';
+import { settleOnReply } from './mail/followups.ts';
 import { setScheduleCanceller } from './mail/store.ts';
 import { cancelScheduleByMessageId } from './mail/send.ts';
 import { startClassifier, kickClassifier, onClassified } from './classify/engine.ts';
@@ -80,6 +81,7 @@ syncManager.on('changed', (userId: number) => {
 });
 
 syncManager.on('newMail', (ev: NewMailEvent) => {
+  void settleOnReply(ev.userId, ev.rowId).catch((err) => console.error('[followups] settle failed:', err?.message ?? err));
   void wakeOnReply(ev.userId, ev.rowId).catch((err) => console.error('[snooze] wake on reply failed:', err?.message ?? err));
   broadcast({ type: 'newMail', accountId: ev.accountId, from: ev.from, subject: ev.subject, mailboxRole: 'inbox' }, ev.userId);
   kickClassifier();

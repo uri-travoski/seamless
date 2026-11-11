@@ -101,6 +101,8 @@ export async function rowToApi(r: MsgRow): Promise<ApiEmail> {
     if (ta && ta.c > 0) { threadOpenCount = ta.c; threadOpenAt = new Date(ta.last!).toISOString(); }
   }
   const hasNote = !!(await one('SELECT 1 FROM notes WHERE user_id = ? AND email_id = ?', [r.user_id, `m${r.id}`]));
+  const fu = await one<{ id: number; due_at: number; status: string }>(
+    `SELECT id, due_at, status FROM followups WHERE message_id = ? AND user_id = ? AND status IN ('waiting','due') ORDER BY id DESC LIMIT 1`, [r.id, r.user_id]);
   return {
     id: `m${r.id}`,
     threadId: r.thread_id,
@@ -135,6 +137,9 @@ export async function rowToApi(r: MsgRow): Promise<ApiEmail> {
     disposition: (r.disposition as 'keep' | 'delete') ?? 'keep',
     deleteAt: r.delete_at ? new Date(r.delete_at).toISOString() : null,
     needsReview: r.classify_state === 'needs_review',
+    followupId: fu?.id ?? null,
+    followupDueAt: fu ? new Date(Number(fu.due_at)).toISOString() : null,
+    followupStatus: fu ? (fu.status as 'waiting' | 'due') : null,
     snoozedUntil: r.snoozed_until && r.snoozed_until > Date.now() ? new Date(Number(r.snoozed_until)).toISOString() : null,
   };
 }
@@ -196,6 +201,7 @@ export async function queryEmails(userId: number, req: EmailQueryRequest): Promi
   if (f.notKeyword === '$seen') where.push('m.unread = true');
   if (f.hasKeyword === '$flagged') where.push('m.flagged = true');
   if (f.needsReview) where.push("m.classify_state = 'needs_review'");
+  if (f.waiting) where.push(`EXISTS (SELECT 1 FROM followups fu WHERE fu.message_id = m.id AND fu.user_id = m.user_id AND fu.status IN ('waiting','due'))`);
   if (f.snoozed) {
     where.push('m.snoozed_until > ?'); params.push(Date.now());
   } else if (f.inMailbox) {

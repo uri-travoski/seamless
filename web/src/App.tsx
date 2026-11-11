@@ -67,6 +67,7 @@ function folderView(route: Extract<Route, { page: 'mail' }>): View {
   if (route.folder === 'starred') return { kind: 'search', query: 'is:starred', title: 'Starred' };
   if (route.folder === 'review') return { kind: 'review', title: 'Review' };
   if (route.folder === 'snoozed') return { kind: 'snoozed', title: 'Snoozed' };
+  if (route.folder === 'waiting') return { kind: 'waiting', title: 'Waiting for reply' };
   if (route.folder === 'label') {
     const id = Number(route.arg);
     return { kind: 'label', labelId: id, title: labels.find((l) => l.id === id)?.name ?? 'Label' };

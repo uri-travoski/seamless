@@ -132,6 +132,9 @@ export interface ApiEmail {
   deleteAt: string | null; // when the retention sweep will trash it (countdown badge)
   needsReview: boolean;
   snoozedUntil: string | null; // ISO while snoozed (hidden from the Inbox until then)
+  followupId: number | null;   // T2 F-19: a live reminder on this sent message
+  followupDueAt: string | null;
+  followupStatus: 'waiting' | 'due' | null;
 }
 
 export interface ApiAttachmentMeta {
@@ -169,6 +172,7 @@ export interface ApiEmailBody {
 
 export interface EmailQueryFilter {
   snoozed?: boolean;         // T2: only mail currently snoozed, soonest first
+  waiting?: boolean;         // T2: sent mail with a live follow-up reminder
   scope?: ScopeId;           // T1: unified | category:<id> | account:<id> (default unified)
   inMailbox?: string;        // "mb:<id>" or "u:<role>"
   label?: number;

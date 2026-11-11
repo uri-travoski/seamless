@@ -43,6 +43,20 @@ export const actions = {
     } catch (err: any) { toast(err?.message ?? 'Could not snooze', 'error'); }
   },
 
+  /** Remind me if nobody replies to this sent message within `days`. */
+  followup: async (id: string, days: number) => {
+    const due = Date.now() + days * 86_400_000;
+    try {
+      await api.post('/api/followups', { emailId: id, dueAt: due });
+      toast(`Reminder set — you'll be told in ${days} day${days === 1 ? '' : 's'} if nobody replies`);
+      await mail().refreshCurrent();
+    } catch (err: any) { toast(err?.message ?? 'Could not set the reminder', 'error'); }
+  },
+  cancelFollowup: async (followupId: number) => {
+    try { await api.del(`/api/followups/${followupId}`); toast('Reminder cancelled'); await mail().refreshCurrent(); }
+    catch (err: any) { toast(err?.message ?? 'Could not cancel', 'error'); }
+  },
+
   /** Delete → Bin (undoable). In Bin/Spam it's permanent, so ask first. */
   trash: (id: string) => {
     const e = email(id);

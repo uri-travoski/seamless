@@ -14,6 +14,7 @@ import { renderTemplate, hasRecipientTokens, type ComposePayload, type ApiTempla
 import { useTemplates, fillTemplate } from '../state/templates.ts';
 import { NO_AUTOFILL } from '../state/ui.ts';
 import { useCompose, type Draft } from '../state/compose.ts';
+import { FollowupChoices } from './FollowupMenu.tsx';
 import AddressField from './AddressField.tsx';
 import { useMail } from '../state/mail.ts';
 import { sendMail, undoSendApi, saveDraftApi, scheduleMail, uploadFile, api } from '../api/client.ts';
@@ -22,7 +23,7 @@ import {
   MinimizeIcon, MaximizeIcon, RestoreIcon, CloseIcon, UndoIcon, RedoIcon, BoldIcon, ItalicIcon,
   UnderlineIcon, StrikethroughIcon, HighlightIcon, BulletListIcon, NumberedListIcon,
   AlignLeftIcon, AlignCenterIcon, AlignRightIcon, LinkIcon, ImageIcon, ClearFormatIcon, AttachIcon, SparkleIcon, EyeIcon, TrashIcon,
-  ScheduledIcon, CaretDownIcon, TemplateIcon, KebabIcon,
+  ScheduledIcon, CaretDownIcon, TemplateIcon, KebabIcon, AlarmIcon,
 } from '../icons.tsx';
 import { IconContext } from '@phosphor-icons/react';
 
@@ -61,6 +62,7 @@ export default function ComposeWindow({ draft }: { draft: Draft }) {
   const [tplOpen, setTplOpen] = useState(false);
   const [tplFilter, setTplFilter] = useState('');
   const [moreOpen, setMoreOpen] = useState(false);
+  const [fuOpen, setFuOpen] = useState(false);
   useEffect(() => { if (!useTemplates.getState().loaded) void useTemplates.getState().refresh(); }, []);
 
   // latest draft for the editor's key handler (it's created once)
@@ -131,6 +133,7 @@ export default function ComposeWindow({ draft }: { draft: Draft }) {
     replyToEmailId: draft.replyToEmailId,
     attachmentIds: draft.attachments.map((a) => a.id),
     attachments: draft.attachments,
+    followupDays: draft.followupDays,
     track: draft.track,
     perRecipientTracking: draft.track && draft.perRecipientTracking,
     draftId: draft.draftId,
@@ -392,12 +395,22 @@ export default function ComposeWindow({ draft }: { draft: Draft }) {
             <button className="btn ghost" disabled={aiBusy} onClick={aiDraft}><SparkleIcon /> {aiBusy ? 'Drafting…' : 'AI draft'}</button>
           )}
           <div className="grow" />
+          {draft.followupDays && <span className="track-state" title="You will be reminded if nobody replies"><AlarmIcon size={14} /> Remind in {draft.followupDays}d</span>}
           {draft.track && <span className="track-state" title="Open tracking is on for this message"><EyeIcon weight="fill" size={14} /> Tracked{draft.perRecipientTracking ? ' per recipient' : ''}</span>}
           <div className="label-menu">
             <button className={`icon-btn ${moreOpen ? 'active' : ''}`} title="More options" onClick={() => setMoreOpen((v) => !v)}><KebabIcon /></button>
             {moreOpen && (
               <div className="dropdown up">
                 <button className="side-item" onClick={() => { setMoreOpen(false); void saveAsTemplate(); }}><TemplateIcon size={15} /><span className="name">Save as template…</span></button>
+                <button className="side-item" onClick={() => setFuOpen((v) => !v)} aria-expanded={fuOpen}>
+                  <AlarmIcon size={15} /><span className="name">{draft.followupDays ? `Reminder: ${draft.followupDays}d if no reply` : 'Remind me if no reply…'}</span>
+                </button>
+                {fuOpen && (
+                  <div className="followup-choices">
+                    <FollowupChoices current={draft.followupDays} onPick={(days) => { update(draft.key, { followupDays: days }); setFuOpen(false); setMoreOpen(false); }} />
+                    {draft.followupDays && <button className="side-item" onClick={() => { update(draft.key, { followupDays: undefined }); setFuOpen(false); setMoreOpen(false); }}><span className="name">No reminder</span></button>}
+                  </div>
+                )}
                 <label className="side-item checkbox-line" title="Send each recipient their own copy with its own pixel, so the open report shows who opened">
                   <input type="checkbox" checked={draft.perRecipientTracking} disabled={!draft.track}
                     onChange={(e) => update(draft.key, { perRecipientTracking: e.target.checked })} />

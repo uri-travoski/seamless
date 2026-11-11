@@ -9,6 +9,7 @@ import { config } from '../config.ts';
 import { putBlob } from '../s3.ts';
 import { enqueueOp, syncManager, type AccountRow } from '../imap/sync.ts';
 import { setKeywords } from './store.ts';
+import { createPendingFollowup } from './followups.ts';
 
 const uploadDir = path.join(config.dataDir, 'uploads');
 fs.mkdirSync(uploadDir, { recursive: true });
@@ -164,6 +165,8 @@ export async function sendEmail(userId: number, payload: ComposePayload): Promis
   const now = Date.now();
   let raw: Buffer;
   let trackingToken: string | null = null;
+  // a follow-up reminder needs to find the Sent copy again, so give the message a Message-ID we know
+  const followMsgId = payload.followupDays && payload.followupDays > 0 ? `<fu-${randomToken(12)}@${new URL(config.publicUrl).hostname}>` : undefined;
 
   if (track && payload.perRecipientTracking && envelopeTo.length > 1) {
     // one copy per recipient, each with its own pixel and Message-ID; headers stay the same
@@ -177,9 +180,9 @@ export async function sendEmail(userId: number, payload: ComposePayload): Promis
       await recordTrackedSend(userId, t, payload.subject, now, { groupToken: trackingToken, recipient: rcpt });
       await transport.sendMail({ envelope: { from: payload.fromEmail, to: [rcpt] }, raw: copy.raw });
     }
-    raw = (await buildRaw(payload, acct, { trackingToken })).raw;
+    raw = (await buildRaw(payload, acct, { trackingToken, messageId: followMsgId })).raw;
   } else {
-    const built = await buildRaw(payload, acct, { trackingToken: track ? randomToken(16) : null });
+    const built = await buildRaw(payload, acct, { trackingToken: track ? randomToken(16) : null, messageId: followMsgId });
     raw = built.raw;
     trackingToken = built.trackingToken;
     if (trackingToken) await recordTrackedSend(userId, trackingToken, payload.subject, now);
@@ -193,6 +196,9 @@ export async function sendEmail(userId: number, payload: ComposePayload): Promis
     await enqueueOp(acct.id, 'append', { s3Key: key, targetRole: 'sent', flags: ['\\Seen'] });
   }
 
+  if (followMsgId) {
+    await createPendingFollowup(userId, followMsgId, now + payload.followupDays! * 86_400_000, { subject: payload.subject, to: envelopeTo });
+  }
   if (payload.replyToEmailId) await setKeywords(userId, payload.replyToEmailId, { $answered: true });
   if (payload.draftId) await destroyDraft(userId, payload.draftId);
   for (const id of payload.attachmentIds) removeUpload(id);

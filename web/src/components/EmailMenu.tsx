@@ -4,11 +4,12 @@ import type { ApiEmail } from '@seamless/shared';
 import { useMail } from '../state/mail.ts';
 import { actions } from '../state/actions.ts';
 import { SnoozeList } from './SnoozeMenu.tsx';
+import { FollowupChoices } from './FollowupMenu.tsx';
 import { api } from '../api/client.ts';
 import {
   ReplyIcon, ReplyAllIcon, ForwardIcon, EnvelopeIcon, EnvelopeOpenIcon, StarIcon, TagIcon, FolderIcon, JunkIcon,
   TrashIcon, ArchiveIcon, CaretRightIcon, CheckIcon, FilterIcon, SourceIcon, DownloadIcon, PrinterIcon, BlockIcon,
-  EyeIcon, InboxIcon, SnoozeIcon,
+  EyeIcon, InboxIcon, SnoozeIcon, AlarmIcon,
 } from '../icons.tsx';
 
 export interface MenuPos { x: number; y: number }
@@ -55,6 +56,12 @@ export function EmailMenuItems({ email, close }: { email: ApiEmail; close: () =>
           <SnoozeList onPick={(at) => { close(); void actions.snooze(email.id, at); }} />
         </Sub>
       )}
+      {email.mailboxRole === 'sent' && (
+        <Sub label="Follow up…" Icon={AlarmIcon}>
+          <FollowupChoices onPick={(days) => { close(); void actions.followup(email.id, days); }} />
+        </Sub>
+      )}
+      {email.followupId && item('Cancel reminder', AlarmIcon, () => void actions.cancelFollowup(email.followupId!))}
       {email.snoozedUntil && item('Remove snooze', SnoozeIcon, () => { void api.del(`/api/snooze/${encodeURIComponent(email.threadId)}`).then(() => useMail.getState().refreshCurrent()); })}
       <Sub label="Label" Icon={TagIcon}>
         {labels.length === 0 && <div className="menu-empty">No labels yet</div>}

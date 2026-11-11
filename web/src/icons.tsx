@@ -134,6 +134,7 @@ export {
   ShieldWarning as ShieldWarnIcon,
   ClockClockwise as SnoozeIcon,
   Hourglass as WaitingIcon,
+  Alarm as AlarmIcon,
   CloudArrowUp as CloudIcon,
   Key as KeyIcon,
   Envelope as MailboxIcon,

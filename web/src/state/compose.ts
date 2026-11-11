@@ -18,6 +18,7 @@ export interface Draft {
   attachments: { id: string; filename: string; size: number }[];
   track: boolean;
   perRecipientTracking: boolean;
+  followupDays?: number;       // T2 F-19: remind me if no reply in N days
   minimized: boolean;
   maximized: boolean;
 }
@@ -107,7 +108,7 @@ export const useCompose = create<ComposeState>((set, get) => ({
         key: `c${++counter}`, identity,
         to: p.to, cc: p.cc, bcc: p.bcc, subject: p.subject, initialHtml: p.html,
         inReplyTo: p.inReplyTo, replyToEmailId: p.replyToEmailId, draftId: p.draftId,
-        attachments: p.attachments ?? [], track: p.track, perRecipientTracking: !!p.perRecipientTracking,
+        attachments: p.attachments ?? [], track: p.track, perRecipientTracking: !!p.perRecipientTracking, followupDays: p.followupDays,
         minimized: false, maximized: false,
       }],
     });
