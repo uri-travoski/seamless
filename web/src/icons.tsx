@@ -90,6 +90,8 @@ export {
   PlusCircle as PlusIcon,
   WarningCircle as WarningIcon,
   Rows as TableViewIcon,
+  ArrowsInLineVertical as CompactIcon,
+  ArrowsOutLineVertical as ComfortableIcon,
   SidebarSimple as SplitViewIcon,
   DotsThreeVertical as KebabIcon,
   Code as SourceIcon,

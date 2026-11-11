@@ -189,7 +189,7 @@ svg { flex: 0 0 auto; vertical-align: middle; }
   border-radius: 9px; padding: 1px 7px; min-width: 18px; text-align: center;
 }
 .side-item .count.muted { background: var(--md-border-strong); color: var(--md-text-soft); }
-.label-dot { width: 11px; height: 11px; border-radius: 3px; flex: 0 0 auto; }
+.label-dot { width: 9.9px; height: 9.9px; border-radius: 3px; flex: 0 0 auto; }
 .label-dot.dot-btn { border: none; padding: 0; cursor: pointer; }
 .color-pop-backdrop { position: fixed; inset: 0; z-index: 19; }
 .color-pop {
@@ -710,7 +710,7 @@ svg { flex: 0 0 auto; vertical-align: middle; }
 }
 .topbar .brand .app-name { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .topbar-actions { display: flex; align-items: center; gap: 4px; padding-right: 12px; }
-.topbar-actions .conn-dot { margin-right: 6px; }
+.topbar-actions .conn-dot { margin-right: 0; }
 .topbar .icon-btn.active { background: color-mix(in srgb, var(--color-header-text) 16%, transparent); color: var(--color-header-text); }
 
 /* scope switcher */
@@ -1256,8 +1256,6 @@ kbd { font-family: var(--font-mono); font-size: 11.5px; padding: 1px 6px; border
 :root[data-theme="simply"] .msg-row .row-actions .icon-btn:hover { background: #e2e8f0; color: #1e324e; }
 
 /* header: tidy right cluster */
-:root[data-theme="simply"] .topbar .conn-dot { position: relative; z-index: 1; margin-right: -26px; margin-left: 4px; flex: 0 0 auto; }
-:root[data-theme="simply"] .topbar .scope-btn { padding-left: 30px; }
 :root[data-theme="simply"] .topbar .bell-btn {
   width: 36px; height: 36px; border-radius: 999px; margin-left: 8px;
   border: 1px solid color-mix(in srgb, var(--color-header-text) 22%, transparent);
@@ -1265,3 +1263,8 @@ kbd { font-family: var(--font-mono); font-size: 11.5px; padding: 1px 6px; border
 }
 :root[data-theme="simply"] .topbar .bell-btn:hover { background: color-mix(in srgb, var(--color-header-text) 12%, transparent); }
 :root[data-theme="simply"] .bell-badge { top: -4px; right: -4px; box-shadow: 0 0 0 2px #1e324e; }
+
+/* search box centred in the top bar (desktop) */
+@media (min-width: 901px) {
+  .topbar .search { position: absolute; left: 50%; transform: translateX(-50%); margin: 0; width: min(560px, 38vw); flex: none; }
+}

@@ -64,21 +64,21 @@ export default function AppearanceSettings() {
       </div>
 
       <h3>Font</h3>
-      <p className="settings-desc">Any Google font by name, applied across the app. Leave empty for the theme's font.</p>
+      <p className="settings-desc">Any Google font by name, applied across the app. Leave empty for the default, Inter.</p>
       <div className="field-row" style={{ alignItems: 'flex-end' }}>
         <div className="field" style={{ marginBottom: 0 }}>
-          <input className="text-input" list="google-fonts" value={s.fontFamily} placeholder="Theme default (e.g. Inter, Roboto, Lato…)"
+          <input className="text-input" list="google-fonts" value={s.fontFamily} placeholder="Inter (default) — or Roboto, Lato…"
             onChange={(e) => save({ fontFamily: e.target.value })} aria-label="Google font" />
           <datalist id="google-fonts">{POPULAR_FONTS.map((f) => <option key={f} value={f} />)}</datalist>
         </div>
-        {s.fontFamily && <button className="btn" onClick={() => save({ fontFamily: '' })}>Reset</button>}
+        {s.fontFamily && s.fontFamily !== 'Inter' && <button className="btn" onClick={() => save({ fontFamily: 'Inter' })}>Reset</button>}
       </div>
       <h3>Text size</h3>
       <div className="range-line">
         <input type="range" min={12} max={20} step={1} value={s.fontSize} onChange={(e) => save({ fontSize: Number(e.target.value) })} aria-label="Text size" />
         <output>{s.fontSize}px</output>
       </div>
-      <div className="font-preview">The quick brown fox jumps over the lazy dog — {s.fontFamily || 'theme font'} at {s.fontSize}px.</div>
+      <div className="font-preview">The quick brown fox jumps over the lazy dog — {s.fontFamily || 'Inter'} at {s.fontSize}px.</div>
     </div>
   );
 }

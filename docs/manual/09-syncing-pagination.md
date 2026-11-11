@@ -4,11 +4,11 @@
 
 Seamless keeps a live connection to each account and receives new mail in near real time — usually within seconds of it arriving. As a safety net it also re-checks each account about every 45 seconds, and if a connection drops it reconnects automatically with a backoff. Gmail and Microsoft accounts sync the same way over their authenticated connection.
 
-You do not need to refresh manually; new mail appears on its own. The small **dot** in the top bar (left of the mailbox switcher) is **green** while your browser is connected live to the server, and **amber** while it is offline or reconnecting. Hover it for the details.
+You do not need to refresh manually; new mail appears on its own. The small **dot** inside the mailbox switcher at the top right is **green** while your browser is connected live to the server, and **amber** while it is offline or reconnecting. Hover it for the details.
 
 ## The refresh button
 
-The **refresh** button (single circular arrow, like Gmail's) in the top bar, just left of the mailbox switcher, checks **all** of your mailboxes for new mail immediately. It is handy after your computer wakes from sleep, after a network change, or whenever you just want to be sure you are up to date. It nudges the existing connections rather than reconnecting, so it is cheap even with many accounts.
+The **refresh** button (single circular arrow, like Gmail's) in the sidebar's footer bar, next to log out, checks **all** of your mailboxes for new mail immediately. It is handy after your computer wakes from sleep, after a network change, or whenever you just want to be sure you are up to date. It nudges the existing connections rather than reconnecting, so it is cheap even with many accounts.
 
 ## Pagination
 

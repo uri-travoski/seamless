@@ -31,7 +31,7 @@ Two layouts are available (switch in **Settings > Appearance**, or with the layo
 - **Folders** — when the switcher shows a single mailbox, that mailbox's own folders appear here.
 - **Footer bar** (bottom, left to right):
   - **Settings** (gear).
-  - **Space used** by whatever the switcher shows — shown as just the size, e.g. *23GB* or *1.4TB*, centred between the Settings and Log out buttons. Hover it for the message count.
+  - **Space used** by whatever the switcher shows — shown as just the size, e.g. *23GB* or *1.4TB*, centred between the Settings button and the refresh button. Hover it for the message count.
   - **Refresh** — checks every mailbox for new mail now.
   - **Show/hide sidebar** — shrinks the sidebar to icons.
 

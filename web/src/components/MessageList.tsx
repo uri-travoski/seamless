@@ -10,7 +10,7 @@ import { ContextMenu, type MenuPos } from './EmailMenu.tsx';
 import { IconContext } from '@phosphor-icons/react';
 import {
   StarIcon, EyeIcon, AttachClipIcon, EnvelopeIcon, EnvelopeOpenIcon, ArchiveIcon, JunkIcon, TrashIcon, RefreshIcon,
-  TableViewIcon, SplitViewIcon, CloseIcon, NoteIcon, RestoreMailIcon, ReplyIcon, InboxIcon, SnoozeIcon, ShieldWarnIcon,
+  TableViewIcon, SplitViewIcon, CompactIcon, ComfortableIcon, CloseIcon, NoteIcon, RestoreMailIcon, ReplyIcon, InboxIcon, SnoozeIcon, ShieldWarnIcon,
 } from '../icons.tsx';
 import { useSession } from '../state/session.ts';
 import { useUi } from '../state/ui.ts';
@@ -240,6 +240,7 @@ export default function MessageList() {
   const layout = useSession((s) => s.settings.layout);
   const density = useSession((s) => s.settings.density);
   const saveSettings = useSession((s) => s.saveSettings);
+  const settings = useSession((s) => s.settings);
   const table = layout === 'table';
   const [menu, setMenu] = useState<{ email: ApiEmail; pos: MenuPos } | null>(null);
 
@@ -374,7 +375,11 @@ export default function MessageList() {
             onClick={() => saveSettings({ layout: table ? 'split' : 'table' })}>
             {table ? <SplitViewIcon /> : <TableViewIcon />}
           </button>
-          <button className="icon-btn" title="Refresh" onClick={() => void refreshCurrent()}><RefreshIcon /></button>
+          <button className="icon-btn" title={settings.density === 'compact' ? 'Comfortable rows' : 'Compact rows'}
+            onClick={() => saveSettings({ density: settings.density === 'compact' ? 'comfortable' : 'compact' })}>
+            {settings.density === 'compact' ? <ComfortableIcon /> : <CompactIcon />}
+          </button>
+          <button className="icon-btn" title="Reload this list" onClick={() => void refreshCurrent()}><RefreshIcon /></button>
         </div>
       )}
       {!allMatching && pageAllChecked && total > checkedCount && (

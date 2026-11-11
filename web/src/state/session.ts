@@ -33,7 +33,7 @@ export const DEFAULT_SIDEBAR: SidebarConfig = {
 };
 
 const DEFAULTS: ClientSettings = {
-  fontSize: 15, fontFamily: '', density: 'comfortable', layout: 'split', allowRemoteImages: false,
+  fontSize: 16, fontFamily: 'Inter', density: 'comfortable', layout: 'split', allowRemoteImages: false,
   trackByDefault: true, theme: DEFAULT_THEME, mode: 'light', accent: '', appName: 'Seamless',
   shortcuts: true, lastScope: 'unified', noTrackDomains: [], perRecipientTracking: false,
   sidebar: DEFAULT_SIDEBAR, labelSort: 'az', sidebarCollapsed: false,
@@ -77,11 +77,7 @@ function applyFontFamily(family: string): void {
   const root = document.documentElement.style;
   const id = 'md-google-font';
   document.getElementById(id)?.remove();
-  const trimmed = family.trim();
-  if (!trimmed) {
-    root.removeProperty('--md-font');   // fall back to the theme's own font
-    return;
-  }
+  const trimmed = family.trim() || 'Inter';   // Inter is the app default; an empty choice means "default"
   const link = document.createElement('link');
   link.id = id;
   link.rel = 'stylesheet';
