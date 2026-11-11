@@ -5,7 +5,7 @@ anything by itself — it just tells you why it is suspicious.
 
 ## What you'll see
 
-- A **shield** next to the message in the list.
+- A small **red or amber circle with a “!”** next to the message in the list (red = likely scam, amber = take care).
 - A banner above the message that lists, in plain English, what looks wrong.
 - **High** warnings (red) also switch off the links in the message until you press **Enable links anyway**.
 - A new-mail notification for a high-risk message reads **Possible phishing: <sender>**.

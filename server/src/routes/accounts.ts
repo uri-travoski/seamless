@@ -61,14 +61,14 @@ export function register(app: FastifyInstance): void {
     if (!existing) return reply.code(404).send({ error: 'not found' });
     await run(`
       UPDATE accounts SET name=?, email=?, aliases=?, imap_host=?, imap_port=?, imap_secure=?, imap_user=?, imap_pass_enc=?,
-        smtp_host=?, smtp_port=?, smtp_secure=?, smtp_user=?, smtp_pass_enc=?, color=?, signature=?, sent_copy=?, ai_categorize=?, enabled=?
+        smtp_host=?, smtp_port=?, smtp_secure=?, smtp_user=?, smtp_pass_enc=?, color=?, signature=?, sent_copy=?, ai_categorize=?, enabled=?, health_ignored=?
       WHERE id=?
     `, [
       b.name ?? '', b.email, JSON.stringify(b.aliases ?? []),
       b.imapHost, b.imapPort, !!b.imapSecure, b.imapUser, b.imapPass ? encrypt(b.imapPass) : existing.imap_pass_enc,
       b.smtpHost, b.smtpPort, !!b.smtpSecure, b.smtpUser, b.smtpPass ? encrypt(b.smtpPass) : existing.smtp_pass_enc,
       b.color ?? existing.color, b.signature ?? '', b.sentCopy !== false,
-      !!b.aiCategorize, b.enabled !== false, id,
+      !!b.aiCategorize, b.enabled !== false, b.healthIgnored === undefined ? !!existing.health_ignored : !!b.healthIgnored, id,
     ]);
     if (Array.isArray(b.categoryIds)) await setAccountCategories(uid(req), id, b.categoryIds);
     await syncManager.restartAccount(id);

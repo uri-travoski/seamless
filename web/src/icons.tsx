@@ -1,3 +1,4 @@
+import type React from 'react';
 // Central Phosphor icon barrel. All icons render filled by default (set via
 // IconContext in main.tsx). Import from here so glyph choices stay consistent.
 
@@ -92,7 +93,6 @@ export {
   Rows as TableViewIcon,
   ArrowsInLineVertical as CompactIcon,
   ArrowsOutLineVertical as ComfortableIcon,
-  SidebarSimple as SplitViewIcon,
   DotsThreeVertical as KebabIcon,
   Code as SourceIcon,
   Note as NoteIcon,
@@ -146,3 +146,13 @@ export {
 
 /** Category icon by name (mailbox_categories.icon). */
 export { CategoryGlyph } from './components/CategoryGlyph.tsx';
+
+/** Square with a centre divider (the split-view icon from the design mock-up). */
+export function SplitViewIcon({ size = 18, ...rest }: { size?: number | string } & React.SVGProps<SVGSVGElement>) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden {...rest}>
+      <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
+      <line x1="12" y1="3" x2="12" y2="21" />
+    </svg>
+  );
+}

@@ -100,7 +100,8 @@ syncManager.on('newMail', (ev: NewMailEvent) => {
 
 syncManager.on('syncFailed', (ev: { accountId: number; userId: number; email: string; error: string }) => {
   // a mailbox that stays broken would otherwise re-alert on every reconnect cycle: once per 6 hours
-  void shouldAlert('sync.failed', ev.accountId, Date.now())
+  void one<{ health_ignored: boolean }>('SELECT health_ignored FROM accounts WHERE id = ?', [ev.accountId])
+    .then((a) => (a?.health_ignored ? false : shouldAlert('sync.failed', ev.accountId, Date.now())))
     .then(async (ok) => { if (ok) await emitEvent(ev.userId, 'sync.failed', { type: 'account', id: ev.accountId }, ev); })
     .catch(() => {});
 });

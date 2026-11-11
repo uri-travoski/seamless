@@ -12,7 +12,7 @@ Nothing shows up until you connect a mailbox. Open **Settings > Mailboxes > Add 
 
 ## The layout
 
-- **Top bar** — the app name, **search**, a small **dot** that is green while you're connected live to the server (amber while it reconnects), the **mailbox switcher** (Unified, Work, Personal, Disposable or a single mailbox) and the **notification bell** in the corner.
+- **Top bar** — the app name, **search**, a small **dot** that is green while you're connected live to the server (amber while it reconnects), the **mailbox switcher** (Unified, Work, Personal, Disposable or a single mailbox) and the **notification bell** and, at the far right, the **menu** (check all mailboxes for new mail, Settings, Log out).
 - **Sidebar** (left) — Compose, your folders and labels, and a footer bar (see below).
 - **Message list** (middle) — the mail in the current view.
 - **Reading pane** (right) — the open conversation.
@@ -25,13 +25,13 @@ Two layouts are available (switch in **Settings > Appearance**, or with the layo
 ## The sidebar
 
 - **Compose** — start a new message.
-- **Inbox, Starred, Drafts, Scheduled, Sent, Templates, Spam, Bin** (Archive is under **More**) — your folders. Every connected account's Inbox is merged into one, and each account gets its own **color bar** down the left edge of a row so you can tell them apart.
+- **Inbox, Starred, Drafts, Scheduled, Sent, Templates, Spam, Bin** (Archive is under **More**) — your folders. Every connected account's Inbox is merged into one, and each account gets its own **coloured dot** at the left of a row (it turns into a tick-box when you point at the row) so you can tell them apart.
 - **Review** — appears only when the AI is unsure about some mail and wants a quick decision from you.
 - **Labels** — your colored labels, across all accounts. Click the **+** on the right of the LABELS heading to add one; click the **color dot** in front of a label to recolor it.
 - **Folders** — when the switcher shows a single mailbox, that mailbox's own folders appear here.
 - **Footer bar** (bottom, left to right):
   - **Settings** (gear).
-  - **Space used** by whatever the switcher shows — shown as just the size, e.g. *23GB* or *1.4TB*, centred between the refresh button and the Log out button. Hover it for the message count.
+  - **Space used** by whatever the switcher shows — just the size, e.g. *23GB* or *1.4TB*, at the far left of the footer. Hover it for the message count.
   - **Refresh** — checks every mailbox for new mail now.
   - **Show/hide sidebar** — shrinks the sidebar to icons.
 

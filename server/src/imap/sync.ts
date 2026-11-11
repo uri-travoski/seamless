@@ -15,6 +15,7 @@ export interface AccountRow {
   smtp_host: string; smtp_port: number; smtp_secure: boolean; smtp_user: string; smtp_pass_enc: string;
   color: string; signature: string; sent_copy: boolean; ai_categorize: boolean; enabled: boolean;
   safe_delete_enabled: boolean; safe_delete_mode: string; safe_delete_grace_days: number;
+  health_ignored?: boolean;
 }
 
 export interface NewMailEvent {

@@ -15,7 +15,7 @@ import { useSession, DEFAULT_SIDEBAR, SIDEBAR_FOLDERS } from '../state/session.t
 import { useRouter, navigate, FOLDER_ROLE, FOLDER_TITLE } from '../router.ts';
 import {
   InboxIcon, DraftsIcon, SentIcon, ScheduledIcon, ArchiveIcon, JunkIcon, TrashIcon, FolderIcon, ComposeIcon,
-  CaretDownIcon, CaretRightIcon, StarIcon, ReviewIcon, LogoutIcon, RedoIcon, TemplateIcon, MailLogo, SidebarCollapseIcon, SettingsIcon, SnoozeIcon, WaitingIcon,
+  CaretDownIcon, CaretRightIcon, StarIcon, ReviewIcon, TemplateIcon, MailLogo, SidebarCollapseIcon, SettingsIcon, SnoozeIcon, WaitingIcon,
 } from '../icons.tsx';
 import { IconContext } from '@phosphor-icons/react';
 import { api } from '../api/client.ts';
@@ -72,20 +72,6 @@ export default function Sidebar({ open, onNavigate, onAddLabel }: { open: boolea
   const go = (folder: string, arg?: string) => { navigate({ page: 'mail', scope: slug, folder, arg }); onNavigate(); };
   const isActive = (folder: string, arg?: string) =>
     route.page === 'mail' && route.folder === folder && (arg === undefined || route.arg === arg);
-
-  const [fetching, setFetching] = useState(false);
-  const fetchAll = async () => {
-    if (fetching) return;
-    setFetching(true);
-    try {
-      const res = await api.post<{ accounts: number }>('/api/sync');
-      toast(res.accounts ? `Checking ${res.accounts} mailbox${res.accounts === 1 ? '' : 'es'} for new mail…` : 'No connected mailboxes to check');
-    } catch (e: any) {
-      toast(e?.message ?? 'Could not check for mail', 'error');
-    } finally {
-      setFetching(false);
-    }
-  };
 
   const folderItem = (folder: string, nested = false) => {
     const Icon = FOLDER_ICON[folder] ?? FolderIcon;
@@ -193,12 +179,7 @@ export default function Sidebar({ open, onNavigate, onAddLabel }: { open: boolea
       )}
 
       <div className="side-foot">
-        <button className={`icon-btn ${route.page === 'settings' ? 'active' : ''}`} title="Settings" aria-label="Settings"
-          onClick={() => { navigate({ page: 'settings', tab: 'general' }); onNavigate(); }}><SettingsIcon size={17} weight="regular" /></button>
-        <button className={`icon-btn refresh-btn ${fetching ? 'busy' : ''}`} title="Check all mailboxes for new mail"
-          aria-label="Check all mailboxes for new mail" disabled={fetching} onClick={fetchAll}><RedoIcon size={17} weight="bold" /></button>
         <span className="side-size" title={sizeTitle}>{sizeLabel}</span>
-        <button className="icon-btn" title="Log out" aria-label="Log out" onClick={() => void useSession.getState().logout()}><LogoutIcon size={17} weight="regular" /></button>
         <button className="icon-btn desktop-only" title={settings.sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
           aria-label={settings.sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
           onClick={() => saveSettings({ sidebarCollapsed: !settings.sidebarCollapsed })}><SidebarCollapseIcon size={17} weight="regular" /></button>

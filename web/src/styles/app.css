@@ -1180,14 +1180,7 @@ kbd { font-family: var(--font-mono); font-size: 11.5px; padding: 1px 6px; border
 /* ======================================================================
    Theme: Simply Seamless — content-first. Everything here is scoped to the theme.
    ====================================================================== */
-.quick-pills, .search-kbd { display: none; }
-:root[data-theme="simply"] .quick-pills { display: inline-flex; gap: 4px; margin-right: 6px; }
-:root[data-theme="simply"] .quick-pill {
-  border: 1px solid transparent; background: transparent; color: #64748b; font: inherit; font-size: 12px; font-weight: 600;
-  padding: 3px 10px; border-radius: 999px; cursor: pointer; white-space: nowrap;
-}
-:root[data-theme="simply"] .quick-pill:hover { background: #f1f5f9; }
-:root[data-theme="simply"] .quick-pill.on { background: #eff6ff; color: #1e324e; border-color: #dbe7fb; }
+.search-kbd { display: none; }
 :root[data-theme="simply"] .search-kbd {
   display: inline-block; font: 600 11px/1 var(--font-sans); color: rgba(255,255,255,.7); border: 1px solid rgba(255,255,255,.28);
   border-radius: 4px; padding: 3px 6px; margin-left: auto; background: transparent; box-shadow: none;
@@ -1217,8 +1210,6 @@ kbd { font-family: var(--font-mono); font-size: 11.5px; padding: 1px 6px; border
   border-top-left-radius: 12px; overflow: hidden;
 }
 :root[data-theme="simply"] .list-toolbar { border-bottom-color: #f1f5f9; }
-:root[data-theme="simply"] .list-toolbar .title { margin-right: 8px; flex: 0 1 auto; }
-:root[data-theme="simply"] .list-toolbar .quick-pills { margin-right: auto; }
 
 /* rows */
 :root[data-theme="simply"] .msg-row { border-bottom: none; background: #f8fafc; color: #475569; }
@@ -1268,3 +1259,53 @@ kbd { font-family: var(--font-mono); font-size: 11.5px; padding: 1px 6px; border
 @media (min-width: 901px) {
   .topbar .search { position: absolute; left: 50%; transform: translateX(-50%); margin: 0; width: min(560px, 38vw); flex: none; }
 }
+
+/* ======================================================================
+   All themes (from the design mock-up): quiet rows, circle warnings, filter pills,
+   top-bar menu, footer with the size on the far left.
+   ====================================================================== */
+/* account dot at rest -> checkbox on hover; star only on hover (or when starred) */
+.msg-row .row-check { position: absolute; left: 4px; top: 50%; transform: translateY(-50%); margin: 0; opacity: 0; transition: opacity 120ms ease; z-index: 1; }
+.msg-row.table .row-check { margin: 0; }
+.msg-row .acct-bar { transition: opacity 120ms ease, transform 120ms ease; }
+.msg-row:hover .acct-bar, .msg-row.checked .acct-bar, .msg-row:has(.row-check:checked) .acct-bar { opacity: 0; transform: scale(0.5); }
+.msg-row:hover .row-check, .msg-row.checked .row-check, .msg-row .row-check:checked, .msg-row .row-check:focus-visible { opacity: 1; }
+.msg-row .star:not(.on) { opacity: 0; transition: opacity 120ms ease; }
+.msg-row:hover .star, .msg-row .star:focus-visible { opacity: 1; }
+@media (hover: none) { .msg-row .row-check, .msg-row .star:not(.on) { opacity: 1; } .msg-row .acct-bar { opacity: 1 !important; transform: none !important; } .msg-row .row-check { display: none; } .msg-row.checked .row-check { display: block; } }
+
+/* warnings: a small circle with "!" */
+.risk-flag { width: 15px; height: 15px; border-radius: 50%; color: #fff; font-size: 10px; font-weight: 700; justify-content: center; line-height: 1; flex: 0 0 auto; }
+.risk-flag.high { background: #ef4444; color: #fff; }
+.risk-flag.medium { background: #d97706; color: #fff; }
+
+/* All / Unread / Attachments */
+.list-toolbar .title { margin-right: 14px; flex: 0 1 auto; }
+.quick-pills { display: inline-flex; align-items: center; gap: 4px; background: var(--color-bg); padding: 3px; border-radius: 7px; margin-right: auto; }
+.quick-pill { border: none; background: none; font: inherit; font-size: 12px; font-weight: 500; color: var(--color-text-soft); padding: 3px 10px; border-radius: 5px; cursor: pointer; white-space: nowrap; transition: all 120ms ease; }
+.quick-pill:hover { color: var(--color-text-strong); }
+.quick-pill.on { background: var(--color-surface); color: var(--color-text-strong); font-weight: 600; box-shadow: 0 1px 2px rgba(15, 23, 42, 0.08); }
+@media (max-width: 600px) { .quick-pills { display: none; } }
+
+/* health dot inside the switcher: amber when offline / a mailbox struggles, red when one stopped */
+.conn-dot { box-shadow: 0 0 0 2px color-mix(in srgb, var(--md-ok) 25%, transparent); }
+.conn-dot.offline { box-shadow: 0 0 0 2px color-mix(in srgb, var(--md-warn) 25%, transparent); }
+.conn-dot.bad { background: var(--color-danger); box-shadow: 0 0 0 2px color-mix(in srgb, var(--color-danger) 28%, transparent); }
+
+/* top-bar menu */
+.app-menu { position: relative; margin-left: 4px; }
+.app-menu .app-menu-pop { min-width: 270px; top: 40px; }
+.app-menu .side-item { color: var(--color-text); }
+.app-menu .side-item svg { color: var(--color-text-soft); }
+.app-menu .spin { animation: spin 0.9s linear infinite; }
+:root[data-theme="simply"] .topbar .menu-btn {
+  width: 36px; height: 36px; border-radius: 999px; border: 1px solid color-mix(in srgb, var(--color-header-text) 22%, transparent);
+  background: color-mix(in srgb, var(--color-header-text) 6%, transparent);
+}
+
+/* footer: size on the far left */
+.side-size { text-align: left; padding-left: 8px; font-weight: 500; }
+
+/* "Seamless" theme: the mock-up's brand lock-up (logo + name) */
+:root[data-theme="seamless"] .topbar .brand-link { font-size: 18px; gap: 9px; }
+:root[data-theme="seamless"] .topbar .brand .app-name { font-weight: 700; letter-spacing: -0.02em; }

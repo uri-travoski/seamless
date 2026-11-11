@@ -46,10 +46,16 @@ export async function backupHealth(now = Date.now()): Promise<BackupHealth> {
   return { enabled: cfg.enabled, lastAt: st.lastAt, lastStatus: st.lastStatus, lastError: st.lastError, nextDueAt: st.nextDueAt, status, note };
 }
 
-export async function healthReport(userId: number, isAdmin: boolean, now = Date.now()) {
-  // ---- mailboxes ----
-  const accts = await q<{ id: number; email: string; kind: string | null; enabled: boolean }>('SELECT id, email, kind, enabled FROM accounts WHERE user_id = ? ORDER BY id', [userId]);
-  const mailboxes = [];
+export interface MailboxHealth {
+  accountId: number; email: string; kind: string; enabled: boolean; state: string; lastSyncAt: number | null; lastError: string;
+  failures: number; needsReconnect: boolean; newLast24h: number; status: Light; ignored: boolean;
+}
+
+/** One row per mailbox. A mailbox the user ticked "ignore" keeps its real status here (the Health page
+ *  shows it, greyed) but never counts towards the overall light, the status dot or alerts. */
+export async function mailboxHealth(userId: number, now = Date.now()): Promise<MailboxHealth[]> {
+  const accts = await q<{ id: number; email: string; kind: string | null; enabled: boolean; health_ignored: boolean }>('SELECT id, email, kind, enabled, health_ignored FROM accounts WHERE user_id = ? ORDER BY id', [userId]);
+  const out: MailboxHealth[] = [];
   for (const a of accts) {
     const st = syncManager.status(a.id);
     const fresh = await one<{ c: string }>('SELECT COUNT(*) AS c FROM messages WHERE account_id = ? AND created_at > ?', [a.id, now - DAY]);
@@ -58,8 +64,13 @@ export async function healthReport(userId: number, isAdmin: boolean, now = Date.
     if (!a.enabled || st.state === 'paused') status = 'warn';
     else if (st.state === 'error') status = st.failures >= 2 ? 'red' : 'warn';
     if (needsReconnect) status = 'red';
-    mailboxes.push({ accountId: a.id, email: a.email, kind: a.kind ?? 'imap', enabled: a.enabled, state: st.state, lastSyncAt: st.lastSyncAt, lastError: st.lastError, failures: st.failures, needsReconnect, newLast24h: Number(fresh?.c ?? 0), status });
+    out.push({ accountId: a.id, email: a.email, kind: a.kind ?? 'imap', enabled: a.enabled, state: st.state, lastSyncAt: st.lastSyncAt, lastError: st.lastError, failures: st.failures, needsReconnect, newLast24h: Number(fresh?.c ?? 0), status, ignored: !!a.health_ignored });
   }
+  return out;
+}
+
+export async function healthReport(userId: number, isAdmin: boolean, now = Date.now()) {
+  const mailboxes = await mailboxHealth(userId, now);
 
   // ---- sending ----
   const failed = async (since: number) => Number((await one<{ c: string }>(`SELECT COUNT(*) AS c FROM events WHERE user_id = ? AND type = 'send.failed' AND created_at > ?`, [userId, since]))?.c ?? 0);
@@ -82,7 +93,7 @@ export async function healthReport(userId: number, isAdmin: boolean, now = Date.
   const ai = { providers: Number((await one<{ c: string }>('SELECT COUNT(*) AS c FROM ai_providers WHERE user_id = ?', [userId]))?.c ?? 0) };
 
   const report: any = { generatedAt: now, isAdmin, mailboxes, sending, jobs, ai: { ...ai, status: ai.providers ? 'ok' : 'warn', note: ai.providers ? 'Press Test in Settings → AI to check a provider is reachable.' : 'No AI provider is set up.' } };
-  report.overall = worst(...mailboxes.map((m) => m.status), sending.status, jobs.status);
+  report.overall = worst(...mailboxes.filter((m) => !m.ignored).map((m) => m.status), sending.status, jobs.status);
 
   if (isAdmin) {
     const p = await storageProbe(now);

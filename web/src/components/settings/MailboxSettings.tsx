@@ -44,7 +44,7 @@ interface Form {
   name: string; email: string; color: string;
   imapHost: string; imapPort: number; imapSecure: boolean; imapUser: string; imapPass: string;
   smtpHost: string; smtpPort: number; smtpSecure: boolean; smtpUser: string; smtpPass: string; smtpSameLogin: boolean;
-  categoryIds: number[]; signature: string; aliases: string; sentCopy: boolean; aiCategorize: boolean;
+  categoryIds: number[]; signature: string; aliases: string; sentCopy: boolean; aiCategorize: boolean; healthIgnored: boolean;
 }
 
 const COLORS = ['#2f7ed8', '#7a5fd0', '#d05f8e', '#d0755f', '#c9a13a', '#4d9e53', '#3a9e9e', '#5b6570', '#a85d24', '#151f2e'];
@@ -53,7 +53,7 @@ const BLANK: Form = {
   enabled: true, name: '', email: '', color: COLORS[0],
   imapHost: '', imapPort: 993, imapSecure: true, imapUser: '', imapPass: '',
   smtpHost: '', smtpPort: 465, smtpSecure: true, smtpUser: '', smtpPass: '', smtpSameLogin: true,
-  categoryIds: [], signature: '', aliases: '', sentCopy: true, aiCategorize: false,
+  categoryIds: [], signature: '', aliases: '', sentCopy: true, aiCategorize: false, healthIgnored: false,
 };
 
 const STEPS = ['Address', 'Provider', 'Incoming', 'Outgoing', 'Test', 'Categories', 'Identity'];
@@ -273,6 +273,7 @@ function Wizard({ initial, categories, onDone }: { initial: Form; categories: Ap
               <input className="text-input" value={f.aliases} placeholder="info@acme.com, sales@acme.com" onChange={(e) => set('aliases', e.target.value)} /></div>
             <label className="checkbox-line"><input type="checkbox" checked={f.sentCopy} onChange={(e) => set('sentCopy', e.target.checked)} /> Save a copy in this mailbox's Sent folder (turn off for Gmail, which does it itself)</label>
             <label className="checkbox-line"><input type="checkbox" checked={f.aiCategorize} onChange={(e) => set('aiCategorize', e.target.checked)} /> AI-categorise incoming mail into labels (needs Settings → AI)</label>
+            <label className="checkbox-line"><input type="checkbox" checked={f.healthIgnored} onChange={(e) => set('healthIgnored', e.target.checked)} /> Ignore this mailbox in health checks (the green status dot and “can’t connect” alerts skip it)</label>
             {editing && <label className="checkbox-line"><input type="checkbox" checked={!f.enabled} onChange={(e) => set('enabled', !e.target.checked)} /> Pause syncing this mailbox</label>}
           </>
         )}
@@ -432,7 +433,7 @@ export default function MailboxSettings() {
       imapHost: a.imapHost, imapPort: a.imapPort, imapSecure: a.imapSecure, imapUser: a.imapUser,
       smtpHost: a.smtpHost, smtpPort: a.smtpPort, smtpSecure: a.smtpSecure, smtpUser: a.smtpUser,
       smtpSameLogin: a.smtpUser === a.imapUser, categoryIds: a.categoryIds ?? [], signature: a.signature ?? '',
-      aliases: (a.aliases ?? []).join(', '), sentCopy: a.sentCopy, aiCategorize: a.aiCategorize,
+      aliases: (a.aliases ?? []).join(', '), sentCopy: a.sentCopy, aiCategorize: a.aiCategorize, healthIgnored: !!a.healthIgnored,
     });
   };
 

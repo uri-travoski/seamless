@@ -1,12 +1,19 @@
 import type { FastifyInstance } from 'fastify';
 import { one, run } from '../db.ts';
-import { healthReport, liveness, storageProbe } from '../health/status.ts';
+import { healthReport, mailboxHealth, liveness, storageProbe } from '../health/status.ts';
 import { syncManager } from '../imap/sync.ts';
 import { broadcast } from '../ws.ts';
 import { uid, isAdmin } from './util.ts';
 
 export function register(app: FastifyInstance): void {
   app.get('/api/health', async (req) => healthReport(uid(req), isAdmin(req)));
+
+  // the status dot in the top bar: only the mailboxes that matter (not the ones set to "ignore")
+  app.get('/api/health/mailboxes', async (req) => {
+    const rows = (await mailboxHealth(uid(req))).filter((m) => !m.ignored);
+    const status = rows.some((m) => m.status === 'red') ? 'red' : rows.some((m) => m.status === 'warn') ? 'warn' : 'ok';
+    return { status, problems: rows.filter((m) => m.status !== 'ok').map((m) => ({ email: m.email, status: m.status, error: m.lastError, paused: !m.enabled })) };
+  });
 
   /** Public, for an uptime monitor: only "is it up". */
   app.get('/healthz', async (_req, reply) => {
@@ -17,6 +24,16 @@ export function register(app: FastifyInstance): void {
   app.post('/api/health/storage-check', async (req, reply) => {
     if (!isAdmin(req)) return reply.code(403).send({ error: 'admins only' });
     return storageProbe(Date.now(), true);
+  });
+
+  app.post('/api/accounts/:id/health-ignore', async (req, reply) => {
+    const id = Number((req.params as any).id);
+    const ignored = !!(req.body as any)?.ignored;
+    const a = await one('SELECT id FROM accounts WHERE id = ? AND user_id = ?', [id, uid(req)]);
+    if (!a) return reply.code(404).send({ error: 'not found' });
+    await run('UPDATE accounts SET health_ignored = ? WHERE id = ?', [ignored, id]);
+    broadcast({ type: 'stateChange' }, uid(req));
+    return { ok: true, ignored };
   });
 
   app.post('/api/accounts/:id/resync', async (req, reply) => {

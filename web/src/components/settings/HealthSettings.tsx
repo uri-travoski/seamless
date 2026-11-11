@@ -7,7 +7,7 @@ import { formatBytes } from '../Sidebar.tsx';
 type Light = 'ok' | 'warn' | 'red';
 interface Report {
   generatedAt: number; isAdmin: boolean; overall: Light;
-  mailboxes: { accountId: number; email: string; kind: string; enabled: boolean; state: string; lastSyncAt: number | null; lastError: string; failures: number; needsReconnect: boolean; newLast24h: number; status: Light }[];
+  mailboxes: { accountId: number; email: string; kind: string; enabled: boolean; state: string; lastSyncAt: number | null; lastError: string; failures: number; needsReconnect: boolean; newLast24h: number; status: Light; ignored: boolean }[];
   sending: { failed24h: number; failed7d: number; scheduled: number; holding: number; status: Light };
   jobs: { counts: Record<string, number>; oldestPendingAt: number | null; lateMs: number; failed: { id: number; kind: string; attempts: number; lastError: string; runAt: number }[]; status: Light };
   ai: { providers: number; status: Light; note: string };
@@ -47,6 +47,7 @@ export default function HealthSettings() {
   if (!r) return <div><h2>Health</h2><p className="dim">{err ? 'Could not load the health report.' : 'Loading…'}</p></div>;
 
   const resync = async (id: number) => { try { await api.post(`/api/accounts/${id}/resync`); toast('Re-sync started'); setTimeout(load, 1500); } catch { toast('Could not start', 'error'); } };
+  const setIgnored = async (id: number, ignored: boolean) => { try { await api.post(`/api/accounts/${id}/health-ignore`, { ignored }); toast(ignored ? 'Ignored: no status colour or alerts for this mailbox' : 'No longer ignored'); load(); } catch { toast('Could not change that', 'error'); } };
   const jobOp = async (id: number, op: 'retry' | 'cancel') => { try { await api.post(`/api/jobs/${id}/${op}`); load(); } catch { toast('Could not do that', 'error'); } };
   const checkStorage = async () => { try { await api.post('/api/health/storage-check'); load(); } catch { toast('Could not check', 'error'); } };
 
@@ -59,19 +60,20 @@ export default function HealthSettings() {
       </p>
 
       <div className="health-grid">
-        <Card title="Mailboxes" status={r.mailboxes.length ? r.mailboxes.reduce<Light>((a, m) => (m.status === 'red' || a === 'red' ? 'red' : m.status === 'warn' || a === 'warn' ? 'warn' : 'ok'), 'ok') : 'warn'}>
+        <Card title="Mailboxes" status={r.mailboxes.length ? r.mailboxes.filter((m) => !m.ignored).reduce<Light>((a, m) => (m.status === 'red' || a === 'red' ? 'red' : m.status === 'warn' || a === 'warn' ? 'warn' : 'ok'), 'ok') : 'warn'}>
           {r.mailboxes.length === 0 && <p className="dim">No mailboxes connected.</p>}
           {r.mailboxes.map((m) => (
-            <div key={m.accountId} className="health-row">
-              <Dot s={m.status} />
+            <div key={m.accountId} className="health-row" style={m.ignored ? { opacity: 0.6 } : undefined}>
+              <Dot s={m.ignored ? 'ok' : m.status} />
               <div className="grow">
-                <strong>{m.email}</strong>
+                <strong>{m.email}</strong>{m.ignored && <span className="tag muted">ignored</span>}
                 <div className="dim">
                   {m.state === 'paused' ? 'Paused' : m.state === 'error' ? 'Can’t connect' : 'Connected'} · last sync {ago(m.lastSyncAt)} · {m.newLast24h} new in 24 h
                 </div>
                 {m.needsReconnect && <div className="health-note red">Its sign-in no longer works. Reconnect it in Settings → Mailboxes.</div>}
                 {m.state === 'error' && m.lastError && <div className="health-note">{m.lastError}</div>}
               </div>
+              <button className="btn ghost small" title="Stop counting this mailbox in the status dot, this page's overall light and failure alerts" onClick={() => void setIgnored(m.accountId, !m.ignored)}>{m.ignored ? 'Stop ignoring' : 'Ignore'}</button>
               <button className="btn ghost small" onClick={() => void resync(m.accountId)}>Re-sync</button>
             </div>
           ))}

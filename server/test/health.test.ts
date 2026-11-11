@@ -117,4 +117,21 @@ describe('F-21 health and alerts', () => {
     expect((await app.inject({ method: 'POST', url: `/api/accounts/${theirs}/resync`, headers: { cookie } })).statusCode).toBe(404);
     expect((await app.inject({ method: 'POST', url: `/api/accounts/${a}/resync`, headers: { cookie } })).statusCode).toBe(200);
   });
+
+  it('an ignored mailbox no longer turns the status dot, and only your own mailbox can be ignored', async () => {
+    const a = await makeAccount('alice@demo.test');
+    const other = await makeUser('b@x.test');
+    const theirs = await makeAccount('bob@demo.test', { userId: other });
+    const cookie = await login(app);
+    const dot = async () => (await app.inject({ method: 'GET', url: '/api/health/mailboxes', headers: { cookie } })).json();
+    expect((await dot()).status).not.toBe('ok');             // no sync running here, so the mailbox is not "connected"
+    expect((await app.inject({ method: 'POST', url: `/api/accounts/${theirs}/health-ignore`, headers: { cookie }, payload: { ignored: true } })).statusCode).toBe(404);
+    expect((await app.inject({ method: 'POST', url: `/api/accounts/${a}/health-ignore`, headers: { cookie }, payload: { ignored: true } })).statusCode).toBe(200);
+    expect(await dot()).toEqual({ status: 'ok', problems: [] });
+    const rep = await healthReport(TEST_USER, false);
+    expect(rep.mailboxes[0].ignored).toBe(true);
+    expect(rep.overall).toBe('ok');
+    await app.inject({ method: 'POST', url: `/api/accounts/${a}/health-ignore`, headers: { cookie }, payload: { ignored: false } });
+    expect((await dot()).status).not.toBe('ok');
+  });
 });

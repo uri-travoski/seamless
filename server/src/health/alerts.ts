@@ -18,7 +18,7 @@ export async function shouldAlert(condition: string, subject: string | number, n
 
 export async function runHealthAlerts(now = Date.now()): Promise<void> {
   // OAuth mailboxes whose sign-in no longer works (the refresh token was revoked or expired)
-  const oauth = await q<{ id: number; user_id: number; email: string }>(`SELECT id, user_id, email FROM accounts WHERE enabled = true AND kind IN ('gmail','microsoft')`);
+  const oauth = await q<{ id: number; user_id: number; email: string }>(`SELECT id, user_id, email FROM accounts WHERE enabled = true AND health_ignored = false AND kind IN ('gmail','microsoft')`);
   for (const a of oauth) {
     const st = syncManager.status(a.id);
     if (st.state === 'error' && st.failures >= 2 && AUTH_ERR.test(st.lastError) && await shouldAlert('oauth.expiring', a.id, now)) {

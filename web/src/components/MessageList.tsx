@@ -10,7 +10,7 @@ import { ContextMenu, type MenuPos } from './EmailMenu.tsx';
 import { IconContext } from '@phosphor-icons/react';
 import {
   StarIcon, EyeIcon, AttachClipIcon, EnvelopeIcon, EnvelopeOpenIcon, ArchiveIcon, JunkIcon, TrashIcon,
-  TableViewIcon, SplitViewIcon, CompactIcon, ComfortableIcon, CloseIcon, NoteIcon, RestoreMailIcon, ReplyIcon, InboxIcon, SnoozeIcon, ShieldWarnIcon,
+  TableViewIcon, SplitViewIcon, CompactIcon, ComfortableIcon, CloseIcon, NoteIcon, RestoreMailIcon, ReplyIcon, InboxIcon, SnoozeIcon,
 } from '../icons.tsx';
 import { useSession } from '../state/session.ts';
 import { useUi } from '../state/ui.ts';
@@ -76,7 +76,7 @@ function RiskFlag({ email }: { email: ApiEmail }) {
   if (!email.risk) return null;
   return (
     <span className={`risk-flag ${email.risk.level}`} title={email.risk.reasons.map((r) => r.text).join('\n')}>
-      <ShieldWarnIcon size={16} weight="fill" aria-label={email.risk.level === 'high' ? 'Possible phishing' : 'Be careful'} />
+      <span aria-label={email.risk.level === 'high' ? 'Possible phishing' : 'Be careful'}>!</span>
     </span>
   );
 }

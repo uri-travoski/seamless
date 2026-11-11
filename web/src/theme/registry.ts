@@ -45,7 +45,7 @@ const seamlessLight: Tokens = {
   '--color-text': '#434654', '--color-text-strong': '#191c1e', '--color-text-soft': '#5b6570', '--color-text-muted': '#8a939c',
   '--color-accent': '#1867c0', '--color-accent-strong': '#12508f', '--color-accent-soft': '#e8f1fb', '--color-accent-contrast': '#ffffff', '--color-accent-warm': '#1867c0',
   '--color-hover': '#eef2f6', '--color-selected': '#dcebfb', '--color-selected-rule': 'transparent', '--color-checked': '#fdf3d6',
-  '--color-header-bg': '#243959', '--color-header-text': '#ffffff', '--color-header-search-bg': 'rgba(255, 255, 255, 0.16)',
+  '--color-header-bg': '#1b314e', '--color-header-text': '#ffffff', '--color-header-search-bg': 'rgba(255, 255, 255, 0.16)',
   '--color-header-search-text': '#ffffff', '--color-header-rule': 'transparent',
   '--color-sidebar-bg': '#ffffff', '--color-sidebar-icon': '#243959', '--color-ink': '#243959', '--color-ink-hover': '#1b2c47', '--color-ink-text': '#ffffff',
   '--color-danger': '#d64541', '--color-danger-soft': '#fdeaea', '--color-warning': '#b26a00', '--color-warning-soft': '#fff8e6',

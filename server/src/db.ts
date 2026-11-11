@@ -701,6 +701,13 @@ CREATE INDEX followups_header ON followups(message_id_header) WHERE message_id I
 `,
   },
   {
+    id: 15,
+    sql: `
+-- "Ignore this mailbox" in health checks, the status dot and failure alerts
+ALTER TABLE accounts ADD COLUMN health_ignored BOOLEAN NOT NULL DEFAULT false;
+`,
+  },
+  {
     id: 14,
     sql: `
 -- T2 F-20: phishing / lookalike risk per message + the user's "this sender is safe" list

@@ -3,7 +3,7 @@
  * the scope switcher and — in the far top-right corner — the notification bell.
  * (Settings, refresh, log out and space used live in the sidebar footer; Help and shortcuts in Settings.)
  */
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useSession } from '../../state/session.ts';
 import { useMail, scopeToSlug } from '../../state/mail.ts';
 import { useRouter, navigate } from '../../router.ts';
@@ -11,12 +11,26 @@ import { MenuIcon, SearchIcon, CloseIcon, MailLogo } from '../../icons.tsx';
 import { NO_AUTOFILL } from '../../state/ui.ts';
 import ScopeSwitcher from './ScopeSwitcher.tsx';
 import NotificationBell from './NotificationBell.tsx';
+import AppMenu from './AppMenu.tsx';
+import { api } from '../../api/client.ts';
 
 export default function AppHeader({ onMenu, connected }: { onMenu: () => void; connected: boolean }) {
   const appName = useSession((s) => s.settings.appName) || 'Seamless';
   const online = useMail((s) => s.online);
   const route = useRouter((s) => s.route);
   const [search, setSearch] = useState(route.page === 'mail' && route.folder === 'search' ? route.q ?? '' : '');
+
+  // the dot: green = all well; amber = offline, or a mailbox is struggling; red = a mailbox has stopped working.
+  // Mailboxes set to "ignore" (Settings → Health or the mailbox's own settings) don't count.
+  const [mbHealth, setMbHealth] = useState<{ status: 'ok' | 'warn' | 'red'; problems: { email: string; status: string; error: string; paused: boolean }[] }>({ status: 'ok', problems: [] });
+  useEffect(() => {
+    let alive = true;
+    const load = () => api.get<typeof mbHealth>('/api/health/mailboxes').then((r) => { if (alive) setMbHealth(r); }).catch(() => {});
+    void load();
+    const t = setInterval(load, 45_000);
+    return () => { alive = false; clearInterval(t); };
+  }, []);
+  const live = connected && online;
 
   const slug = () => scopeToSlug(useMail.getState().scope, useMail.getState().overview);
   const runSearch = () => {
@@ -53,10 +67,15 @@ export default function AppHeader({ onMenu, connected }: { onMenu: () => void; c
       </div>
       <div className="spacer" />
       <div className="topbar-actions">
-        <ScopeSwitcher dot={<span className={`conn-dot ${connected && online ? '' : 'offline'}`} role="status"
-                    title={connected && online ? 'Live: connected to the server — new mail and changes appear instantly' : 'Offline or reconnecting — changes will appear once the connection is back'}
-                    aria-label={connected && online ? 'Live connection' : 'Offline, reconnecting'} />} />
+        <ScopeSwitcher dot={
+          <span className={`conn-dot ${!live || mbHealth.status === 'warn' ? 'offline' : ''} ${live && mbHealth.status === 'red' ? 'bad' : ''}`} role="status"
+            title={!live ? 'Offline or reconnecting — changes will appear once the connection is back'
+              : mbHealth.status === 'ok' ? 'Live, and all mailboxes are working'
+                : mbHealth.problems.map((p) => `${p.email}: ${p.paused ? 'paused' : p.status === 'red' ? 'not working' : 'having trouble'}`).join('\n')}
+            aria-label={live ? (mbHealth.status === 'ok' ? 'Live connection, all mailboxes working' : 'Live connection, a mailbox has a problem') : 'Offline, reconnecting'} />
+        } />
         <NotificationBell />
+        <AppMenu />
       </div>
     </header>
   );
