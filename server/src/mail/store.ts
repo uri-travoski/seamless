@@ -4,6 +4,7 @@ import { parseSearch } from './searchparse.ts';
 import { enqueueOp } from '../imap/sync.ts';
 import { deleteMessageRow } from './ingest.ts';
 import { scopeAccountIds, categoryIdByName } from './categories.ts';
+import { accessibleAccountIds, roleFor, canSendRole, Forbidden, type AccessRole } from '../auth/access.ts';
 
 const UNIFIED_ROLES: MailboxRole[] = ['inbox', 'drafts', 'sent', 'scheduled', 'archive', 'junk', 'trash'];
 const UNIFIED_NAMES: Record<string, string> = {
@@ -14,20 +15,23 @@ const UNIFIED_NAMES: Record<string, string> = {
  *  accounts inside `scope`; per-account folders are always listed in full. */
 export async function listMailboxes(userId: number, scope?: string): Promise<ApiMailbox[]> {
   const inScope = await scopeAccountIds(userId, scope);
+  const access = await accessibleAccountIds(userId);
+  const accIds = access.map((a) => a.id);
+  const roleOf = new Map(access.map((a) => [a.id, a.role]));
   const counts = await q<{ mailbox_id: number; total: number; unread: number }>(`
     SELECT m.mailbox_id, COUNT(*) AS total,
            COUNT(*) FILTER (WHERE m.unread AND (m.snoozed_until IS NULL OR m.snoozed_until <= ?)) AS unread
-    FROM messages m WHERE m.user_id = ? GROUP BY m.mailbox_id
-  `, [Date.now(), userId]);
+    FROM messages m WHERE m.account_id = ANY(?::int[]) GROUP BY m.mailbox_id
+  `, [Date.now(), accIds]);
   const byId = new Map(counts.map((c) => [c.mailbox_id, c]));
 
   const rows = await q(`
     SELECT mb.*, a.email AS account_email FROM mailboxes mb JOIN accounts a ON a.id = mb.account_id
-    WHERE a.user_id = ?
+    WHERE a.id = ANY(?::int[])
     ORDER BY mb.account_id, CASE mb.role
       WHEN 'inbox' THEN 0 WHEN 'drafts' THEN 1 WHEN 'sent' THEN 2 WHEN 'scheduled' THEN 3
       WHEN 'archive' THEN 4 WHEN 'junk' THEN 5 WHEN 'trash' THEN 6 ELSE 7 END, mb.name
-  `, [userId]);
+  `, [accIds]);
 
   const out: ApiMailbox[] = [];
   const roleTotals = new Map<string, { total: number; unread: number }>();
@@ -39,6 +43,7 @@ export async function listMailboxes(userId: number, scope?: string): Promise<Api
       roleTotals.set(r.role, agg);
     }
     out.push({
+      ...(roleOf.get(r.account_id) !== 'owner' ? { shared: true, sharedRole: roleOf.get(r.account_id) as 'viewer' | 'responder' | 'manager' } : {}),
       id: `mb:${r.id}`, accountId: r.account_id, name: r.name, path: r.path,
       role: r.role, totalEmails: c.total, unreadEmails: c.unread ?? 0,
     });
@@ -72,7 +77,7 @@ const BASE_SELECT = `
   JOIN mailboxes mb ON mb.id = m.mailbox_id
 `;
 
-export async function rowToApi(r: MsgRow): Promise<ApiEmail> {
+export async function rowToApi(r: MsgRow, viewerId: number = r.user_id): Promise<ApiEmail> {
   const labels = await q<{ label_id: number }>('SELECT label_id FROM message_labels WHERE message_id = ?', [r.id]);
   let openCount = -1;
   let lastOpenAt: string | null = null;
@@ -100,7 +105,7 @@ export async function rowToApi(r: MsgRow): Promise<ApiEmail> {
        WHERE sm.thread_id = ? AND sm.user_id = ? AND sm.tracking_token IS NOT NULL`, [r.thread_id, r.user_id]);
     if (ta && ta.c > 0) { threadOpenCount = ta.c; threadOpenAt = new Date(ta.last!).toISOString(); }
   }
-  const hasNote = !!(await one('SELECT 1 FROM notes WHERE user_id = ? AND email_id = ?', [r.user_id, `m${r.id}`]));
+  const hasNote = !!(await one('SELECT 1 FROM notes WHERE user_id = ? AND email_id = ?', [viewerId, `m${r.id}`]));
   const risk = await one<{ level: string; reasons: any }>('SELECT level, reasons FROM message_risk WHERE message_id = ?', [r.id]);
   const fu = await one<{ id: number; due_at: number; status: string }>(
     `SELECT id, due_at, status FROM followups WHERE message_id = ? AND user_id = ? AND status IN ('waiting','due') ORDER BY id DESC LIMIT 1`, [r.id, r.user_id]);
@@ -157,6 +162,7 @@ export async function getNote(userId: number, emailId: string): Promise<string> 
 }
 
 export async function setNote(userId: number, emailId: string, body: string): Promise<void> {
+  if (!(await getMsgRow(userId, emailId))) return; // notes are private, but only on mail you can see
   const trimmed = body.trim();
   if (trimmed === '') {
     await run('DELETE FROM notes WHERE user_id = ? AND email_id = ?', [userId, emailId]);
@@ -172,20 +178,36 @@ export async function setNote(userId: number, emailId: string, body: string): Pr
 export async function getEmails(userId: number, ids: string[]): Promise<ApiEmail[]> {
   const out: ApiEmail[] = [];
   for (const id of ids) {
-    const row = await one<MsgRow>(`${BASE_SELECT} WHERE m.id = ? AND m.user_id = ?`, [Number(id.replace(/^m/, '')) || 0, userId]);
-    if (row) out.push(await rowToApi(row));
+    const row = await getMsgRow(userId, id);
+    if (row) out.push(await rowToApi(row, userId));
   }
   return out;
 }
 
-export async function getMsgRow(userId: number, emailId: string): Promise<MsgRow | undefined> {
-  return one<MsgRow>(`${BASE_SELECT} WHERE m.id = ? AND m.user_id = ?`, [Number(emailId.replace(/^m/, '')) || 0, userId]);
+/** Role the user holds on the message's account (null = no access). Exported for routes that need to branch. */
+export type RowAccess = AccessRole | null;
+
+/**
+ * THE message access chokepoint. Returns undefined when the user has no access to the message's account
+ * (indistinguishable from "does not exist"). `need: 'write'` additionally requires owner/responder/manager and
+ * throws Forbidden (403) for viewers; `need: 'own'` is for per-user data on mail (labels): owner only.
+ */
+export async function getMsgRow(userId: number, emailId: string, need: 'read' | 'write' | 'own' = 'read'): Promise<MsgRow | undefined> {
+  const row = await one<MsgRow>(`${BASE_SELECT} WHERE m.id = ?`, [Number(String(emailId).replace(/^m/, '')) || 0]);
+  if (!row) return undefined;
+  const role = row.user_id === userId ? 'owner' : await roleFor(userId, row.account_id);
+  if (!role) return undefined;
+  if (need === 'write' && !canSendRole(role)) throw new Forbidden();
+  if (need === 'own' && role !== 'owner') throw new Forbidden('labels are personal and cannot be set on shared mail');
+  return row;
 }
 
 export async function queryEmails(userId: number, req: EmailQueryRequest): Promise<EmailQueryResponse> {
-  const where: string[] = ['m.user_id = ?'];
-  const params: unknown[] = [userId];
   const f = req.filter ?? {};
+  // access: own accounts + accounts shared with me (scope narrows further; unified = everything accessible)
+  const accessIds = (await accessibleAccountIds(userId)).map((a) => a.id);
+  const where: string[] = ['m.account_id = ANY(?::int[])'];
+  const params: unknown[] = [accessIds];
 
   const scoped = await scopeAccountIds(userId, f.scope);
   if (scoped !== null) { where.push('m.account_id = ANY(?::int[])'); params.push(scoped); }
@@ -208,7 +230,8 @@ export async function queryEmails(userId: number, req: EmailQueryRequest): Promi
   if (f.notKeyword === '$seen') where.push('m.unread = true');
   if (f.hasKeyword === '$flagged') where.push('m.flagged = true');
   if (f.needsReview) where.push("m.classify_state = 'needs_review'");
-  if (f.waiting) where.push(`EXISTS (SELECT 1 FROM followups fu WHERE fu.message_id = m.id AND fu.user_id = m.user_id AND fu.status IN ('waiting','due'))`);
+  if (f.waiting) where.push(`EXISTS (SELECT 1 FROM followups fu WHERE fu.message_id = m.id AND fu.user_id = ? AND fu.status IN ('waiting','due'))`); 
+  if (f.waiting) params.push(userId);
   if (f.snoozed) {
     where.push('m.snoozed_until > ?'); params.push(Date.now());
   } else if (f.inMailbox) {
@@ -272,9 +295,9 @@ export async function queryEmails(userId: number, req: EmailQueryRequest): Promi
 export async function getThreadEmailIds(userId: number, threadId: string): Promise<string[]> {
   const rows = await q<{ id: number }>(`
     SELECT m.id FROM messages m JOIN mailboxes mb ON mb.id = m.mailbox_id
-    WHERE m.user_id = ? AND m.thread_id = ? AND (mb.role IS NULL OR mb.role NOT IN ('trash','junk'))
+    WHERE m.account_id = ANY(?::int[]) AND m.thread_id = ? AND (mb.role IS NULL OR mb.role NOT IN ('trash','junk'))
     ORDER BY m.date ASC
-  `, [userId, threadId]);
+  `, [(await accessibleAccountIds(userId)).map((a) => a.id), threadId]);
   return rows.map((r) => `m${r.id}`);
 }
 
@@ -287,7 +310,7 @@ const KEYWORD_FLAG: Record<string, { col: string; imap: string; invert: boolean 
 };
 
 export async function setKeywords(userId: number, emailId: string, patch: Record<string, boolean>): Promise<void> {
-  const row = await getMsgRow(userId, emailId);
+  const row = await getMsgRow(userId, emailId, 'write');
   if (!row) return;
   const add: string[] = [];
   const remove: string[] = [];
@@ -312,7 +335,7 @@ export async function setKeywords(userId: number, emailId: string, patch: Record
 }
 
 export async function setLabels(userId: number, emailId: string, labelIds: number[]): Promise<void> {
-  const row = await getMsgRow(userId, emailId);
+  const row = await getMsgRow(userId, emailId, 'own'); // labels are per user: not on shared mail in T4
   if (!row) return;
   const before = (await q<{ label_id: number }>('SELECT label_id FROM message_labels WHERE message_id = ?', [row.id])).map((l) => l.label_id);
   await run('DELETE FROM message_labels WHERE message_id = ?', [row.id]);
@@ -370,7 +393,7 @@ async function recordCorrection(userId: number, row: MsgRow, before: number[], a
 
 /** Move to a mailbox ("mb:<id>" same-account, or "u:<role>" resolved per account). */
 export async function moveEmail(userId: number, emailId: string, target: string): Promise<void> {
-  const row = await getMsgRow(userId, emailId);
+  const row = await getMsgRow(userId, emailId, 'write');
   if (!row) return;
   let targetMailboxId: number | null = null;
   if (target.startsWith('mb:')) {
@@ -407,7 +430,7 @@ export function setScheduleCanceller(fn: (messageId: string | null) => Promise<b
 
 /** Delete = move to trash; trash/junk expunge permanently; deleting a Scheduled item cancels the send. */
 export async function destroyEmail(userId: number, emailId: string): Promise<void> {
-  const row = await getMsgRow(userId, emailId);
+  const row = await getMsgRow(userId, emailId, 'write');
   if (!row) return;
   if (row.mailbox_role === 'scheduled') {
     await cancelSchedule(row.message_id);

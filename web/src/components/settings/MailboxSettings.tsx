@@ -10,6 +10,7 @@ import { toast } from '../../toast.ts';
 import { useMail } from '../../state/mail.ts';
 import { useCompose } from '../../state/compose.ts';
 import PushInboxSetup, { PushPanel } from './PushInboxSetup.tsx';
+import { SharePanel } from './SharePanel.tsx';
 import { OauthSection, SafeDeletePanel, GmailLearnPanel } from './AccountSettings.tsx';
 import { CategoryGlyph, CATEGORY_ICON_NAMES } from '../CategoryGlyph.tsx';
 import { CheckIcon, CloseIcon, WarningIcon, PlusSimpleIcon, CaretUpIcon, CaretDownIcon, TrashIcon, PencilIcon, DragIcon } from '../../icons.tsx';
@@ -466,7 +467,7 @@ export default function MailboxSettings() {
   const [tab, setTab] = useState<'mailboxes' | 'categories'>('mailboxes');
   const [accounts, setAccounts] = useState<any[]>([]);
   const [form, setForm] = useState<Form | null>(null);
-  const [panel, setPanel] = useState<{ kind: 'safe' | 'learn' | 'push'; id: number } | null>(null);
+  const [panel, setPanel] = useState<{ kind: 'safe' | 'learn' | 'push' | 'share'; id: number } | null>(null);
   const [pushSetup, setPushSetup] = useState(false);
 
   const load = () => {
@@ -546,11 +547,13 @@ export default function MailboxSettings() {
                   <div className="mbx-actions">
                     <button className="btn" onClick={() => edit(a)}>Edit</button>
                     {a.inboundKind === 'push' && <button className="btn ghost" onClick={() => setPanel(panel?.kind === 'push' && panel.id === a.id ? null : { kind: 'push', id: a.id })}>Cloudflare setup</button>}
+                    <button className="btn ghost" onClick={() => setPanel(panel?.kind === 'share' && panel.id === a.id ? null : { kind: 'share', id: a.id })}>Share with…</button>
                     <button className="btn ghost" onClick={() => setPanel(panel?.kind === 'safe' && panel.id === a.id ? null : { kind: 'safe', id: a.id })}>Safe delete</button>
                     {a.kind === 'gmail' && <button className="btn ghost" onClick={() => setPanel(panel?.kind === 'learn' && panel.id === a.id ? null : { kind: 'learn', id: a.id })}>Learn</button>}
                     <button className="btn ghost danger" onClick={() => void remove(a)}>Remove</button>
                   </div>
                   {panel?.id === a.id && panel?.kind === 'safe' && <SafeDeletePanel account={a} onClose={() => setPanel(null)} onSaved={load} />}
+                  {panel?.id === a.id && panel?.kind === 'share' && <SharePanel account={a} onClose={() => setPanel(null)} />}
                   {panel?.id === a.id && panel?.kind === 'push' && <PushPanel accountId={a.id} onClose={() => setPanel(null)} />}
                   {panel?.id === a.id && panel?.kind === 'learn' && <GmailLearnPanel account={a} onClose={() => setPanel(null)} />}
                 </div>

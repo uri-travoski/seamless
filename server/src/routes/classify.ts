@@ -66,7 +66,7 @@ export function register(app: FastifyInstance): void {
   app.post('/api/review/:id/resolve', async (req) => {
     const emailId = String((req.params as any).id);
     const b = (req.body ?? {}) as { labelIds?: number[] };
-    const row = await getMsgRow(uid(req), emailId);
+    const row = await getMsgRow(uid(req), emailId, 'write');
     if (!row) return { ok: false };
     if (Array.isArray(b.labelIds)) await setLabels(uid(req), emailId, b.labelIds);
     await run("UPDATE messages SET classify_state = 'classified', review_reason = NULL WHERE id = ?", [row.id]);

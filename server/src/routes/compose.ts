@@ -38,6 +38,7 @@ export function register(app: FastifyInstance): void {
       if (result.queued) return { ok: true, queued: true, jobId: result.jobId, releaseAt: result.releaseAt };
       return { ok: true, queued: false, trackingToken: result.sent.trackingToken };
     } catch (err: any) {
+      if (err?.statusCode === 403) return reply.code(403).send({ error: err.message });
       const p = req.body as ComposePayload;
       await emitEvent(uid(req), 'send.failed', null, { subject: p?.subject ?? '', accountId: p?.accountId ?? null, error: err?.message ?? 'send failed' }).catch(() => {});
       return reply.code(502).send({ error: err?.message ?? 'send failed' });
@@ -60,6 +61,7 @@ export function register(app: FastifyInstance): void {
       broadcast({ type: 'stateChange' }, uid(req));
       return { ok: true };
     } catch (err: any) {
+      if (err?.statusCode === 403) return reply.code(403).send({ error: err.message });
       return reply.code(502).send({ error: err?.message ?? 'draft save failed' });
     }
   });
@@ -71,6 +73,7 @@ export function register(app: FastifyInstance): void {
       broadcast({ type: 'stateChange' }, uid(req));
       return { ok: true, ...result };
     } catch (err: any) {
+      if (err?.statusCode === 403) return reply.code(403).send({ error: err.message });
       return reply.code(400).send({ error: err?.message ?? 'could not schedule' });
     }
   });

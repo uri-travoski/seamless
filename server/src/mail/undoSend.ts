@@ -7,7 +7,7 @@ import type { ComposePayload } from '@seamless/shared';
 import { one, q } from '../db.ts';
 import { getUserSetting } from '../classify/settings.ts';
 import { registerJob, enqueueJob, cancelJob } from '../jobs/runner.ts';
-import { sendEmail } from './send.ts';
+import { sendEmail, actingUser } from './send.ts';
 import { emitEvent } from '../events/emit.ts';
 import { broadcast } from '../ws.ts';
 
@@ -22,8 +22,7 @@ export async function queueSend(userId: number, payload: ComposePayload): Promis
   if (!secs) return { queued: false, sent: await sendEmail(userId, payload) };
 
   // validate now so a bad message fails at once instead of 10 seconds later
-  const acct = await one('SELECT id FROM accounts WHERE id = ? AND user_id = ?', [payload.accountId, userId]);
-  if (!acct) throw new Error('Unknown account');
+  await actingUser(userId, payload.accountId); // owner, or responder/manager on a shared mailbox (viewer → 403)
   if (![...payload.to, ...payload.cc, ...payload.bcc].some((a) => a.email?.trim())) throw new Error('Add at least one recipient');
 
   const releaseAt = Date.now() + secs * 1000;

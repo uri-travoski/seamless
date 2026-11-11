@@ -17,6 +17,9 @@ export interface ApiMailbox {
   role: MailboxRole;
   totalEmails: number;
   unreadEmails: number;
+  /** T4 F-32: set when the mailbox belongs to someone else and is shared with you. */
+  shared?: boolean;
+  sharedRole?: 'viewer' | 'responder' | 'manager';
 }
 
 export interface ApiAddress {
@@ -346,6 +349,8 @@ export interface ApiCategoryOverview {
   unifiedUnread: number;
   categories: ApiCategory[];
   mailboxes: ApiCategoryMailbox[];
+  /** T4 F-32: mailboxes other users shared with you (scope `shared:<id>`). */
+  shared: { id: number; name: string; email: string; color: string; role: 'viewer' | 'responder' | 'manager'; owner: string; unread: number }[];
 }
 
 export interface TestStep {

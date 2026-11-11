@@ -9,7 +9,7 @@ import { useRouter, navigate, type Route } from '../../router.ts';
 import { CaretDownIcon, CategoryGlyph, SettingsIcon, TimerIcon } from '../../icons.tsx';
 import { NO_AUTOFILL } from '../../state/ui.ts';
 
-interface Row { kind: 'category' | 'mailbox'; scope: string; name: string; sub?: string; unread: number; icon?: string; color: string }
+interface Row { kind: 'category' | 'mailbox' | 'shared'; scope: string; name: string; sub?: string; unread: number; icon?: string; color: string }
 
 export default function ScopeSwitcher({ dot }: { dot?: React.ReactNode }) {
   const overview = useMail((s) => s.overview);
@@ -30,17 +30,19 @@ export default function ScopeSwitcher({ dot }: { dot?: React.ReactNode }) {
     const boxes: Row[] = [...overview.mailboxes]
       .sort((a, b) => (a.name || a.email).localeCompare(b.name || b.email))
       .map((m) => ({ kind: 'mailbox', scope: `account:${m.id}`, name: m.name || m.email, sub: m.email, unread: m.unread, color: m.color }));
+    const shared: Row[] = (overview.shared ?? []).map((m) => ({ kind: 'shared' as const, scope: `shared:${m.id}`, name: m.name || m.email, sub: `${m.email} · ${m.role}`, unread: m.unread, color: m.color }));
     const f = filter.trim().toLowerCase();
-    const all = [...cats, ...boxes];
+    const all = [...cats, ...boxes, ...shared];
     return f ? all.filter((r) => `${r.name} ${r.sub ?? ''}`.toLowerCase().includes(f)) : all;
   }, [overview, filter]);
 
   const current = useMemo(() => {
     const unread = !overview ? 0 : scope === 'unified' ? overview.unifiedUnread
       : scope.startsWith('category:') ? overview.categories.find((c) => `category:${c.id}` === scope)?.unread ?? 0
-        : overview.mailboxes.find((m) => `account:${m.id}` === scope)?.unread ?? 0;
+        : scope.startsWith('shared:') ? overview.shared?.find((m) => `shared:${m.id}` === scope)?.unread ?? 0
+          : overview.mailboxes.find((m) => `account:${m.id}` === scope)?.unread ?? 0;
     const cat = overview?.categories.find((c) => `category:${c.id}` === scope);
-    const mb = overview?.mailboxes.find((m) => `account:${m.id}` === scope);
+    const mb = overview?.mailboxes.find((m) => `account:${m.id}` === scope) ?? overview?.shared?.find((m) => `shared:${m.id}` === scope);
     return { name: scopeName(scope, overview), unread, icon: scope === 'unified' ? 'unified' : cat?.icon, color: cat?.color ?? mb?.color };
   }, [overview, scope]);
 
@@ -95,6 +97,7 @@ export default function ScopeSwitcher({ dot }: { dot?: React.ReactNode }) {
 
   const cats = rows.filter((r) => r.kind === 'category');
   const boxes = rows.filter((r) => r.kind === 'mailbox');
+  const sharedRows = rows.filter((r) => r.kind === 'shared');
   const rowEl = (r: Row, i: number) => (
     <button key={r.scope} className={`switch-row ${r.scope === scope ? 'current' : ''} ${i === hi ? 'hi' : ''}`}
       onMouseEnter={() => setHi(i)} onClick={() => pick(r.scope)} role="option" aria-selected={r.scope === scope}>
@@ -131,6 +134,9 @@ export default function ScopeSwitcher({ dot }: { dot?: React.ReactNode }) {
               {cats.length > 0 && boxes.length > 0 && <div className="menu-sep" />}
               {boxes.length > 0 && <div className="switch-head">Mailboxes</div>}
               {boxes.map((r, i) => rowEl(r, cats.length + i))}
+              {sharedRows.length > 0 && <div className="menu-sep" />}
+              {sharedRows.length > 0 && <div className="switch-head">Shared</div>}
+              {sharedRows.map((r, i) => rowEl(r, cats.length + boxes.length + i))}
               {rows.length === 0 && <div className="menu-empty">Nothing matches “{filter}”</div>}
             </div>
             <button className="switch-foot" onClick={() => { setOpen(false); navigate({ page: 'settings', tab: 'disposable' }); }}>

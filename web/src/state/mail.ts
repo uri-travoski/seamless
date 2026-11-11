@@ -42,9 +42,10 @@ function viewKey(view: View, scope: ScopeId = useMail.getState().scope): string 
 // ---- scope <-> URL slug ----
 
 export function scopeToSlug(scope: ScopeId, overview: ApiCategoryOverview | null): string {
-  const m = scope.match(/^(category|account):(\d+)$/);
+  const m = scope.match(/^(category|account|shared):(\d+)$/);
   if (!m) return 'unified';
   if (m[1] === 'account') return `mb-${m[2]}`;
+  if (m[1] === 'shared') return `sh-${m[2]}`;
   return overview?.categories.find((c) => c.id === Number(m[2]))?.key ?? 'unified';
 }
 
@@ -52,13 +53,19 @@ export function slugToScope(slug: string, overview: ApiCategoryOverview | null):
   if (!slug || slug === 'unified') return 'unified';
   const mb = slug.match(/^mb-(\d+)$/);
   if (mb) return `account:${mb[1]}`;
+  const sh = slug.match(/^sh-(\d+)$/);
+  if (sh) return `shared:${sh[1]}`;
   const cat = overview?.categories.find((c) => c.key === slug);
   return cat ? `category:${cat.id}` : null;
 }
 
 export function scopeName(scope: ScopeId, overview: ApiCategoryOverview | null): string {
-  const m = scope.match(/^(category|account):(\d+)$/);
+  const m = scope.match(/^(category|account|shared):(\d+)$/);
   if (!m) return 'Unified';
+  if (m[1] === 'shared') {
+    const sh = overview?.shared?.find((x) => x.id === Number(m[2]));
+    return sh ? (sh.name || sh.email) : 'Shared mailbox';
+  }
   if (m[1] === 'account') {
     const mb = overview?.mailboxes.find((x) => x.id === Number(m[2]));
     return mb ? (mb.name || mb.email) : 'Mailbox';

@@ -8,6 +8,7 @@
  */
 import type { ApiCategory, ApiCategoryOverview } from '@seamless/shared';
 import { q, one, run, insertId } from '../db.ts';
+import { roleFor, sharedAccountIds, accessibleAccountIds } from '../auth/access.ts';
 
 export const BUILTIN_CATEGORIES = [
   { key: 'work', name: 'Work', icon: 'briefcase', color: '#2f7ed8', ord: 1 },
@@ -26,12 +27,12 @@ export async function ensureBuiltinCategories(userId: number): Promise<void> {
   }
 }
 
-export type Scope = { kind: 'unified' } | { kind: 'category'; id: number } | { kind: 'account'; id: number };
+export type Scope = { kind: 'unified' } | { kind: 'category'; id: number } | { kind: 'account'; id: number } | { kind: 'shared'; id: number };
 
 export function parseScope(raw: string | undefined | null): Scope {
   const s = String(raw ?? '').trim();
-  const m = s.match(/^(category|account):(\d+)$/);
-  if (m) return { kind: m[1] as 'category' | 'account', id: Number(m[2]) };
+  const m = s.match(/^(category|account|shared):(\d+)$/);
+  if (m) return { kind: m[1] as 'category' | 'account' | 'shared', id: Number(m[2]) };
   return { kind: 'unified' };
 }
 
@@ -40,8 +41,11 @@ export async function scopeAccountIds(userId: number, scope: Scope | string | un
   const s = typeof scope === 'object' && scope ? scope : parseScope(scope as string);
   if (s.kind === 'unified') return null;
   if (s.kind === 'account') {
-    const ok = await one('SELECT 1 FROM accounts WHERE id = ? AND user_id = ?', [s.id, userId]);
-    return ok ? [s.id] : [];
+    return (await roleFor(userId, s.id)) ? [s.id] : []; // own, or shared with you
+  }
+  if (s.kind === 'shared') {
+    // only a mailbox someone else shared with you
+    return (await sharedAccountIds(userId)).includes(s.id) ? [s.id] : [];
   }
   const rows = await q<{ account_id: number }>(`
     SELECT m.account_id FROM mailbox_category_members m
@@ -71,7 +75,8 @@ export async function categoryOverview(userId: number): Promise<ApiCategoryOverv
   // inbox unread per account (what the badges count)
   const unreadRows = await q<{ account_id: number; c: number }>(`
     SELECT m.account_id, COUNT(*) AS c FROM messages m JOIN mailboxes mb ON mb.id = m.mailbox_id
-    WHERE m.user_id = ? AND mb.role = 'inbox' AND m.unread = true GROUP BY m.account_id`, [userId]);
+    WHERE m.account_id = ANY(?::int[]) AND mb.role = 'inbox' AND m.unread = true GROUP BY m.account_id`,
+    [(await accessibleAccountIds(userId)).map((a) => a.id)]);
   const unread = new Map(unreadRows.map((r) => [r.account_id, r.c]));
   const accounts = await q<any>('SELECT id, name, email, color, enabled FROM accounts WHERE user_id = ? ORDER BY lower(coalesce(nullif(name, \'\'), email)), id', [userId]);
 
@@ -82,7 +87,12 @@ export async function categoryOverview(userId: number): Promise<ApiCategoryOverv
       accountIds, unread: accountIds.reduce((n, id) => n + (unread.get(id) ?? 0), 0),
     };
   });
+  const sharedRows = await q<{ id: number; name: string; email: string; color: string; role: 'viewer' | 'responder' | 'manager'; owner: string }>(`
+    SELECT a.id, a.name, a.email, a.color, s.role, u.email AS owner
+    FROM mailbox_shares s JOIN accounts a ON a.id = s.account_id JOIN users u ON u.id = a.user_id
+    WHERE s.user_id = ? ORDER BY lower(coalesce(nullif(a.name, ''), a.email)), a.id`, [userId]);
   return {
+    shared: sharedRows.map((r) => ({ ...r, unread: unread.get(r.id) ?? 0 })),
     unifiedUnread: [...unread.values()].reduce((a, b) => a + b, 0),
     categories,
     mailboxes: accounts.map((a) => ({

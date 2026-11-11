@@ -123,7 +123,7 @@ export function register(app: FastifyInstance): void {
   /** Block sender: a filter that sends their future mail to Spam, and this message goes there now. */
   app.post('/api/block-sender', async (req, reply) => {
     const userId = uid(req);
-    const row = await getMsgRow(userId, String((req.body as any)?.emailId ?? ''));
+    const row = await getMsgRow(userId, String((req.body as any)?.emailId ?? ''), 'write');
     if (!row) return reply.code(404).send({ error: 'not found' });
     const addr = row.from_addr.toLowerCase();
     const existing = (await q<{ conditions: string }>('SELECT conditions FROM filters WHERE user_id = ?', [userId]))

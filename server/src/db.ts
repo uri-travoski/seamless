@@ -986,6 +986,40 @@ ALTER TABLE templates ADD COLUMN last_used_at BIGINT;
 ALTER TABLE templates ADD COLUMN kind TEXT NOT NULL DEFAULT 'reply';
 `,
   },
+  {
+    id: 27,
+    sql: `
+-- T4 F-32: shared mailboxes. Shared mail rows keep messages.user_id = the owner.
+CREATE TABLE mailbox_shares (
+  account_id INTEGER NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
+  user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  role TEXT NOT NULL CHECK (role IN ('viewer','responder','manager')),
+  created_at BIGINT NOT NULL DEFAULT 0,
+  PRIMARY KEY (account_id, user_id)
+);
+CREATE INDEX mailbox_shares_user ON mailbox_shares(user_id);
+CREATE TABLE assignments (
+  message_thread_id TEXT NOT NULL,
+  account_id INTEGER NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
+  assignee_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+  status TEXT NOT NULL DEFAULT 'open' CHECK (status IN ('open','pending','done')),
+  due_at BIGINT,
+  updated_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
+  updated_at BIGINT NOT NULL,
+  PRIMARY KEY (account_id, message_thread_id)
+);
+CREATE TABLE thread_comments (
+  id SERIAL PRIMARY KEY,
+  account_id INTEGER NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
+  message_thread_id TEXT NOT NULL,
+  user_id INTEGER NOT NULL REFERENCES users(id),
+  body TEXT NOT NULL,
+  mentions INTEGER[] NOT NULL DEFAULT '{}',
+  created_at BIGINT NOT NULL
+);
+CREATE INDEX thread_comments_thread ON thread_comments(account_id, message_thread_id);
+`,
+  },
 ];
 
 /** Run `fn` in one transaction. Events emitted through the client are only turned into

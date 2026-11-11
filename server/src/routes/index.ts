@@ -38,6 +38,7 @@ import { register as disposable } from './disposable.ts';
 import { register as storage } from './storage.ts';
 import { register as exportRoutes } from './export.ts';
 import { register as businesses } from './businesses.ts';
+import { register as shares } from './shares.ts';
 import { sessionToken } from '../auth/sessions.ts';
 
 export { sessionUser, type SessionUser } from './util.ts';
@@ -93,4 +94,5 @@ export function registerRoutes(app: FastifyInstance): void {
   storage(app);
   exportRoutes(app);
   businesses(app);
+  shares(app);
 }

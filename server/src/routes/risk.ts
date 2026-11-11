@@ -8,7 +8,7 @@ import { uid } from './util.ts';
 
 export function register(app: FastifyInstance): void {
   app.post('/api/risk/:emailId/safe', async (req, reply) => {
-    const row = await getMsgRow(uid(req), String((req.params as any).emailId));
+    const row = await getMsgRow(uid(req), String((req.params as any).emailId), 'write');
     if (!row) return reply.code(404).send({ error: 'not found' });
     await run(`INSERT INTO trusted_senders(user_id, kind, value, created_at) VALUES (?,?,?,?) ON CONFLICT DO NOTHING`,
       [uid(req), 'address', row.from_addr.toLowerCase(), Date.now()]);
@@ -18,7 +18,7 @@ export function register(app: FastifyInstance): void {
   });
 
   app.post('/api/risk/:emailId/report', async (req, reply) => {
-    const row = await getMsgRow(uid(req), String((req.params as any).emailId));
+    const row = await getMsgRow(uid(req), String((req.params as any).emailId), 'write');
     if (!row) return reply.code(404).send({ error: 'not found' });
     await moveEmail(uid(req), `m${row.id}`, 'u:junk');
     broadcast({ type: 'stateChange' }, uid(req));

@@ -2,6 +2,7 @@ import MailComposer from 'nodemailer/lib/mail-composer/index.js';
 import fs from 'node:fs';
 import path from 'node:path';
 import type { ComposePayload } from '@seamless/shared';
+import { roleFor, canSendRole, Forbidden } from '../auth/access.ts';
 import { q, one, run, insertId } from '../db.ts';
 import { randomToken, sha256 } from '../crypto.ts';
 import { config } from '../config.ts';
@@ -64,6 +65,20 @@ async function getAccount(userId: number, accountId: number): Promise<AccountRow
   const acct = await one<AccountRow>('SELECT * FROM accounts WHERE id = ? AND user_id = ?', [accountId, userId]);
   if (!acct) throw new Error('Unknown account');
   return acct;
+}
+
+/**
+ * Who a send is performed as. The owner acts as themself. A responder/manager on a shared mailbox acts as the
+ * mailbox owner (identity, transport, Sent copy all live with the owner); a viewer gets Forbidden (403).
+ */
+export async function actingUser(userId: number, accountId: number): Promise<number> {
+  const acct = await one<{ user_id: number }>('SELECT user_id FROM accounts WHERE id = ?', [accountId]);
+  if (!acct) throw new Error('Unknown account');
+  if (acct.user_id === userId) return userId;
+  const role = await roleFor(userId, accountId);
+  if (!role) throw new Error('Unknown account');
+  if (!canSendRole(role)) throw new Forbidden('viewers cannot send from a shared mailbox');
+  return acct.user_id;
 }
 
 export { smtpTransport } from '../transport/outbound/smtp.ts';
@@ -152,6 +167,7 @@ export async function buildRaw(payload: ComposePayload, acct: AccountRow, extraF
 }
 
 export async function sendEmail(userId: number, original: ComposePayload): Promise<{ trackingToken: string | null }> {
+  userId = await actingUser(userId, original.accountId);
   const acct = await getAccount(userId, original.accountId);
   const ident = await resolveSendIdentity(userId, original);
   const payload = effectivePayload(original, ident);
@@ -208,6 +224,7 @@ export async function sendEmail(userId: number, original: ComposePayload): Promi
 }
 
 export async function saveDraft(userId: number, original: ComposePayload): Promise<void> {
+  userId = await actingUser(userId, original.accountId);
   const acct = await getAccount(userId, original.accountId);
   const ident = await resolveSendIdentity(userId, original);
   const payload: ComposePayload = ident ? { ...original, fromEmail: ident.email } : original;
@@ -230,6 +247,7 @@ export async function saveDraft(userId: number, original: ComposePayload): Promi
  */
 export async function scheduleEmail(userId: number, original: ComposePayload, sendAt: number): Promise<{ id: number; sendAt: number }> {
   if (!Number.isFinite(sendAt) || sendAt <= Date.now()) throw new Error('Scheduled time must be in the future');
+  userId = await actingUser(userId, original.accountId);
   const acct = await getAccount(userId, original.accountId);
   const ident = await resolveSendIdentity(userId, original);
   const payload = effectivePayload(original, ident);

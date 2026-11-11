@@ -6,6 +6,12 @@ import { getBlob } from '../s3.ts';
 import { config } from '../config.ts';
 import { getMsgRow, getNote } from './store.ts';
 import { attachmentMeta } from './ingest.ts';
+import { roleFor } from '../auth/access.ts';
+
+async function canReadAccount(userId: number, rowId: number): Promise<boolean> {
+  const m = await one<{ account_id: number }>('SELECT account_id FROM messages WHERE id = ?', [rowId]);
+  return !!m && (await roleFor(userId, m.account_id)) !== null;
+}
 
 // small LRU for parsed messages (body views + attachment downloads)
 const cache = new Map<number, ParsedMail>();
@@ -15,7 +21,7 @@ const CACHE_MAX = 40;
 export async function getParsed(rowId: number, userId?: number): Promise<ParsedMail | null> {
   const row = await one<{ s3_key: string | null; user_id: number }>('SELECT s3_key, user_id FROM messages WHERE id = ?', [rowId]);
   if (!row?.s3_key) return null;
-  if (userId !== undefined && row.user_id !== userId) return null;
+  if (userId !== undefined && row.user_id !== userId && !(await canReadAccount(userId, rowId))) return null;
   const hit = cache.get(rowId);
   if (hit) { cache.delete(rowId); cache.set(rowId, hit); return hit; }
   const raw = await getBlob(row.s3_key);
