@@ -118,14 +118,13 @@ export function register(app: FastifyInstance): void {
     const mutes = await q<{ account_id: number }>('SELECT account_id FROM notification_mutes WHERE user_id = ?', [userId]);
     let quiet = { enabled: false, from: '22:00', to: '07:00', tz: 'Australia/Perth' };
     try { quiet = { ...quiet, ...JSON.parse((await getUserSetting(userId, 'notif_quiet')) || '{}') }; } catch { /* default */ }
-    const digest = (await getUserSetting(userId, 'notif_digest')) || 'off';
     const sound = (await getUserSetting(userId, 'notif_sound')) === 'true';
-    return { prefs: await getPrefs(userId), mutedAccountIds: mutes.map((m) => m.account_id), quiet, digest, sound };
+    return { prefs: await getPrefs(userId), mutedAccountIds: mutes.map((m) => m.account_id), quiet, sound };
   });
 
   app.put('/api/notification-prefs', async (req) => {
     const userId = uid(req);
-    const b = (req.body ?? {}) as { prefs?: ApiNotificationPref[]; mutedAccountIds?: number[]; quiet?: object; digest?: string; sound?: boolean };
+    const b = (req.body ?? {}) as { prefs?: ApiNotificationPref[]; mutedAccountIds?: number[]; quiet?: object; sound?: boolean };
     if (Array.isArray(b.prefs)) await setPrefs(userId, b.prefs);
     if (Array.isArray(b.mutedAccountIds)) {
       await run('DELETE FROM notification_mutes WHERE user_id = ?', [userId]);
@@ -134,7 +133,6 @@ export function register(app: FastifyInstance): void {
       }
     }
     if (b.quiet) await setUserSetting(userId, 'notif_quiet', JSON.stringify(b.quiet));
-    if (b.digest) await setUserSetting(userId, 'notif_digest', ['off', 'daily', 'weekly'].includes(b.digest) ? b.digest : 'off');
     if (b.sound !== undefined) await setUserSetting(userId, 'notif_sound', b.sound ? 'true' : 'false');
     return { ok: true };
   });

@@ -1,4 +1,4 @@
-/** Settings → Notifications (T1 F-14): per-type in-app / push / digest, mailbox mutes, quiet hours, digest, sound. */
+/** Settings → Notifications (T1 F-14): per-type in-app / push, mailbox mutes, quiet hours, sound. */
 import { useEffect, useState } from 'react';
 import { NOTIFICATION_GROUPS, type ApiNotificationPref, type EventType } from '@seamless/shared';
 import { api } from '../../api/client.ts';
@@ -10,7 +10,6 @@ interface Prefs {
   prefs: ApiNotificationPref[];
   mutedAccountIds: number[];
   quiet: { enabled: boolean; from: string; to: string; tz: string };
-  digest: string;
   sound: boolean;
 }
 
@@ -37,17 +36,17 @@ export default function NotificationSettings() {
   };
   if (!p) return <div><h2>Notifications</h2><p className="dim">Loading…</p></div>;
 
-  const setPref = (type: EventType, key: 'inApp' | 'push' | 'emailDigest', v: boolean) =>
+  const setPref = (type: EventType, key: 'inApp' | 'push', v: boolean) =>
     void persist({ ...p, prefs: p.prefs.map((x) => (x.type === type ? { ...x, [key]: v } : x)) });
 
   return (
     <div>
       <h2>Notifications</h2>
-      <p className="settings-desc">Choose what reaches the bell, what pushes to your devices, and what waits for the digest.</p>
+      <p className="settings-desc">Choose what reaches the bell and what pushes to your devices.</p>
 
       <div className="table-scroll">
         <table className="tbl pref-matrix">
-          <thead><tr><th>Type</th><th>In-app</th><th>Push</th><th>Email digest</th></tr></thead>
+          <thead><tr><th>Type</th><th>In-app</th><th>Push</th></tr></thead>
           <tbody>
             {NOTIFICATION_GROUPS.map((g) => g.types.map((type, i) => {
               const pref = p.prefs.find((x) => x.type === type);
@@ -57,7 +56,6 @@ export default function NotificationSettings() {
                   <td>{i === 0 && <span className="group-name">{g.name}</span>}<span className={i === 0 ? 'type-name first' : 'type-name'}>{TYPE_NAMES[type] ?? type}</span></td>
                   <td><input type="checkbox" checked={pref.inApp} onChange={(e) => setPref(type, 'inApp', e.target.checked)} aria-label={`${type} in-app`} /></td>
                   <td><input type="checkbox" checked={pref.push} onChange={(e) => setPref(type, 'push', e.target.checked)} aria-label={`${type} push`} /></td>
-                  <td><input type="checkbox" checked={pref.emailDigest} onChange={(e) => setPref(type, 'emailDigest', e.target.checked)} aria-label={`${type} digest`} /></td>
                 </tr>
               );
             }))}
@@ -86,14 +84,6 @@ export default function NotificationSettings() {
         <input type="time" className="text-input compact inline" value={p.quiet.to} onChange={(e) => void persist({ ...p, quiet: { ...p.quiet, to: e.target.value } })} />
         <span className="dim">({p.quiet.tz.replace('_', ' ')} time)</span>
       </label>
-
-      <h3>Email digest</h3>
-      <div className="seg" role="group" aria-label="Digest">
-        {(['off', 'daily', 'weekly'] as const).map((d) => (
-          <button key={d} className={`seg-btn ${p.digest === d ? 'on' : ''}`} onClick={() => void persist({ ...p, digest: d })}>{d[0].toUpperCase() + d.slice(1)}</button>
-        ))}
-      </div>
-      <p className="hint">The digest email itself ships with the newsletter-digest work in a later tier; your choice is saved now.</p>
 
       <h3>Sound</h3>
       <label className="checkbox-line">

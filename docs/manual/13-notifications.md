@@ -18,7 +18,7 @@ Choose 25, 50 or 100 per page. Tick notifications to mark them read, unread, or 
 
 ## Settings > Notifications
 
-- A row per type with **In-app** (the bell), **Push** (your phone or desktop) and **Email digest**.
+- A row per type with **In-app** (the bell) and **Push** (your phone or desktop).
 - **Mute mailboxes** — a muted mailbox still gets mail, it just doesn't notify.
 - **Quiet hours** — push is held between the times you set (Perth time); the bell still fills up.
 - **Sound** — a short chime when something new arrives.
