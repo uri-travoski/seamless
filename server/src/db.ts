@@ -660,6 +660,46 @@ ALTER TABLE tracking_opens
   ADD COLUMN IF NOT EXISTS proxied BOOLEAN NOT NULL DEFAULT false;
 `,
   },
+  {
+    id: 13,
+    sql: `
+-- T2: generic job runner + undo send / snooze / follow-ups
+CREATE TABLE jobs (
+  id BIGSERIAL PRIMARY KEY,
+  user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+  kind TEXT NOT NULL,
+  run_at BIGINT NOT NULL,
+  payload JSONB NOT NULL DEFAULT '{}',
+  status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending','running','done','failed','cancelled')),
+  attempts INTEGER NOT NULL DEFAULT 0,
+  last_error TEXT,
+  locked_until BIGINT,
+  created_at BIGINT NOT NULL,
+  finished_at BIGINT
+);
+CREATE INDEX jobs_due ON jobs(run_at) WHERE status = 'pending';
+CREATE INDEX jobs_user_kind ON jobs(user_id, kind, status);
+
+ALTER TABLE messages ADD COLUMN snoozed_until BIGINT, ADD COLUMN sort_date BIGINT;
+UPDATE messages SET sort_date = date;
+CREATE INDEX msg_snoozed ON messages(user_id, snoozed_until) WHERE snoozed_until IS NOT NULL;
+CREATE INDEX msg_sort ON messages(mailbox_id, sort_date DESC);
+
+CREATE TABLE followups (
+  id SERIAL PRIMARY KEY,
+  user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  message_id INTEGER REFERENCES messages(id) ON DELETE CASCADE,
+  message_id_header TEXT,
+  thread_id TEXT,
+  due_at BIGINT NOT NULL,
+  status TEXT NOT NULL DEFAULT 'waiting' CHECK (status IN ('waiting','replied','due','cancelled')),
+  job_id BIGINT,
+  created_at BIGINT NOT NULL
+);
+CREATE INDEX followups_user ON followups(user_id, status);
+CREATE INDEX followups_header ON followups(message_id_header) WHERE message_id IS NULL;
+`,
+  },
 ];
 
 /** Run `fn` in one transaction. Events emitted through the client are only turned into

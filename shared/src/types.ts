@@ -368,7 +368,7 @@ export type EventType =
   | 'mail.received' | 'mail.opened' | 'mail.bounced'
   | 'send.failed' | 'send.sent'
   | 'reminder.due' | 'snooze.woke' | 'followup.due'
-  | 'sync.failed' | 'oauth.expiring'
+  | 'sync.failed' | 'oauth.expiring' | 'job.failed'
   | 'backup.failed' | 'backup.ok'
   | 'storage.migration.done' | 'storage.migration.failed'
   | 'disposable.received' | 'lead.captured' | 'assignment.changed'
@@ -382,7 +382,7 @@ export const NOTIFICATION_GROUPS: { id: string; name: string; types: EventType[]
   { id: 'followups', name: 'Follow-ups', types: ['followup.due'] },
   { id: 'snooze', name: 'Snooze', types: ['snooze.woke'] },
   { id: 'send', name: 'Send failures', types: ['send.failed', 'mail.bounced'] },
-  { id: 'sync', name: 'Sync errors', types: ['sync.failed', 'oauth.expiring'] },
+  { id: 'sync', name: 'Sync errors', types: ['sync.failed', 'oauth.expiring', 'job.failed'] },
   { id: 'backup', name: 'Backups', types: ['backup.failed', 'backup.ok', 'storage.migration.done', 'storage.migration.failed'] },
   { id: 'security', name: 'Security', types: ['security.login', 'security.2fa_changed'] },
   { id: 'leads', name: 'Leads', types: ['lead.captured'] },

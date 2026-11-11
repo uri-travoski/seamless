@@ -15,6 +15,7 @@ import { addClient, broadcast } from './ws.ts';
 import { initPush } from './push.ts';
 import { categorizeEmail } from './ai/tasks.ts';
 import { startScheduler, onScheduledSend } from './mail/scheduler.ts';
+import { startJobRunner } from './jobs/runner.ts';
 import { setScheduleCanceller } from './mail/store.ts';
 import { cancelScheduleByMessageId } from './mail/send.ts';
 import { startClassifier, kickClassifier, onClassified } from './classify/engine.ts';
@@ -112,6 +113,7 @@ await initPush();
 setScheduleCanceller((messageId) => cancelScheduleByMessageId(messageId));
 onScheduledSend(async () => broadcast({ type: 'stateChange', state: await currentState() }));
 startScheduler();
+startJobRunner();
 
 // classification + retention workers
 onClassified(async (userId) => broadcast({ type: 'stateChange', state: await currentState() }, userId));

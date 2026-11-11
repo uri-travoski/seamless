@@ -30,6 +30,7 @@ export const DEFAULT_PREFS: Record<EventType, { inApp: boolean; push: boolean }>
   'followup.due': { inApp: true, push: true },
   'sync.failed': { inApp: true, push: false },
   'oauth.expiring': { inApp: true, push: false },
+  'job.failed': { inApp: true, push: false },
   'backup.failed': { inApp: true, push: false },       // the backup engine already pushes + emails
   'backup.ok': { inApp: false, push: false },
   'storage.migration.done': { inApp: true, push: false },
@@ -117,6 +118,8 @@ export function render(ev: EventRow): Rendered {
       return { title: `Can't sync ${p.email ?? 'a mailbox'}`, body: String(p.error ?? ''), link: '/settings/mailboxes', groupKey: `sync:${accountId ?? p.email}`, accountId };
     case 'oauth.expiring':
       return { title: `Reconnect ${p.email ?? 'a mailbox'}`, body: 'Its sign-in is about to expire', link: '/settings/mailboxes', groupKey: `oauth:${accountId}`, accountId };
+    case 'job.failed':
+      return { title: 'A background task failed', body: `${p.kind ?? ''}: ${p.error ?? ''}`.trim(), link: '/settings/health', groupKey: null, accountId: null };
     case 'backup.failed':
       return { title: 'Backup failed', body: String(p.error ?? ''), link: '/settings/backup', groupKey: 'backup:failed', accountId: null };
     case 'backup.ok':
