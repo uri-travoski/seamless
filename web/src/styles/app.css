@@ -1290,8 +1290,8 @@ kbd { font-family: var(--font-mono); font-size: 11.5px; padding: 1px 6px; border
 
 /* label pills on emails — the mock-up's soft tinted style, derived from each label's colour (all themes) */
 .msg-row .chip {
-  background: color-mix(in srgb, var(--chip, #64748b) 16%, var(--color-surface)) !important;
-  color: color-mix(in srgb, var(--chip, #64748b) 55%, var(--color-text-strong)) !important;
+  background: color-mix(in srgb, var(--chip, #64748b) 18%, var(--color-surface)) !important;
+  color: color-mix(in srgb, var(--chip, #64748b) 38%, var(--color-text-strong)) !important;
   border: 1px solid color-mix(in srgb, var(--chip, #64748b) 32%, var(--color-surface));
   border-radius: 4px; font-size: 11px; font-weight: 600; padding: 1px 7px; line-height: 1.4;
 }
