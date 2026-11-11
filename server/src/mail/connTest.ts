@@ -9,6 +9,7 @@ import tls from 'node:tls';
 import { ImapFlow } from 'imapflow';
 import nodemailer from 'nodemailer';
 import type { TestStep } from '@seamless/shared';
+import { Pop3Client } from '../transport/inbound/pop3client.ts';
 
 const TIMEOUT = 10_000;
 
@@ -125,5 +126,24 @@ export async function testOutgoing(spec: ServerSpec, opts: { sendTo?: string; fr
     }));
   }
   transport.close();
+  return { ok: steps.every((s) => s.ok), steps };
+}
+
+export async function testPop3Incoming(spec: ServerSpec): Promise<{ ok: boolean; steps: TestStep[] }> {
+  const steps: TestStep[] = [];
+  if (!(await network(spec, steps))) return { ok: false, steps };
+  const client = new Pop3Client({ host: spec.host, port: spec.port, secure: spec.secure, starttls: !spec.secure, timeoutMs: TIMEOUT });
+  steps.push(await timed('auth', async () => {
+    await client.connect();
+    await client.auth(spec.user, spec.pass ?? '');
+    return `Signed in as ${spec.user}`;
+  }));
+  if (steps.at(-1)!.ok) {
+    steps.push(await timed('folders', async () => {
+      const { count } = await client.stat();
+      return `${count} message${count === 1 ? '' : 's'} waiting on the server`;
+    }));
+  }
+  await client.quit().catch(() => {});
   return { ok: steps.every((s) => s.ok), steps };
 }

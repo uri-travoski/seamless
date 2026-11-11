@@ -18,6 +18,8 @@ export interface AccountRow {
   health_ignored?: boolean;
   outbound_transport_id?: number | null;
   inbound_kind?: string;
+  pop3_host?: string; pop3_port?: number; pop3_secure?: boolean; pop3_user?: string; pop3_pass_enc?: string;
+  pop3_interval_min?: number; pop3_leave_on_server?: boolean; pop3_delete_after_days?: number | null;
 }
 
 export interface NewMailEvent {
@@ -349,6 +351,9 @@ class AccountSyncer extends EventEmitter {
 }
 
 export async function enqueueOp(accountId: number, op: string, payload: unknown): Promise<void> {
+  // local mailboxes (POP3 / push) have no IMAP server to write to
+  const kind = await one<{ inbound_kind: string }>('SELECT inbound_kind FROM accounts WHERE id = ?', [accountId]);
+  if (kind && kind.inbound_kind !== 'imap') return;
   await run('INSERT INTO op_queue(account_id, op, payload, created_at) VALUES (?,?,?,?)',
     [accountId, op, JSON.stringify(payload), Date.now()]);
   syncManager.kick(accountId);
@@ -358,6 +363,15 @@ setFlagOpEnqueuer((accountId, payload) => enqueueOp(accountId, 'setFlags', paylo
 
 class SyncManager extends EventEmitter {
   private syncers = new Map<number, AccountSyncer>();
+  /** inbound drivers for non-IMAP accounts (POP3 registers itself), and their live status */
+  private drivers = new Map<string, { start(acct: AccountRow): void; stop(accountId: number): void; kick?(accountId: number): void }>();
+  private external = new Map<number, SyncStatus>();
+
+  registerInbound(kind: string, driver: { start(acct: AccountRow): void; stop(accountId: number): void; kick?(accountId: number): void }): void {
+    this.drivers.set(kind, driver);
+  }
+
+  setStatus(accountId: number, st: SyncStatus): void { this.external.set(accountId, st); }
 
   async startAll(): Promise<void> {
     const accounts = await q<AccountRow>('SELECT * FROM accounts WHERE enabled = true');
@@ -366,6 +380,10 @@ class SyncManager extends EventEmitter {
 
   startAccount(acct: AccountRow): void {
     this.stopAccount(acct.id);
+    if (acct.inbound_kind && acct.inbound_kind !== 'imap') {
+      this.drivers.get(acct.inbound_kind)?.start(acct); // POP3 has its own poller; push has none
+      return;
+    }
     const syncer = new AccountSyncer(acct);
     syncer.on('newMail', (ev) => this.emit('newMail', ev));
     syncer.on('changed', (userId) => this.emit('changed', userId));
@@ -378,6 +396,8 @@ class SyncManager extends EventEmitter {
   stopAccount(accountId: number): void {
     this.syncers.get(accountId)?.stop();
     this.syncers.delete(accountId);
+    for (const d of this.drivers.values()) d.stop(accountId);
+    this.external.delete(accountId);
   }
 
   async restartAccount(accountId: number): Promise<void> {
@@ -387,13 +407,13 @@ class SyncManager extends EventEmitter {
   }
 
   kick(accountId?: number): void {
-    if (accountId !== undefined) this.syncers.get(accountId)?.kick();
-    else for (const s of this.syncers.values()) s.kick();
+    if (accountId !== undefined) { this.syncers.get(accountId)?.kick(); for (const d of this.drivers.values()) d.kick?.(accountId); }
+    else { for (const s of this.syncers.values()) s.kick(); for (const d of this.drivers.values()) for (const id of this.external.keys()) d.kick?.(id); }
   }
 
   /** Live status for Settings → Mailboxes ('paused' = disabled or not running). */
   status(accountId: number): SyncStatus {
-    return this.syncers.get(accountId)?.status ?? { state: 'paused', lastSyncAt: null, lastError: '', failures: 0 };
+    return this.syncers.get(accountId)?.status ?? this.external.get(accountId) ?? { state: 'paused', lastSyncAt: null, lastError: '', failures: 0 };
   }
 
   /** Kick every running syncer belonging to one user; returns how many were kicked. */

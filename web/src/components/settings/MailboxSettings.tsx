@@ -41,6 +41,9 @@ function detectPreset(email: string): Preset | null {
 
 interface Form {
   id?: number; kind?: string; enabled: boolean; outboundTransportId?: number | null;
+  inboundKind: 'imap' | 'pop3';
+  pop3Host: string; pop3Port: number; pop3Secure: boolean; pop3User: string; pop3Pass: string;
+  pop3IntervalMin: number; pop3LeaveOnServer: boolean; pop3DeleteAfterDays: number | '';
   name: string; email: string; color: string;
   imapHost: string; imapPort: number; imapSecure: boolean; imapUser: string; imapPass: string;
   smtpHost: string; smtpPort: number; smtpSecure: boolean; smtpUser: string; smtpPass: string; smtpSameLogin: boolean;
@@ -50,11 +53,17 @@ interface Form {
 const COLORS = ['#2f7ed8', '#7a5fd0', '#d05f8e', '#d0755f', '#c9a13a', '#4d9e53', '#3a9e9e', '#5b6570', '#a85d24', '#151f2e'];
 
 const BLANK: Form = {
-  enabled: true, name: '', email: '', color: COLORS[0],
+  enabled: true, name: '', email: '', color: COLORS[0], inboundKind: 'imap',
+  pop3Host: '', pop3Port: 995, pop3Secure: true, pop3User: '', pop3Pass: '', pop3IntervalMin: 5, pop3LeaveOnServer: true, pop3DeleteAfterDays: '',
   imapHost: '', imapPort: 993, imapSecure: true, imapUser: '', imapPass: '',
   smtpHost: '', smtpPort: 465, smtpSecure: true, smtpUser: '', smtpPass: '', smtpSameLogin: true,
   categoryIds: [], signature: '', aliases: '', sentCopy: true, aiCategorize: false, healthIgnored: false,
 };
+
+const POP3_PRESETS = [
+  { name: 'Gmail POP', host: 'pop.gmail.com', note: 'Gmail needs POP switched on in its settings and an app password.' },
+  { name: 'Outlook POP', host: 'outlook.office365.com', note: 'Outlook.com POP needs an app password; Microsoft 365 often blocks it.' },
+];
 
 const STEPS = ['Address', 'Provider', 'Incoming', 'Outgoing', 'Test', 'Categories', 'Identity'];
 
@@ -108,15 +117,16 @@ function Wizard({ initial, categories, onDone }: { initial: Form; categories: Ap
 
   const body = () => ({
     ...f,
-    smtpUser: f.smtpSameLogin ? f.imapUser : f.smtpUser,
-    smtpPass: f.smtpSameLogin ? f.imapPass : f.smtpPass,
+    smtpUser: f.smtpSameLogin ? (f.inboundKind === 'pop3' ? f.pop3User : f.imapUser) : f.smtpUser,
+    smtpPass: f.smtpSameLogin ? (f.inboundKind === 'pop3' ? f.pop3Pass : f.imapPass) : f.smtpPass,
+    pop3DeleteAfterDays: f.pop3LeaveOnServer && f.pop3DeleteAfterDays ? Number(f.pop3DeleteAfterDays) : null,
     aliases: f.aliases.split(/[,;\s]+/).map((s) => s.trim()).filter(Boolean),
     accountId: f.id,
   });
 
   const testIn = async () => {
     setInTest({ steps: null, busy: true });
-    try { const r = await api.post<{ steps: TestStep[] }>('/api/accounts/test/incoming', body()); setInTest({ steps: r.steps, busy: false }); }
+    try { const r = await api.post<{ steps: TestStep[] }>(f.inboundKind === 'pop3' ? '/api/accounts/test/pop3' : '/api/accounts/test/incoming', body()); setInTest({ steps: r.steps, busy: false }); }
     catch (e: any) { setInTest({ steps: [{ step: 'tcp', ok: false, ms: 0, detail: e?.message ?? 'failed' }], busy: false }); }
   };
   const testOut = async () => {
@@ -127,7 +137,7 @@ function Wizard({ initial, categories, onDone }: { initial: Form; categories: Ap
 
   const save = async () => {
     if (!/^[^@\s]+@[^@\s]+$/.test(f.email)) { toast('Enter a valid email address', 'error'); setStep(0); return; }
-    if (!f.imapHost || !f.smtpHost) { toast('Fill in the incoming and outgoing servers', 'error'); setStep(2); return; }
+    if ((f.inboundKind === 'pop3' ? !f.pop3Host : !f.imapHost) || !f.smtpHost) { toast('Fill in the incoming and outgoing servers', 'error'); setStep(2); return; }
     setBusy(true);
     try {
       if (f.id) await api.put(`/api/accounts/${f.id}`, body());
@@ -190,11 +200,34 @@ function Wizard({ initial, categories, onDone }: { initial: Form; categories: Ap
         {step === 2 && (
           <>
             <div className="seg" role="group" aria-label="How mail arrives">
-              <button className="seg-btn on">IMAP</button>
-              <button className="seg-btn" disabled title="POP3 arrives in tier 3">POP3 · coming in T3</button>
+              <button className={`seg-btn ${f.inboundKind === 'imap' ? 'on' : ''}`} disabled={editing} onClick={() => set('inboundKind', 'imap')}>IMAP</button>
+              <button className={`seg-btn ${f.inboundKind === 'pop3' ? 'on' : ''}`} disabled={editing || isOauth} onClick={() => setF((x) => ({ ...x, inboundKind: 'pop3', pop3User: x.pop3User || x.email.trim() }))}>POP3</button>
               <button className="seg-btn" disabled title="Delivered to Seamless (Cloudflare / own domain) arrives in tier 3">Pushed · coming in T3</button>
             </div>
-            {isOauth ? <p className="settings-desc">This mailbox signs in with {f.kind === 'gmail' ? 'Google' : 'Microsoft'} (OAuth); there's no password to enter.</p> : (
+            {f.inboundKind === 'pop3' ? (
+              <>
+                <p className="settings-desc">POP3 downloads new mail into Seamless; folders and read state stay in Seamless only. Presets:{' '}
+                  {POP3_PRESETS.map((pr) => <button key={pr.name} className="btn ghost" onClick={() => setF((x) => ({ ...x, pop3Host: pr.host, pop3Port: 995, pop3Secure: true, pop3User: x.pop3User || x.email.trim() }))} title={pr.note}>{pr.name}</button>)}
+                </p>
+                <div className="field-row">
+                  <div className="field" style={{ flex: 2 }}><label>POP3 server</label><input className="text-input" value={f.pop3Host} placeholder="pop.example.com" onChange={(e) => set('pop3Host', e.target.value.trim())} /></div>
+                  <div className="field"><label>Port</label><input className="text-input" type="number" value={f.pop3Port} onChange={(e) => set('pop3Port', Number(e.target.value))} /></div>
+                  <div className="field"><label>Security</label>
+                    <select className="text-input" value={f.pop3Secure ? 'tls' : 'starttls'} onChange={(e) => { const tls = e.target.value === 'tls'; setF((x) => ({ ...x, pop3Secure: tls, pop3Port: tls ? 995 : 110 })); }}>
+                      <option value="tls">SSL/TLS</option><option value="starttls">STARTTLS / none</option>
+                    </select></div>
+                </div>
+                <div className="field-row">
+                  <div className="field"><label>Username</label><input className="text-input" value={f.pop3User} onChange={(e) => set('pop3User', e.target.value)} /></div>
+                  <div className="field"><label>Password {editing ? '(blank keeps the saved one)' : ''}</label><input className="text-input" type="password" value={f.pop3Pass} onChange={(e) => set('pop3Pass', e.target.value)} /></div>
+                </div>
+                <div className="field-row">
+                  <div className="field"><label>Check every (minutes)</label><input className="text-input" type="number" min={1} value={f.pop3IntervalMin} onChange={(e) => set('pop3IntervalMin', Math.max(1, Number(e.target.value) || 1))} /></div>
+                  <div className="field"><label>Delete from server after (days)</label><input className="text-input" type="number" min={1} value={f.pop3DeleteAfterDays} disabled={!f.pop3LeaveOnServer} placeholder="never" onChange={(e) => set('pop3DeleteAfterDays', e.target.value ? Number(e.target.value) : '')} /></div>
+                </div>
+                <label className="checkbox-line"><input type="checkbox" checked={f.pop3LeaveOnServer} onChange={(e) => set('pop3LeaveOnServer', e.target.checked)} /> Leave messages on the server (otherwise each one is deleted once Seamless has stored it)</label>
+              </>
+            ) : isOauth ? <p className="settings-desc">This mailbox signs in with {f.kind === 'gmail' ? 'Google' : 'Microsoft'} (OAuth); there's no password to enter.</p> : (
               <>
                 <div className="field-row">
                   <div className="field" style={{ flex: 2 }}><label>IMAP server</label><input className="text-input" value={f.imapHost} placeholder="imap.example.com" onChange={(e) => set('imapHost', e.target.value.trim())} /></div>
@@ -244,7 +277,7 @@ function Wizard({ initial, categories, onDone }: { initial: Form; categories: Ap
         {step === 4 && (
           <div className="test-panels">
             <div className="test-panel">
-              <div className="test-panel-head"><strong>Incoming</strong><span className="dim">{f.imapHost}:{f.imapPort}</span>
+              <div className="test-panel-head"><strong>Incoming</strong><span className="dim">{f.inboundKind === 'pop3' ? `${f.pop3Host}:${f.pop3Port}` : `${f.imapHost}:${f.imapPort}`}</span>
                 <button className="btn" disabled={inTest.busy} onClick={() => void testIn()}>Test incoming</button></div>
               <TestResult {...inTest} />
             </div>
@@ -323,6 +356,7 @@ function ago(ms: number | null): string {
 function providerName(a: any): string {
   if (a.kind === 'gmail') return 'Gmail (OAuth)';
   if (a.kind === 'microsoft') return 'Microsoft (OAuth)';
+  if (a.inboundKind === 'pop3') return `POP3 · ${a.pop3Host}`;
   return detectPreset(a.email)?.name ?? `IMAP · ${a.imapHost}`;
 }
 
@@ -448,9 +482,14 @@ export default function MailboxSettings() {
       ...BLANK, id: a.id, kind: a.kind, enabled: a.enabled, name: a.name, email: a.email, color: a.color,
       imapHost: a.imapHost, imapPort: a.imapPort, imapSecure: a.imapSecure, imapUser: a.imapUser,
       smtpHost: a.smtpHost, smtpPort: a.smtpPort, smtpSecure: a.smtpSecure, smtpUser: a.smtpUser,
-      smtpSameLogin: a.smtpUser === a.imapUser, categoryIds: a.categoryIds ?? [], signature: a.signature ?? '',
+      smtpSameLogin: a.inboundKind === 'pop3' ? a.smtpUser === a.pop3User : a.smtpUser === a.imapUser, categoryIds: a.categoryIds ?? [], signature: a.signature ?? '',
       aliases: (a.aliases ?? []).join(', '), sentCopy: a.sentCopy, aiCategorize: a.aiCategorize, healthIgnored: !!a.healthIgnored,
       outboundTransportId: a.outboundTransportId ?? null,
+      inboundKind: a.inboundKind === 'pop3' ? 'pop3' : 'imap',
+      ...(a.inboundKind === 'pop3' ? {
+        pop3Host: a.pop3Host, pop3Port: a.pop3Port, pop3Secure: a.pop3Secure, pop3User: a.pop3User,
+        pop3IntervalMin: a.pop3IntervalMin, pop3LeaveOnServer: a.pop3LeaveOnServer, pop3DeleteAfterDays: a.pop3DeleteAfterDays ?? '',
+      } : {}),
     });
   };
 

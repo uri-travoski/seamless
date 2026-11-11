@@ -6,6 +6,7 @@ import { q, one, run, insertId } from '../db.ts';
 import { randomToken, sha256 } from '../crypto.ts';
 import { config } from '../config.ts';
 import { putBlob } from '../s3.ts';
+import { ingestLocal } from './localbox.ts';
 import { enqueueOp, syncManager, type AccountRow } from '../imap/sync.ts';
 import { setKeywords } from './store.ts';
 import { createPendingFollowup } from './followups.ts';
@@ -180,9 +181,13 @@ export async function sendEmail(userId: number, payload: ComposePayload): Promis
 
   // copy to the account's Sent mailbox via IMAP APPEND
   if (acct.sent_copy) {
-    const key = `outbound/${acct.id}/${sha256(raw)}.eml`;
-    await putBlob(key, raw);
-    await enqueueOp(acct.id, 'append', { s3Key: key, targetRole: 'sent', flags: ['\\Seen'] });
+    if (acct.inbound_kind && acct.inbound_kind !== 'imap') {
+      await ingestLocal(acct.id, 'sent', raw); // POP3 / push: no IMAP server, keep the Sent copy locally
+    } else {
+      const key = `outbound/${acct.id}/${sha256(raw)}.eml`;
+      await putBlob(key, raw);
+      await enqueueOp(acct.id, 'append', { s3Key: key, targetRole: 'sent', flags: ['\\Seen'] });
+    }
   }
 
   if (followMsgId) {
@@ -198,9 +203,13 @@ export async function sendEmail(userId: number, payload: ComposePayload): Promis
 export async function saveDraft(userId: number, payload: ComposePayload): Promise<void> {
   const acct = await getAccount(userId, payload.accountId);
   const { raw } = await buildRaw(payload, acct, { draft: true });
-  const key = `outbound/${acct.id}/${sha256(raw)}.eml`;
-  await putBlob(key, raw);
-  await enqueueOp(acct.id, 'append', { s3Key: key, targetRole: 'drafts', flags: ['\\Draft', '\\Seen'] });
+  if (acct.inbound_kind && acct.inbound_kind !== 'imap') {
+    await ingestLocal(acct.id, 'drafts', raw);
+  } else {
+    const key = `outbound/${acct.id}/${sha256(raw)}.eml`;
+    await putBlob(key, raw);
+    await enqueueOp(acct.id, 'append', { s3Key: key, targetRole: 'drafts', flags: ['\\Draft', '\\Seen'] });
+  }
   if (payload.draftId) await destroyDraft(userId, payload.draftId);
   syncManager.kick(acct.id);
 }

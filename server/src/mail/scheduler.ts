@@ -4,6 +4,7 @@ import { sha256 } from '../crypto.ts';
 import { transportForAccount, sendWithFallback } from '../transport/registry.ts';
 import { setKeywords } from './store.ts';
 import { deleteMessageRow } from './ingest.ts';
+import { ingestLocal } from './localbox.ts';
 import { enqueueOp, syncManager, type AccountRow } from '../imap/sync.ts';
 
 const TICK_MS = 30_000;
@@ -44,9 +45,13 @@ async function deliverOne(row: SchedRow): Promise<void> {
 
   // copy to Sent
   if (acct.sent_copy) {
-    const key = `outbound/${acct.id}/${sha256(raw)}.eml`;
-    await putBlob(key, raw);
-    await enqueueOp(acct.id, 'append', { s3Key: key, targetRole: 'sent', flags: ['\\Seen'] });
+    if (acct.inbound_kind && acct.inbound_kind !== 'imap') {
+      await ingestLocal(acct.id, 'sent', raw);
+    } else {
+      const key = `outbound/${acct.id}/${sha256(raw)}.eml`;
+      await putBlob(key, raw);
+      await enqueueOp(acct.id, 'append', { s3Key: key, targetRole: 'sent', flags: ['\\Seen'] });
+    }
   }
 
   if (row.reply_to_email_id) {

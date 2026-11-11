@@ -764,6 +764,28 @@ CREATE TABLE bounces (
 CREATE INDEX bounces_user ON bounces(user_id);
 `,
   },
+  {
+    id: 18,
+    sql: `
+-- T3 F-23: POP3 receive + local (non-IMAP) mailboxes
+ALTER TABLE mailboxes ADD COLUMN next_uid INTEGER NOT NULL DEFAULT 1;
+ALTER TABLE accounts ADD COLUMN pop3_host TEXT NOT NULL DEFAULT '';
+ALTER TABLE accounts ADD COLUMN pop3_port INTEGER NOT NULL DEFAULT 995;
+ALTER TABLE accounts ADD COLUMN pop3_secure BOOLEAN NOT NULL DEFAULT true;
+ALTER TABLE accounts ADD COLUMN pop3_user TEXT NOT NULL DEFAULT '';
+ALTER TABLE accounts ADD COLUMN pop3_pass_enc TEXT NOT NULL DEFAULT '';
+ALTER TABLE accounts ADD COLUMN pop3_interval_min INTEGER NOT NULL DEFAULT 5;
+ALTER TABLE accounts ADD COLUMN pop3_leave_on_server BOOLEAN NOT NULL DEFAULT true;
+ALTER TABLE accounts ADD COLUMN pop3_delete_after_days INTEGER;
+CREATE TABLE pop3_seen (
+  account_id INTEGER NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
+  uidl TEXT NOT NULL,
+  fetched_at BIGINT NOT NULL,
+  message_row_id INTEGER,
+  PRIMARY KEY (account_id, uidl)
+);
+`,
+  },
 ];
 
 /** Run `fn` in one transaction. Events emitted through the client are only turned into

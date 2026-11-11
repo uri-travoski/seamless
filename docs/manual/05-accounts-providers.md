@@ -59,6 +59,18 @@ Under **Settings > Sending**, each provider has a **Check DNS** button. Enter th
 
 Each row shows what was found and what was expected. DNS changes can take a while to spread; check again later if a record you just added isn't seen.
 
+## POP3 mailboxes
+
+For providers that only offer POP3: **Settings → Mailboxes → Add a mailbox**, then on the *Incoming* step choose **POP3**. Fill in the server, port, security, username and password (presets for Gmail POP and Outlook POP are there too), and use **Test incoming** on the Test step to see each stage: name lookup, connection, security, sign-in, and how many messages are waiting.
+
+- **Check every N minutes** controls how often Seamless polls (default 5).
+- **Leave messages on the server** (default on) keeps your provider's copy. Optionally set **Delete from server after N days**: Seamless then deletes only messages it has already stored and can read back, and only once they are older than N days. Switch "leave on server" off and each message is deleted from the server right after Seamless has stored it.
+- POP3 has no folders on the server, so Inbox, Sent, Drafts, Trash, Junk and Archive live only in Seamless. Moving or deleting a message never touches the provider.
+- New mail goes through the same filters, risk checks and notifications as IMAP mail. Mail you send from a POP3 mailbox is kept in its local Sent folder.
+- The Health page shows the time of the last poll and any error (for example a wrong password) for each POP3 mailbox.
+- Choose how POP3 mailboxes send under **Sending** (the mailbox's own SMTP or a sending service).
+- Port 110 upgrades to TLS (STLS) when the server offers it.
+
 ## Managing accounts
 
 Edit an account any time, disable it to pause syncing, or remove it. Removing an account stops its sync and deletes its rows from Seamless (your mail stays on the origin server).

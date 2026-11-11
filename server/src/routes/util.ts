@@ -32,5 +32,9 @@ export function accountToApi(r: AccountRow) {
     healthIgnored: !!r.health_ignored,
     outboundTransportId: r.outbound_transport_id ?? null,
     inboundKind: r.inbound_kind ?? 'imap',
+    ...(r.inbound_kind === 'pop3' ? {
+      pop3Host: r.pop3_host, pop3Port: r.pop3_port, pop3Secure: !!r.pop3_secure, pop3User: r.pop3_user,
+      pop3IntervalMin: r.pop3_interval_min, pop3LeaveOnServer: !!r.pop3_leave_on_server, pop3DeleteAfterDays: r.pop3_delete_after_days ?? null,
+    } : {}),
   };
 }
