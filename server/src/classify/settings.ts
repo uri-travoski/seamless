@@ -5,6 +5,8 @@ export const SETTING_DEFAULTS: Record<string, string> = {
   dry_run: 'true',              // retention only logs until the user flips it live
   trash_days: '30',             // recoverable-trash grace before purge
   ai_conf_threshold: '0.7',
+  undo_send_seconds: '10',      // T2 F-17: hold a sent message this long so it can be undone
+  snooze_wake_on_reply: 'true', // T2 F-18
   log_retention_days: '90',     // auto-clear processing logs
 };
 

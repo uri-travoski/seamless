@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useSession } from '../../state/session.ts';
 import { api } from '../../api/client.ts';
 import { toast } from '../../toast.ts';
@@ -18,6 +18,15 @@ export default function GeneralSettings() {
   const [pushState, setPushState] = useState<'idle' | 'busy' | 'on'>('idle');
   const [appName, setAppName] = useState(settings.appName);
   const [domains, setDomains] = useState(settings.noTrackDomains.join(', '));
+
+  const [srv, setSrv] = useState<{ undoSendSeconds: number; snoozeWakeOnReply: boolean } | null>(null);
+  useEffect(() => { api.get<{ undoSendSeconds: number; snoozeWakeOnReply: boolean }>('/api/settings/server').then(setSrv).catch(() => {}); }, []);
+  const saveSrv = async (patch: Partial<{ undoSendSeconds: number; snoozeWakeOnReply: boolean }>) => {
+    if (!srv) return;
+    const prev = srv;
+    setSrv({ ...srv, ...patch });
+    try { await api.put('/api/settings/server', patch); } catch { setSrv(prev); toast('Could not save', 'error'); }
+  };
 
   const enablePush = async () => {
     setPushState('busy');
@@ -77,6 +86,21 @@ export default function GeneralSettings() {
           onBlur={() => save({ noTrackDomains: domains.split(/[\s,;]+/).map((d) => d.trim().replace(/^@/, '').toLowerCase()).filter(Boolean) })} />
         <span className="hint">Mail to your own mailboxes is never tracked.</span>
       </div>
+
+      <h3>Sending and snoozing</h3>
+      <div className="field">
+        <label>Undo send</label>
+        <select className="text-input compact" style={{ maxWidth: 220 }} disabled={!srv} value={srv?.undoSendSeconds ?? 10}
+          onChange={(e) => void saveSrv({ undoSendSeconds: Number(e.target.value) })}>
+          <option value={0}>Off — send immediately</option>
+          {[5, 10, 20, 30].map((n) => <option key={n} value={n}>Hold for {n} seconds</option>)}
+        </select>
+        <span className="hint">After you press Send the message waits this long so you can take it back. Scheduled sends are not delayed.</span>
+      </div>
+      <label className="checkbox-line">
+        <input type="checkbox" disabled={!srv} checked={srv?.snoozeWakeOnReply ?? true} onChange={(e) => void saveSrv({ snoozeWakeOnReply: e.target.checked })} />
+        Snooze: bring a conversation back early when someone replies
+      </label>
 
       <h3>Keyboard shortcuts</h3>
       <label className="checkbox-line">

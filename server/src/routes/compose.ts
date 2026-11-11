@@ -3,7 +3,8 @@ import type { FastifyInstance } from 'fastify';
 import type { ComposePayload } from '@seamless/shared';
 import { q } from '../db.ts';
 import { randomToken } from '../crypto.ts';
-import { sendEmail, saveDraft, saveUpload, scheduleEmail } from '../mail/send.ts';
+import { queueSend, undoSend, pendingSends } from '../mail/undoSend.ts';
+import { saveDraft, saveUpload, scheduleEmail } from '../mail/send.ts';
 import { matchReplyIdentity } from '../mail/replyfrom.ts';
 import { getMsgRow } from '../mail/store.ts';
 import { listIdentities } from '../jmap/api.ts';
@@ -23,15 +24,26 @@ export function register(app: FastifyInstance): void {
 
   app.post('/api/send', async (req, reply) => {
     try {
-      const result = await sendEmail(uid(req), req.body as ComposePayload);
+      const result = await queueSend(uid(req), req.body as ComposePayload);
       broadcast({ type: 'stateChange' }, uid(req));
-      return { ok: true, ...result };
+      if (result.queued) return { ok: true, queued: true, jobId: result.jobId, releaseAt: result.releaseAt };
+      return { ok: true, queued: false, trackingToken: result.sent.trackingToken };
     } catch (err: any) {
       const p = req.body as ComposePayload;
       await emitEvent(uid(req), 'send.failed', null, { subject: p?.subject ?? '', accountId: p?.accountId ?? null, error: err?.message ?? 'send failed' }).catch(() => {});
       return reply.code(502).send({ error: err?.message ?? 'send failed' });
     }
   });
+
+  app.post('/api/send/undo', async (req, reply) => {
+    const { jobId } = (req.body ?? {}) as { jobId?: number };
+    const payload = await undoSend(uid(req), Number(jobId));
+    if (!payload) return reply.code(409).send({ error: 'already sent' });
+    broadcast({ type: 'stateChange' }, uid(req));
+    return { payload };
+  });
+
+  app.get('/api/send/pending', async (req) => pendingSends(uid(req)));
 
   app.post('/api/draft', async (req, reply) => {
     try {

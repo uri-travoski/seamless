@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import type { ApiAddress, ApiEmail, ApiEmailBody, ApiIdentity, ApiTemplate } from '@seamless/shared';
+import type { ComposePayload, ApiAddress, ApiEmail, ApiEmailBody, ApiIdentity, ApiTemplate } from '@seamless/shared';
 import { fillTemplate } from './templates.ts';
 import { matchIdentity, fetchIdentities, fetchBody } from '../api/client.ts';
 import { useSession } from './session.ts';
@@ -29,6 +29,7 @@ interface ComposeState {
   openBlank: () => void;
   openTemplate: (t: ApiTemplate) => Promise<void>;
   openReply: (email: ApiEmail, mode: 'reply' | 'replyAll' | 'forward') => Promise<void>;
+  openFromPayload: (p: ComposePayload) => void;
   openDraft: (email: ApiEmail, body: ApiEmailBody) => Promise<void>;
   update: (key: string, patch: Partial<Draft>) => void;
   close: (key: string) => void;
@@ -91,6 +92,22 @@ export const useCompose = create<ComposeState>((set, get) => ({
         to: [], cc: [], bcc: [], subject: filled.subject, initialHtml: filled.html,
         attachments: [], track: useSession.getState().settings.trackByDefault,
         perRecipientTracking: useSession.getState().settings.perRecipientTracking,
+        minimized: false, maximized: false,
+      }],
+    });
+  },
+
+  /** Undo send: put a held message back into a compose window exactly as it was. */
+  openFromPayload: (p) => {
+    const identities = get().identities;
+    const identity = identities.find((i) => i.accountId === p.accountId && i.email.toLowerCase() === p.fromEmail.toLowerCase())
+      ?? identities.find((i) => i.accountId === p.accountId) ?? identities[0] ?? null;
+    set({
+      windows: [...get().windows, {
+        key: `c${++counter}`, identity,
+        to: p.to, cc: p.cc, bcc: p.bcc, subject: p.subject, initialHtml: p.html,
+        inReplyTo: p.inReplyTo, replyToEmailId: p.replyToEmailId, draftId: p.draftId,
+        attachments: p.attachments ?? [], track: p.track, perRecipientTracking: !!p.perRecipientTracking,
         minimized: false, maximized: false,
       }],
     });

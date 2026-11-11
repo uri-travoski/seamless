@@ -16,8 +16,8 @@ import { NO_AUTOFILL } from '../state/ui.ts';
 import { useCompose, type Draft } from '../state/compose.ts';
 import AddressField from './AddressField.tsx';
 import { useMail } from '../state/mail.ts';
-import { sendMail, saveDraftApi, scheduleMail, uploadFile, api } from '../api/client.ts';
-import { toast } from '../toast.ts';
+import { sendMail, undoSendApi, saveDraftApi, scheduleMail, uploadFile, api } from '../api/client.ts';
+import { toast, countdownToast } from '../toast.ts';
 import {
   MinimizeIcon, MaximizeIcon, RestoreIcon, CloseIcon, UndoIcon, RedoIcon, BoldIcon, ItalicIcon,
   UnderlineIcon, StrikethroughIcon, HighlightIcon, BulletListIcon, NumberedListIcon,
@@ -130,6 +130,7 @@ export default function ComposeWindow({ draft }: { draft: Draft }) {
     inReplyTo: draft.inReplyTo,
     replyToEmailId: draft.replyToEmailId,
     attachmentIds: draft.attachments.map((a) => a.id),
+    attachments: draft.attachments,
     track: draft.track,
     perRecipientTracking: draft.track && draft.perRecipientTracking,
     draftId: draft.draftId,
@@ -141,8 +142,18 @@ export default function ComposeWindow({ draft }: { draft: Draft }) {
     if (draft.to.length === 0) { toast('Add at least one recipient', 'error'); return; }
     setSending(true);
     try {
-      await sendMail(payload(true));
-      toast('Message sent');
+      const res = await sendMail(payload(true));
+      if (res.queued && res.jobId && res.releaseAt) {
+        const jobId = res.jobId;
+        const stop = countdownToast((n) => `Sending in ${n}s…`, res.releaseAt, async () => {
+          try {
+            const back = await undoSendApi(jobId);
+            stop();
+            useCompose.getState().openFromPayload(back.payload);
+            toast('Send cancelled — your message is back in the editor');
+          } catch { stop(); toast('Too late — it has already been sent', 'error'); }
+        });
+      } else toast('Message sent');
       close(draft.key);
       void useMail.getState().refreshCurrent();
     } catch (e: any) {

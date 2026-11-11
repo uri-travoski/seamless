@@ -21,6 +21,15 @@ Attach files with the paperclip button, or **drag and drop** them onto the compo
 - **Send** delivers immediately.
 - The **caret** next to Send opens **Send later**: quick choices (in 1 hour, this evening, tomorrow morning, Monday) or a custom date/time. Scheduled mail waits under **Scheduled** and can be edited or cancelled until it fires.
 
+## Undo send
+
+After you press **Send**, the message is held for a few seconds (10 by default) and a bar at the bottom shows
+**Sending in 10s… Undo**. Press **Undo** and the compose window comes back with everything as you left it —
+recipients, text and attachments. Once the time is up the message goes out and can't be recalled.
+
+Change the delay (Off, 5, 10, 20 or 30 seconds) in **Settings > General > Sending and snoozing**. Scheduled
+(send-later) messages aren't delayed. If the server restarts while a message is being held, it is still sent once.
+
 ## Track opens
 
 The **eye** on the formatting toolbar turns open tracking on or off for this message (filled = on). It's on by default; change the default in **Settings > General**. Drafts and scheduled mail remember the setting.

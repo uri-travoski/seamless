@@ -211,6 +211,8 @@ export interface ComposePayload {
   track: boolean;
   perRecipientTracking?: boolean; // separate copy + token per recipient (T1 F-15, default off)
   draftId?: string;          // existing draft row id to replace
+  attachments?: { id: string; filename: string; size: number }[]; // so Undo can rebuild the chips
+  followupDays?: number;     // T2 F-19: remind me if no reply in N days
 }
 
 export interface FilterCondition {

@@ -81,7 +81,8 @@ export const fetchTracking = (id: string) => api.get<TrackingInfo>(`/api/message
 export const saveNote = (emailId: string, body: string) => api.put<{ ok: boolean }>(`/api/message/${emailId}/note`, { body });
 export const matchIdentity = (emailId: string) => api.post<ApiIdentity>('/api/identity/match', { emailId });
 export const fetchIdentities = () => api.get<ApiIdentity[]>('/api/identities');
-export const sendMail = (payload: ComposePayload) => api.post<{ ok: boolean }>('/api/send', payload);
+export const sendMail = (payload: ComposePayload) => api.post<{ ok: boolean; queued: boolean; jobId?: number; releaseAt?: number }>('/api/send', payload);
+export const undoSendApi = (jobId: number) => api.post<{ payload: ComposePayload }>('/api/send/undo', { jobId });
 export const saveDraftApi = (payload: ComposePayload) => api.post<{ ok: boolean }>('/api/draft', payload);
 export const scheduleMail = (payload: ComposePayload, sendAt: number) =>
   api.post<{ ok: boolean; id: number; sendAt: number }>('/api/schedule', { ...payload, sendAt });
