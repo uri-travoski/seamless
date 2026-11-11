@@ -4,11 +4,13 @@ import { api } from '../../api/client.ts';
 import { toast } from '../../toast.ts';
 
 const FREQUENCIES: { id: BackupFrequency; name: string }[] = [
+  { id: 'every_n_hours', name: 'Every few hours…' },
   { id: 'twice_daily', name: 'Twice a day' },
   { id: 'daily', name: 'Once a day' },
   { id: 'every_2_days', name: 'Every 2 days' },
   { id: 'twice_weekly', name: 'Twice a week' },
   { id: 'weekly', name: 'Once a week' },
+  { id: 'monthly', name: 'Once a month' },
 ];
 
 const fmtBytes = (n: number) => (n < 1024 * 1024 ? `${(n / 1024).toFixed(0)} KB` : `${(n / 1024 / 1024).toFixed(1)} MB`);
@@ -125,6 +127,14 @@ export default function BackupSettings() {
         </label>
       </div>
 
+      <div className="field">
+        <label style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+          <input type="checkbox" checked={config.includeEmails} onChange={(e) => void save({ includeEmails: e.target.checked })} />
+          Include emails (copy mail files into the backup storage)
+        </label>
+        <div className="hint">Only new messages are copied on each run. Restoring with <code>--mail-from-mirror</code> can read mail from this copy if the main mail bucket is lost.</div>
+      </div>
+
       <div className="field-row">
         <div className="field">
           <label>How often</label>
@@ -133,6 +143,13 @@ export default function BackupSettings() {
             {FREQUENCIES.map((f) => <option key={f.id} value={f.id}>{f.name}</option>)}
           </select>
         </div>
+        {config.frequency === 'every_n_hours' && (
+          <div className="field">
+            <label>Every (hours)</label>
+            <input className="text-input" type="number" min={1} max={24} value={config.everyHours} disabled={!config.enabled}
+              onChange={(e) => void save({ everyHours: Math.min(24, Math.max(1, Number(e.target.value) || 1)) })} />
+          </div>
+        )}
         <div className="field">
           <label>At (UTC)</label>
           <select className="text-input" value={config.hour} disabled={!config.enabled}

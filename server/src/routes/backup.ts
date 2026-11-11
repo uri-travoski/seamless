@@ -59,17 +59,21 @@ export function register(app: FastifyInstance): void {
   // The backup store's own credentials can never come out of the backup — you need them to
   // read it. So the setup screen may supply them, for a box rebuilt with no S3_BACKUP_* set.
   // (The MAIL bucket needs no such thing: its config travels inside the backup.)
-  const backupStoreFrom = (body: any) => {
+  const backupConfigFrom = (body: any) => {
     const s = body?.store;
     if (!s?.bucket) return undefined;   // fall back to the environment
-    return makeStore({
+    return {
       endpoint: String(s.endpoint ?? config.s3Backup.endpoint),
       region: String(s.region ?? config.s3Backup.region),
       bucket: String(s.bucket),
       accessKey: String(s.accessKey ?? config.s3Backup.accessKey),
       secretKey: String(s.secretKey ?? config.s3Backup.secretKey),
       forcePathStyle: s.forcePathStyle ?? config.s3Backup.forcePathStyle,
-    });
+    };
+  };
+  const backupStoreFrom = (body: any) => {
+    const c = backupConfigFrom(body);
+    return c ? makeStore(c) : undefined;
   };
 
   const listSetupBackups = async (body: any) => {
@@ -105,7 +109,7 @@ export function register(app: FastifyInstance): void {
     const key = String(body?.key ?? '');
     if (!key) return reply.code(400).send({ error: 'backup key required' });
     try {
-      const report = await restoreBackup(key, { store: backupStoreFrom(body) });
+      const report = await restoreBackup(key, { store: backupStoreFrom(body), storeConfig: backupConfigFrom(body), mailFromMirror: body?.mailFromMirror === true });
       await plog(null, 'backup', `restored ${report.rows} rows from ${report.key}`, { meta: report });
       return { ok: true, ...report };
     } catch (err: any) {

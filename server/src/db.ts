@@ -909,6 +909,20 @@ CREATE TABLE storage_migration_items (
 CREATE INDEX storage_migration_items_status ON storage_migration_items(migration_id, status);
 `,
   },
+  {
+    id: 23,
+    sql: `
+-- T3 F-28: blob mirror index. One row per mail blob already copied to the backup store, so the
+-- next run copies only new keys. prefix = the mirror prefix the copy went to (a changed backup
+-- prefix means the old rows no longer count).
+CREATE TABLE backup_blob_index (
+  key TEXT PRIMARY KEY,
+  size BIGINT NOT NULL DEFAULT 0,
+  mirrored_at BIGINT NOT NULL,
+  prefix TEXT NOT NULL DEFAULT ''
+);
+`,
+  },
 ];
 
 /** Run `fn` in one transaction. Events emitted through the client are only turned into

@@ -1,25 +1,27 @@
-import { q, one, getSetting, setSetting } from '../db.ts';
+import { one, getSetting, setSetting } from '../db.ts';
 import { config } from '../config.ts';
 import { plog } from '../classify/settings.ts';
-import { notifyUser } from '../push.ts';
 import { emitToAdmins } from '../events/emit.ts';
 import { smtpTransport } from '../mail/send.ts';
 import type { AccountRow } from '../imap/sync.ts';
 import { createBackup, verifyBackup, pruneBackups, listBackups, type BackupSummary } from './engine.ts';
-import type { BlobStore } from '../s3.ts';
+import { sweepMirror } from './mirror.ts';
+import { backupStore, type BlobStore } from '../s3.ts';
 
 const TICK_MS = 5 * 60_000;
 
-export type Frequency = 'twice_daily' | 'daily' | 'every_2_days' | 'twice_weekly' | 'weekly';
+export type Frequency = 'every_n_hours' | 'twice_daily' | 'daily' | 'every_2_days' | 'twice_weekly' | 'weekly' | 'monthly';
 
 /** Gap the scheduler enforces between runs. twice_weekly is every 3.5 days, which
  *  lands on two fixed slots a week rather than drifting. */
 export const INTERVAL_HOURS: Record<Frequency, number> = {
+  every_n_hours: 6,   // placeholder: the real gap is cfg.everyHours (see intervalHours)
   twice_daily: 12,
   daily: 24,
   every_2_days: 48,
   twice_weekly: 84,
   weekly: 168,
+  monthly: 720,       // 30 days
 };
 
 export const FREQUENCIES = Object.keys(INTERVAL_HOURS) as Frequency[];
@@ -44,7 +46,12 @@ export interface BackupConfig {
   keep: number;            // how many runs to retain in the bucket
   prefix: string;
   alertEmail: string;      // one or more addresses, comma-separated
+  everyHours: number;      // 1–24, used when frequency = every_n_hours
+  includeEmails: boolean;  // mirror mail blobs into <prefix>blobs/
 }
+
+export const intervalHours = (cfg: Pick<BackupConfig, 'frequency' | 'everyHours'>): number =>
+  cfg.frequency === 'every_n_hours' ? Math.min(24, Math.max(1, Math.round(cfg.everyHours) || 6)) : INTERVAL_HOURS[cfg.frequency];
 
 /** Split the alert field into addresses. Accepts commas, semicolons, whitespace and
  *  newlines, because people paste lists in every shape — and drops anything that is not
@@ -77,6 +84,8 @@ const DEFAULTS: BackupConfig = {
   keep: 14,
   prefix: config.backupPrefix,   // BACKUP_PREFIX env: the only prefix a wiped box can know
   alertEmail: '',
+  everyHours: 6,
+  includeEmails: false,
 };
 
 export async function getBackupConfig(): Promise<BackupConfig> {
@@ -92,6 +101,8 @@ export async function getBackupConfig(): Promise<BackupConfig> {
     keep: await num('backup_keep', DEFAULTS.keep),
     prefix: normalizePrefix((await getSetting('backup_prefix')) || DEFAULTS.prefix),
     alertEmail: (await getSetting('backup_alert_email')) ?? '',
+    everyHours: Math.min(24, Math.max(1, Math.round(Number(await getSetting('backup_every_hours'))) || DEFAULTS.everyHours)),
+    includeEmails: (await getSetting('backup_include_emails')) === 'true',
   };
 }
 
@@ -100,6 +111,8 @@ export async function setBackupConfig(cfg: Partial<BackupConfig>): Promise<Backu
   if (cfg.frequency && FREQUENCIES.includes(cfg.frequency)) await setSetting('backup_frequency', cfg.frequency);
   if (cfg.hour !== undefined) await setSetting('backup_hour', String(Math.min(23, Math.max(0, cfg.hour))));
   if (cfg.keep !== undefined) await setSetting('backup_keep', String(Math.max(1, cfg.keep)));
+  if (cfg.everyHours !== undefined) await setSetting('backup_every_hours', String(Math.min(24, Math.max(1, Math.round(Number(cfg.everyHours)) || 6))));
+  if (cfg.includeEmails !== undefined) await setSetting('backup_include_emails', String(!!cfg.includeEmails));
   if (cfg.prefix) await setSetting('backup_prefix', normalizePrefix(cfg.prefix));
   // store the cleaned list, so what the UI shows back is exactly what will be mailed
   if (cfg.alertEmail !== undefined) await setSetting('backup_alert_email', alertRecipients(cfg.alertEmail).join(', '));
@@ -127,13 +140,14 @@ export async function getBackupStatus(): Promise<BackupStatus> {
 
 /** The slot hours for a frequency: twice-daily fires at `hour` and twelve hours later. */
 function slotHours(cfg: BackupConfig): number[] {
+  if (cfg.frequency === 'every_n_hours') return Array.from({ length: 24 }, (_, h) => h);   // any hour: only the gap matters
   return cfg.frequency === 'twice_daily' ? [cfg.hour % 24, (cfg.hour + 12) % 24] : [cfg.hour % 24];
 }
 
 /** Next wall-clock instant the scheduler would fire, given the last successful run.
  *  Exported for the Settings UI ("next backup in 4h") and pinned by tests. */
 export function nextDueAt(lastAt: number | null, cfg: BackupConfig, now: number): number {
-  const intervalMs = INTERVAL_HOURS[cfg.frequency] * 3_600_000;
+  const intervalMs = intervalHours(cfg) * 3_600_000;
   const earliest = lastAt === null ? now : lastAt + intervalMs;
   const slots = slotHours(cfg);
 
@@ -153,7 +167,7 @@ export function nextDueAt(lastAt: number | null, cfg: BackupConfig, now: number)
  *  immediately rather than waiting a whole cycle for the slot to come round again. */
 export function isDue(lastAt: number | null, cfg: BackupConfig, now: number): boolean {
   if (!cfg.enabled) return false;
-  const intervalMs = INTERVAL_HOURS[cfg.frequency] * 3_600_000;
+  const intervalMs = intervalHours(cfg) * 3_600_000;
   if (lastAt === null) return true;                       // never run: take one now
   const elapsed = now - lastAt;
   if (elapsed >= intervalMs * 1.5) return true;           // missed slot: catch up
@@ -161,9 +175,6 @@ export function isDue(lastAt: number | null, cfg: BackupConfig, now: number): bo
 }
 
 async function alert(subject: string, body: string, cfg: BackupConfig): Promise<void> {
-  const admins = await q<{ id: number }>("SELECT id FROM users WHERE role = 'admin'");
-  for (const a of admins) await notifyUser(a.id, subject, body, 'backup-alert').catch(() => {});
-
   const recipients = alertRecipients(cfg.alertEmail);
   if (!recipients.length) return;
   const acct = await one<AccountRow>('SELECT * FROM accounts WHERE enabled = true ORDER BY id LIMIT 1');
@@ -193,9 +204,15 @@ export async function runBackup(opts: { store?: BlobStore; appVersion?: string }
   const started = Date.now();
   try {
     const cfg = await getBackupConfig();
-    const manifest = await createBackup({ prefix: cfg.prefix, store: opts.store, appVersion: opts.appVersion });
+    const manifest = await createBackup({ prefix: cfg.prefix, store: opts.store, appVersion: opts.appVersion, includeEmails: cfg.includeEmails });
     await verifyBackup(manifest.key, { store: opts.store });
     const pruned = await pruneBackups(cfg.keep, { prefix: cfg.prefix, store: opts.store });
+    // mark-and-sweep: mirror objects no kept backup references any more
+    let swept = 0;
+    if (manifest.blobs) {
+      const kept = (await listBackups({ prefix: cfg.prefix, store: opts.store })).map((b) => b.key);
+      swept = await sweepMirror({ store: opts.store ?? backupStore, prefix: cfg.prefix, keptDirs: kept });
+    }
 
     await setSetting('backup_last_at', String(started));
     await setSetting('backup_last_status', 'ok');
@@ -206,9 +223,9 @@ export async function runBackup(opts: { store?: BlobStore; appVersion?: string }
     await setSetting('backup_ack', 'true');
 
     await plog(null, 'backup', `backup ok: ${manifest.rows} rows, ${(manifest.bytes / 1024).toFixed(0)} KB -> ${manifest.key}`, {
-      meta: { key: manifest.key, rows: manifest.rows, bytes: manifest.bytes, pruned, ms: Date.now() - started },
+      meta: { key: manifest.key, rows: manifest.rows, bytes: manifest.bytes, pruned, swept, blobs: manifest.blobs, ms: Date.now() - started },
     });
-    await emitToAdmins('backup.ok', { type: 'backup', id: manifest.key }, { rows: manifest.rows, bytes: manifest.bytes }).catch(() => {});
+    await emitToAdmins('backup.ok', { type: 'backup', id: manifest.key }, { rows: manifest.rows, bytes: manifest.bytes, blobs: manifest.blobs?.mirrored }).catch(() => {});
     return { ok: true, key: manifest.key, rows: manifest.rows, bytes: manifest.bytes };
   } catch (err: any) {
     const message = err?.message ?? String(err);

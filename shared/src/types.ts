@@ -71,7 +71,7 @@ export interface ApiProcessingLog {
   createdAt: string;
 }
 
-export type BackupFrequency = 'twice_daily' | 'daily' | 'every_2_days' | 'twice_weekly' | 'weekly';
+export type BackupFrequency = 'every_n_hours' | 'twice_daily' | 'daily' | 'every_2_days' | 'twice_weekly' | 'weekly' | 'monthly';
 
 export interface ApiBackupConfig {
   enabled: boolean;
@@ -80,6 +80,8 @@ export interface ApiBackupConfig {
   keep: number;              // runs retained in the bucket
   prefix: string;
   alertEmail: string;
+  everyHours: number;        // 1–24, when frequency = every_n_hours
+  includeEmails: boolean;    // mirror mail blobs into the backup store
 }
 
 export interface ApiBackupStatus {

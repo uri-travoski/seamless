@@ -20,7 +20,7 @@ Two objects per run, in a folder named for the moment it was taken:
 
 **`manifest.json`** is deliberately left readable, so you can list and check backups without the secret. It records when the backup was taken, how many rows, a checksum, and **which bucket the mail blobs live in** — but never any credentials.
 
-The `.eml` files are **not copied**. They are already in object storage, and the restored rows point straight back at them. A backup is the *index*, not the archive. That is why a few thousand messages costs a couple of hundred kilobytes rather than gigabytes.
+By default the `.eml` files are **not copied**. They are already in object storage, and the restored rows point straight back at them. A backup is the *index*, not the archive. That is why a few thousand messages costs a couple of hundred kilobytes rather than gigabytes. If you want the mail itself protected too, turn on **Include emails** (next section).
 
 ### The app folder
 
@@ -31,19 +31,34 @@ Backups always live under a `seamless/` folder inside the bucket, so one bucket 
 **Settings > Backup.**
 
 1. Tick **Back up automatically**. Nothing runs until you do; the default is off.
-2. **How often** — twice a day, daily, every 2 days, twice a week, or weekly.
+2. **How often** — every N hours (1–24), twice a day, daily, every 2 days, twice a week, weekly, or monthly (every 30 days). For *every N hours* the hour-of-day setting does not matter; only the gap does.
 3. **At** — the UTC hour the run starts. Twice-daily also runs twelve hours later.
 4. **Keep last** — how many runs to retain. Older ones are deleted from the bucket automatically.
 5. **Where it goes** — the prefix inside your bucket. Leave it alone unless you have a reason.
 6. **Email me if a backup fails** — one address, or several separated by commas.
+7. **Include emails** — also copy the mail files into the backup storage (see below).
 
 **Back up now** runs one immediately, whatever the schedule says. Use it once after setup, so you have a backup before you need one.
+
+## Include emails (blob mirror)
+
+With **Include emails** on, each run also copies every mail file to `<prefix>blobs/<same key>` in the backup storage. A small index remembers what is already there, so the second run copies only new messages. After copying, 20 random files are read back from the mirror and checked against their SHA-256; a mismatch makes the backup a **failure**. The backup's `manifest.json` records `blobs: { mirrored, total, lastKey, verifiedSample }`, and each backup carries a `blobs.keys.gz` list of the files its database rows refer to.
+
+When old backups are deleted (keep-count), mirror files that no remaining backup refers to are deleted too (mark-and-sweep). Turning the option off stops copying but leaves the mirror in place until it ages out of every kept backup.
+
+**Restoring mail from the mirror.** If the main mail bucket is lost, restore with the mirror as the mail store:
+
+```
+npm run restore -- --latest --mail-from-mirror
+```
+
+The restore finishes by telling you whether the mail was reachable; if the main bucket could not serve it and the backup has a mirror, it says so and suggests this flag. (On the first-run screen the same option is sent as `mailFromMirror`.) Backups made by older versions (format 1) still restore normally; they just have no mirror.
 
 ## What each run does
 
 1. **Writes** the encrypted dump and its manifest to storage.
 2. **Reads back** what it just wrote — checksum, then decryption, then a full parse. A backup that cannot be read is reported as a **failure**, not a success. An unverified backup is a rumour.
-3. **Prunes** older runs beyond your keep-count.
+3. **Prunes** older runs beyond your keep-count (and sweeps unreferenced mirror files).
 4. **Records** the result in **Settings > Logs** under `backup`.
 5. **Alerts** you if anything went wrong.
 
@@ -53,7 +68,7 @@ If the server is switched off through a scheduled slot, the run happens shortly 
 
 Three things happen at once, so a silent failure is not possible:
 
-- a **push notification** to every admin,
+- a **notification** to every admin (in-app and push by default; change it in Settings > Notifications — `backup.failed` / `backup.ok`),
 - an **email**, to every address in the alert field,
 - a **red banner** in Settings > Backup that stays until dismissed, plus an `ERROR` line in **Settings > Logs**.
 

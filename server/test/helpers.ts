@@ -20,10 +20,24 @@ vi.mock('../src/s3.ts', () => {
     endpoint: 'http://localhost:9100', region: 'us-east-1', bucket: 'seamless',
     accessKey: 'seamless', secretKey: 'seamless-secret', forcePathStyle: true,
   };
+  // the mail store honours cfg.keyPrefix (the backup mirror), the backup store never does
+  const mp = () => (cfg as any).keyPrefix ?? '';
+  const mput = (k: string, b: Buffer, ct?: string) => put(mp() + k, b);
+  const mget = (k: string) => get(mp() + k);
+  const mlist = async (p: string) => (await list(mp() + p)).map((k) => k.slice(mp().length));
+  const mdel = (k: string) => del(mp() + k);
+  const mailStore = { put: mput, get: mget, list: mlist, del: mdel, bucket: 'seamless', ensure: async () => {}, headBucket: async () => {} };
   return {
     ensureBucket: async () => {},
-    putBlob: put, getBlob: get, listKeys: list, deleteBlob: del,
-    mailStore: store, backupStore: store, s3Store: store,
+    putBlob: mput, getBlob: mget, listKeys: mlist, deleteBlob: mdel,
+    mailStore, backupStore: store, s3Store: mailStore,
+    withKeyPrefix: (inner: any, prefix: string) => ({
+      ...inner,
+      put: (k: string, b: Buffer, ct?: string) => inner.put(prefix + k, b, ct),
+      get: (k: string) => inner.get(prefix + k),
+      del: (k: string) => inner.del(prefix + k),
+      list: async (p: string) => (await inner.list(prefix + p)).map((k: string) => k.slice(prefix.length)),
+    }),
     makeStore: () => store,
     backupSharesMailBucket: true,
     mailStoreConfig: () => ({ ...cfg }),

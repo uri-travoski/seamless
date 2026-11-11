@@ -15,6 +15,8 @@ export interface BlobStore {
 export interface S3Config {
   endpoint: string; region: string; bucket: string;
   accessKey: string; secretKey: string; forcePathStyle: boolean;
+  /** Optional key prefix applied to every operation (used to read mail from the backup mirror). */
+  keyPrefix?: string;
 }
 
 export type Store = BlobStore & { bucket: string; ensure(): Promise<void>; headBucket(): Promise<void> };
@@ -27,7 +29,8 @@ export function makeStore(cfg: S3Config): Store {
     credentials: { accessKeyId: cfg.accessKey, secretAccessKey: cfg.secretKey },
   });
 
-  return {
+  const kp = cfg.keyPrefix ?? '';
+  const base: Store = {
     bucket: cfg.bucket,
 
     async ensure() {
@@ -79,6 +82,19 @@ export function makeStore(cfg: S3Config): Store {
       } while (token);
       return keys;
     },
+  };
+  return kp ? withKeyPrefix(base, kp) : base;
+}
+
+/** Wraps a store so every key is transparently under `prefix`. */
+export function withKeyPrefix<T extends BlobStore>(inner: T, prefix: string): T {
+  return {
+    ...inner,
+    put: (k, b, ct) => inner.put(prefix + k, b, ct),
+    get: (k) => inner.get(prefix + k),
+    del: (k) => inner.del(prefix + k),
+    head: inner.head ? (k: string) => inner.head!(prefix + k) : undefined,
+    list: async (p) => (await inner.list(prefix + p)).map((k) => k.slice(prefix.length)),
   };
 }
 

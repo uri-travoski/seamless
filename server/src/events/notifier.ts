@@ -32,7 +32,7 @@ export const DEFAULT_PREFS: Record<EventType, { inApp: boolean; push: boolean }>
   'oauth.expiring': { inApp: true, push: false },
   'job.failed': { inApp: true, push: false },
   'storage.unreachable': { inApp: true, push: true },
-  'backup.failed': { inApp: true, push: false },       // the backup engine already pushes + emails
+  'backup.failed': { inApp: true, push: true },        // was a direct push to admins; the alert email stays in backup/schedule.ts
   'backup.ok': { inApp: false, push: false },
   'storage.migration.done': { inApp: true, push: false },
   'storage.migration.failed': { inApp: true, push: false },

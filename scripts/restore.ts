@@ -5,6 +5,8 @@
  *   npm run restore -- --latest           restore the newest backup
  *   npm run restore -- --key backup/2026-07-14T02-00-00-000Z/
  *   npm run restore -- --latest --verify-only   check it reads back, change nothing
+ *   npm run restore -- --latest --mail-from-mirror   read mail from the backup's blob mirror
+ *                                      (the backup was taken with "include emails")
  *
  * Needs the same .env as the server: DATABASE_URL, S3_* (pointed at the surviving
  * bucket) and — critically — the SEAMLESS_SECRET the backup was written with.
@@ -70,7 +72,7 @@ async function main() {
   }
 
   console.log(`\nRestoring ${key} (this truncates every table) ...`);
-  const report = await restoreBackup(key);
+  const report = await restoreBackup(key, { mailFromMirror: has('--mail-from-mirror') });
   console.log(`  restored ${report.rows} rows`);
   for (const [t, n] of Object.entries(report.tables).filter(([, n]) => n > 0).sort()) console.log(`      ${t}: ${n}`);
   if (report.skippedColumns.length) {
@@ -81,7 +83,8 @@ async function main() {
   // rebuilt server can actually reach the blobs, rather than letting it surface as 404s later
   const { mailStore, blobs } = report;
   console.log(`\nMail blobs: bucket "${mailStore.bucket}" at ${mailStore.endpoint}` +
-              `${mailStore.adopted ? ' (from the backup — no S3_* needed)' : ' (from your environment)'}`);
+              `${mailStore.adopted ? ' (from the backup — no S3_* needed)' : ' (from your environment)'}` +
+              `${mailStore.fromMirror ? ' — the backup mirror' : ''}`);
   if (!blobs.checked) {
     console.log('  nothing archived yet, nothing to check.');
   } else if (blobs.ok) {
@@ -90,6 +93,7 @@ async function main() {
     console.log(`  UNREACHABLE: ${blobs.error}`);
     console.log('  The database is restored, but message bodies will not open until this bucket is reachable.');
     console.log('  Set S3_BUCKET / S3_ACCESS_KEY / S3_SECRET_KEY to the mail bucket and restart.');
+    if (report.mirrorAvailable) console.log('  This backup carries a mail mirror: re-run with --mail-from-mirror to read mail from it.');
   }
 
   console.log('\nDone. Start the server and log in with your existing credentials.');

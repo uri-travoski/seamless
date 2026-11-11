@@ -2,8 +2,9 @@ import { gzipSync, gunzipSync } from 'node:zlib';
 import { pool, q, one, migrate } from '../db.ts';
 import { config } from '../config.ts';
 import { encryptBuffer, decryptBuffer, sha256 } from '../crypto.ts';
-import { backupStore, mailStoreLocation, type BlobStore } from '../s3.ts';
+import { backupStore, backupStoreConfig, mailStoreLocation, type BlobStore, type S3Config } from '../s3.ts';
 import { saveMailStoreConfig, adoptRestoredMailStore, verifyMailBlobs, type BlobCheck } from './mailref.ts';
+import { mirrorBlobs, writeKeysFile, adoptMirrorMailStore, mailStoreIsMirror, type BlobsManifest } from './mirror.ts';
 
 /** Logical backup of the whole Postgres database.
  *
@@ -22,7 +23,8 @@ import { saveMailStoreConfig, adoptRestoredMailStore, verifyMailBlobs, type Blob
  *  rows reach the blobs through the mail store's own config by key. This backup is the
  *  index, not the archive. */
 
-export const FORMAT_VERSION = 1;
+/** v2 adds `schemaVersion`, `blobs` (the mail mirror) and the optional blobs.keys.gz. v1 manifests still restore. */
+export const FORMAT_VERSION = 2;
 const SECRET_CHECK = 'seamless-backup-v1';
 /** Never a bare "backup/": an omitted prefix must still land inside the app folder,
  *  or a caller that forgets to pass one silently writes to the bucket root. */
@@ -31,6 +33,7 @@ const INSERT_CHUNK = 500;
 
 export interface BackupManifest {
   v: number;
+  schemaVersion?: number;     // v2+: same as v
   createdAt: number;
   appVersion: string;
   tables: Record<string, number>;
@@ -44,6 +47,8 @@ export interface BackupManifest {
    *  is plaintext so backups can be listed without the secret. The credentials ride inside
    *  the encrypted payload (settings.mail_s3). Lets you see which bucket a backup expects
    *  BEFORE restoring it. */
+  /** v2: present when the run mirrored mail blobs to <prefix>blobs/. */
+  blobs?: BlobsManifest;
   mailStore?: { endpoint: string; region: string; bucket: string; forcePathStyle: boolean };
 }
 
@@ -79,13 +84,22 @@ async function columnsOf(table: string): Promise<Column[]> {
 
 const ident = (name: string) => `"${name.replace(/"/g, '""')}"`;
 
-export async function createBackup(opts: { prefix?: string; store?: BlobStore; appVersion?: string } = {}): Promise<BackupManifest> {
+export async function createBackup(opts: { prefix?: string; store?: BlobStore; appVersion?: string; includeEmails?: boolean; mailSource?: (key: string) => Promise<Buffer> } = {}): Promise<BackupManifest> {
   const store = opts.store ?? backupStore;
   const prefix = opts.prefix ?? DEFAULT_PREFIX;
 
   // record where the mail lives BEFORE the dump is taken, so the config travels inside the
   // encrypted payload and a restore can find the blobs without being told where they are
   await saveMailStoreConfig();
+
+  // mirror BEFORE the dump so backup_blob_index inside the dump matches what is in the store
+  let blobs: BlobsManifest | undefined;
+  let mirrorKeys: string[] = [];
+  if (opts.includeEmails && !mailStoreIsMirror()) {
+    const res = await mirrorBlobs({ store, prefix, source: opts.mailSource });
+    blobs = res.manifest;
+    mirrorKeys = res.keys;
+  }
 
   const tables = await tableNames();
 
@@ -115,6 +129,7 @@ export async function createBackup(opts: { prefix?: string; store?: BlobStore; a
   const dir = `${prefix}${new Date(createdAt).toISOString().replace(/[:.]/g, '-')}/`;
   const manifest: BackupManifest = {
     v: FORMAT_VERSION,
+    schemaVersion: FORMAT_VERSION,
     createdAt,
     appVersion: opts.appVersion ?? 'unknown',
     tables: counts,
@@ -125,10 +140,12 @@ export async function createBackup(opts: { prefix?: string; store?: BlobStore; a
     secretCheck: encryptBuffer(Buffer.from(SECRET_CHECK)).toString('base64'),
     key: dir,
     mailStore: mailStoreLocation(),
+    ...(blobs ? { blobs } : {}),
   };
 
   // data first: a manifest only ever exists once its payload is durably uploaded,
   // so a crash mid-run leaves an orphan blob rather than a manifest pointing at nothing
+  if (blobs) await writeKeysFile(store, dir, mirrorKeys);
   await store.put(`${dir}data.ndjson.gz.enc`, cipher, 'application/octet-stream');
   await store.put(`${dir}manifest.json`, Buffer.from(JSON.stringify(manifest, null, 2)), 'application/json');
   return manifest;
@@ -153,7 +170,7 @@ export async function listBackups(opts: { prefix?: string; store?: BlobStore } =
 
 async function loadManifest(store: BlobStore, dir: string): Promise<BackupManifest> {
   const m = JSON.parse((await store.get(`${dir}manifest.json`)).toString('utf8')) as BackupManifest;
-  if (m.v !== FORMAT_VERSION) throw new Error(`unsupported backup format v${m.v} (this server reads v${FORMAT_VERSION})`);
+  if (!(m.v >= 1 && m.v <= FORMAT_VERSION)) throw new Error(`unsupported backup format v${m.v} (this server reads v${FORMAT_VERSION})`);
   return m;
 }
 
@@ -188,7 +205,9 @@ export interface RestoreReport {
   /** Mail is not in the backup — only the pointer to it. These say whether the restored
    *  server actually reached the blobs, so "restored" never means "rows are back but every
    *  message body 404s". */
-  mailStore: { bucket: string; endpoint: string; adopted: boolean };
+  mailStore: { bucket: string; endpoint: string; adopted: boolean; fromMirror?: boolean };
+  /** Set when the primary mail bucket could not serve the check but this backup carries a mirror. */
+  mirrorAvailable?: boolean;
   blobs: BlobCheck;
 }
 
@@ -198,7 +217,7 @@ export interface RestoreReport {
  *  pg_restore uses) rather than a topological sort, so the dump can be replayed in
  *  any order and a future table with a new FK needs no code change here. Runs in one
  *  transaction: a failure part-way leaves the existing database untouched. */
-export async function restoreBackup(dir: string, opts: { store?: BlobStore } = {}): Promise<RestoreReport> {
+export async function restoreBackup(dir: string, opts: { store?: BlobStore; mailFromMirror?: boolean; storeConfig?: S3Config } = {}): Promise<RestoreReport> {
   const store = opts.store ?? backupStore;
   const { manifest } = await verifyBackup(dir, { store });
 
@@ -297,10 +316,19 @@ export async function restoreBackup(dir: string, opts: { store?: BlobStore } = {
 
   // the restored settings say where the mail lives: point the store there, then prove it —
   // fetch one blob and match it against the sha256 embedded in its key
-  const mailStore = await adoptRestoredMailStore();
+  let mailStore: RestoreReport['mailStore'] = await adoptRestoredMailStore();
+  if (opts.mailFromMirror) {
+    if (!manifest.blobs) throw new Error('this backup has no mail mirror (it was taken without "include emails")');
+    const prefix = dir.replace(/[^/]+\/$/, '');
+    const m = await adoptMirrorMailStore(opts.storeConfig ?? backupStoreConfig(), prefix);
+    mailStore = { adopted: true, bucket: m.bucket, endpoint: m.endpoint, fromMirror: true };
+  }
   const blobs = await verifyMailBlobs();
 
-  return { key: dir, createdAt: manifest.createdAt, tables: applied, rows, skippedColumns, mailStore, blobs };
+  return {
+    key: dir, createdAt: manifest.createdAt, tables: applied, rows, skippedColumns, mailStore, blobs,
+    ...(!opts.mailFromMirror && manifest.blobs && blobs.checked && !blobs.ok ? { mirrorAvailable: true } : {}),
+  };
 }
 
 /** Keep the newest `keep` runs; delete the rest. Returns the directories removed. */

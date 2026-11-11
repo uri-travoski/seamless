@@ -476,7 +476,7 @@ describe('failure alert recipients', () => {
 
 describe('schedule', () => {
   const cfg = (over: Partial<BackupConfig> = {}): BackupConfig => ({
-    enabled: true, frequency: 'daily', hour: 2, keep: 14, prefix: PREFIX, alertEmail: '', ...over,
+    enabled: true, frequency: 'daily', hour: 2, keep: 14, prefix: PREFIX, alertEmail: '', everyHours: 6, includeEmails: false, ...over,
   });
   const at = (iso: string) => new Date(iso).getTime();
   const HOUR = 3_600_000;
