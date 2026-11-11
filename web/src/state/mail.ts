@@ -11,9 +11,16 @@ export interface View {
   labelId?: number;
   query?: string;
   title: string;
+  quick?: 'unread' | 'attach';   // Simply Seamless quick-filter pills
 }
 
+const QUICK_TEXT = { unread: 'is:unread', attach: 'has:attachment' } as const;
 function baseFilter(view: View): EmailQueryFilter {
+  const f = baseFilter0(view);
+  if (!view.quick) return f;
+  return { ...f, text: [f.text, QUICK_TEXT[view.quick]].filter(Boolean).join(' ') };
+}
+function baseFilter0(view: View): EmailQueryFilter {
   if (view.kind === 'mailbox') return { inMailbox: view.mailboxId };
   if (view.kind === 'label') return { label: view.labelId };
   if (view.kind === 'review') return { needsReview: true };
@@ -149,7 +156,10 @@ export const useMail = create<MailState>((set, get) => ({
     get().setView({ ...get().view });
   },
 
-  show: (scope, view) => {
+  show: (scope, view0) => {
+    const cur = get().view;
+    const sameBase = cur.kind === view0.kind && cur.mailboxId === view0.mailboxId && cur.labelId === view0.labelId && cur.query === view0.query;
+    const view = sameBase && cur.quick ? { ...view0, quick: cur.quick } : view0;
     const scopeChanged = scope !== get().scope;
     if (scopeChanged) set({ scope });
     if (scopeChanged || viewKey(view, scope) !== viewKey(get().view, scope)) get().setView(view);

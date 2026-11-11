@@ -98,4 +98,4 @@ Press **?** for the full list (turn them off there or in Settings > General): **
 
 ## Themes
 
-**Settings > Appearance**: the **Seamless** theme is the original look; **Rolltop** is warm and paper-toned with serif titles; **Matrix** is neon on black. Pick light, dark or match the system, a custom accent colour, comfortable or compact rows, and a font.
+**Settings > Appearance**: the **Seamless** theme is the original look; **Rolltop** is warm and paper-toned with serif titles; **Simply Seamless** is a quiet, content-first light theme (actions and checkboxes appear on hover, tinted label pills, quick filters above the list). Pick light, dark or match the system, a custom accent colour, comfortable or compact rows, and a font.

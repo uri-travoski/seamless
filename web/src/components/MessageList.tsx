@@ -178,7 +178,7 @@ function Row({ email, selected, onMenu }: { email: ApiEmail; selected: boolean; 
           </div>
           {chips.length > 0 && (
             <div className="chips">
-              {chips.map((l) => <span key={l!.id} className="chip" style={{ background: l!.color, color: readableTextOn(l!.color) }}>{l!.name}</span>)}
+              {chips.map((l) => <span key={l!.id} className="chip" style={{ background: l!.color, color: readableTextOn(l!.color), ['--chip' as any]: l!.color }}>{l!.name}</span>)}
             </div>
           )}
         </div>
@@ -206,7 +206,7 @@ function TableRow({ email, selected, onMenu }: { email: ApiEmail; selected: bool
         onClick={(e) => { e.stopPropagation(); actions.star(email.id); }}><StarIcon weight={email.keywords.$flagged ? 'fill' : 'regular'} size={18} /></button>
       <span className="tbl-from">{who}</span>
       <span className="tbl-main">
-        {chips.map((l) => <span key={l!.id} className="chip" style={{ background: l!.color, color: readableTextOn(l!.color) }}>{l!.name}</span>)}
+        {chips.map((l) => <span key={l!.id} className="chip" style={{ background: l!.color, color: readableTextOn(l!.color), ['--chip' as any]: l!.color }}>{l!.name}</span>)}
         <span className="tbl-subject">{email.subject || '(no subject)'}</span>
         {email.preview && <span className="tbl-snippet"> — {email.preview}</span>}
       </span>
@@ -364,6 +364,12 @@ export default function MessageList() {
       ) : (
         <div className="list-toolbar">
           <span className="title">{view.title}<span className="total">{total > 0 ? total.toLocaleString() : ''}</span></span>
+          <span className="quick-pills" role="group" aria-label="Quick filters">
+            {([[undefined, 'All'], ['unread', 'Unread'], ['attach', 'Attachments']] as const).map(([q, name]) => (
+              <button key={name} className={`quick-pill ${view.quick === q ? 'on' : ''}`}
+                onClick={() => useMail.getState().setView({ ...view, quick: q })}>{name}{q === 'unread' && viewMailbox && viewMailbox.unreadEmails > 0 ? ` (${viewMailbox.unreadEmails})` : ''}</button>
+            ))}
+          </span>
           <button className="icon-btn" title={table ? 'Split view' : 'Table view'}
             onClick={() => saveSettings({ layout: table ? 'split' : 'table' })}>
             {table ? <SplitViewIcon /> : <TableViewIcon />}

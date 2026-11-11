@@ -64,15 +64,16 @@ export default function AppHeader({ onMenu, connected }: { onMenu: () => void; c
             if (e.key === 'Escape') { clear(); (e.target as HTMLInputElement).blur(); }
           }}
         />
+        {!search && <kbd className="search-kbd" aria-hidden>/</kbd>}
         {search && <button className="icon-btn" onClick={clear} aria-label="Clear search"><CloseIcon /></button>}
       </div>
       <div className="spacer" />
       <div className="topbar-actions">
+        <button className={`icon-btn refresh-btn ${fetching ? 'busy' : ''}`} title="Check all mailboxes for new mail"
+          aria-label="Check all mailboxes for new mail" disabled={fetching} onClick={fetchAll}><RedoIcon size={18} weight="bold" /></button>
         <span className={`conn-dot ${connected && online ? '' : 'offline'}`} role="status"
           title={connected && online ? 'Live: connected to the server — new mail and changes appear instantly' : 'Offline or reconnecting — changes will appear once the connection is back'}
           aria-label={connected && online ? 'Live connection' : 'Offline, reconnecting'} />
-        <button className={`icon-btn refresh-btn ${fetching ? 'busy' : ''}`} title="Check all mailboxes for new mail"
-          aria-label="Check all mailboxes for new mail" disabled={fetching} onClick={fetchAll}><RedoIcon size={18} weight="bold" /></button>
         <ScopeSwitcher />
         <NotificationBell />
       </div>

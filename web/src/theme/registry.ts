@@ -6,7 +6,7 @@
  * - "Rolltop" follows Planning/Rolltop UI/design.md (classic + classic dark): warm paper
  *   neutrals, one terracotta accent, serif display face. Layout/feel only — no Rolltop
  *   name or logo ships with it.
- * - "Matrix" is the neon plugin theme from the same pack (dark only).
+ * - "Simply Seamless" is the content-first light theme.
  */
 export type Mode = 'light' | 'dark';
 export type Tokens = Record<string, string>;
@@ -125,27 +125,24 @@ const rolltopDark: Tokens = {
   '--shadow-2': '0 1px 2px rgba(0, 0, 0, 0.38), 0 18px 44px rgba(0, 0, 0, 0.36)',
 };
 
-// Matrix — design.md §4.4 (dark only)
-const matrixDark: Tokens = {
-  ...rolltopDark,
-  '--color-bg': 'radial-gradient(circle at 20% -10%, rgba(0, 245, 160, 0.10), transparent 30rem), linear-gradient(180deg, #020604, #041109 45%, #020604)',
-  '--color-surface': '#06130d', '--color-surface-2': '#0a1c13',
-  '--color-border': 'rgba(74, 222, 128, 0.25)', '--color-border-strong': 'rgba(74, 222, 128, 0.54)',
-  '--color-text': '#dcffe9', '--color-text-strong': '#f2fff7', '--color-text-soft': '#a6d9ba', '--color-text-muted': '#78ad8d',
-  '--color-accent': '#00f5a0', '--color-accent-strong': '#7dffbf', '--color-accent-soft': 'rgba(0, 245, 160, 0.14)', '--color-accent-contrast': '#00160c', '--color-accent-warm': '#22d3ee',
-  '--color-hover': 'rgba(0, 245, 160, 0.11)', '--color-selected': 'rgba(0, 245, 160, 0.16)', '--color-selected-rule': 'rgba(0, 245, 160, 0.62)', '--color-checked': 'rgba(34, 211, 238, 0.14)',
-  '--color-header-bg': 'rgba(2, 10, 6, 0.94)', '--color-header-text': '#dcffe9', '--color-header-search-bg': 'rgba(0, 245, 160, 0.07)',
-  '--color-header-search-text': '#dcffe9', '--color-header-rule': 'rgba(0, 245, 160, 0.45)',
-  '--color-sidebar-bg': 'rgba(4, 17, 9, 0.94)', '--color-sidebar-icon': '#78ad8d', '--color-ink': '#00f5a0', '--color-ink-hover': '#7dffbf', '--color-ink-text': '#00160c',
-  '--color-danger': '#fb7185', '--color-danger-soft': 'rgba(251, 113, 133, 0.14)', '--color-warning': '#c084fc', '--color-warning-soft': 'rgba(192, 132, 252, 0.14)',
-  '--color-success': '#00f5a0', '--color-success-soft': 'rgba(0, 245, 160, 0.12)',
-  '--color-unread': '#00f5a0', '--color-star': '#22d3ee',
-  '--color-toast-bg': '#06130d', '--color-toast-text': '#7dffbf', '--color-focus': '#00f5a0',
-  '--color-login-bg': 'linear-gradient(180deg, #020604, #041109 45%, #020604)',
-  '--shadow-1': '0 0 0 1px rgba(0, 245, 160, 0.07), 0 18px 48px rgba(0, 0, 0, 0.42)',
-  '--shadow-2': '0 0 0 1px rgba(0, 245, 160, 0.10), 0 18px 48px rgba(0, 0, 0, 0.42), 0 0 28px rgba(0, 245, 160, 0.08)',
-  '--font-sans': '"Inter", "Aptos", "Segoe UI", system-ui, sans-serif', '--font-display': '"IBM Plex Mono", "Cascadia Code", Consolas, monospace',
-  '--font-mono': '"JetBrains Mono", "Cascadia Code", Consolas, monospace',
+// "Simply Seamless": content-first. Slate-navy chrome, soft-stone sidebar, white sheet for the list.
+// The structural bits (hover-only row controls, inset dividers, outline nav icons, quick-filter
+// pills, framed list) live in app.css under :root[data-theme="simply"].
+const simplyLight: Tokens = {
+  ...seamlessLight,
+  '--color-bg': '#f8fafc', '--color-surface': '#ffffff', '--color-surface-2': '#f8fafc',
+  '--color-border': '#e2e8f0', '--color-border-strong': '#cbd5e1',
+  '--color-text': '#475569', '--color-text-strong': '#0f172a', '--color-text-soft': '#64748b', '--color-text-muted': '#94a3b8',
+  '--color-accent': '#2563eb', '--color-accent-strong': '#1e324e', '--color-accent-soft': '#eff6ff', '--color-accent-warm': '#2563eb',
+  '--color-hover': '#f1f5f9', '--color-selected': '#eff6ff', '--color-selected-rule': '#1e324e', '--color-checked': '#eff6ff',
+  '--color-header-bg': '#1e324e', '--color-header-search-bg': 'rgba(255, 255, 255, 0.12)',
+  '--color-sidebar-bg': '#f8fafc', '--color-sidebar-icon': '#64748b',
+  '--color-ink': '#2b4c7e', '--color-ink-hover': '#34598f', '--color-ink-text': '#ffffff',
+  '--color-unread': '#2563eb', '--color-focus': '#2563eb',
+  '--color-login-bg': 'radial-gradient(circle at 50% 45%, #243b5a 0%, #111e32 100%)',
+  '--radius-sm': '6px', '--radius-md': '8px', '--radius-lg': '12px',
+  '--shadow-1': '0 1px 2px rgba(15, 23, 42, 0.06), 0 4px 12px rgba(15, 23, 42, 0.06)',
+  '--shadow-2': '0 6px 18px rgba(15, 23, 42, 0.16), 0 18px 48px rgba(15, 23, 42, 0.14)',
 };
 
 export const THEMES: ThemeDef[] = [
@@ -154,12 +151,12 @@ export const THEMES: ThemeDef[] = [
     tokens: { light: seamlessLight, dark: seamlessDark }, swatch: ['#243959', '#1867c0', '#f4f6f8'],
   },
   {
-    id: 'rolltop', name: 'Rolltop', description: 'Warm paper neutrals, terracotta accent, serif titles.',
-    tokens: { light: rolltopLight, dark: rolltopDark }, fonts: ['Fraunces'], swatch: ['#151f2e', '#c46b44', '#f2f0eb'],
+    id: 'simply', name: 'Simply Seamless', description: 'Content-first: quiet rows, tinted labels, outline icons. Light only.',
+    tokens: { light: simplyLight }, swatch: ['#1e324e', '#2563eb', '#f8fafc'],
   },
   {
-    id: 'matrix', name: 'Matrix', description: 'Neon green on black. Dark only.',
-    tokens: { dark: matrixDark }, fonts: ['Inter', 'IBM Plex Mono', 'JetBrains Mono'], swatch: ['#020604', '#00f5a0', '#22d3ee'],
+    id: 'rolltop', name: 'Rolltop', description: 'Warm paper neutrals, terracotta accent, serif titles.',
+    tokens: { light: rolltopLight, dark: rolltopDark }, fonts: ['Fraunces'], swatch: ['#151f2e', '#c46b44', '#f2f0eb'],
   },
 ];
 

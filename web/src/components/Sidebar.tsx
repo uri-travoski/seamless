@@ -131,7 +131,7 @@ export default function Sidebar({ open, onNavigate, onAddLabel }: { open: boolea
   })();
 
   return (
-    <IconContext.Provider value={{ weight: 'fill', size: 18 }}>
+    <IconContext.Provider value={{ weight: settings.theme === 'simply' ? 'regular' : 'fill', size: 18 }}>
     <nav className={`sidebar ${open ? 'open' : ''} ${settings.sidebarCollapsed ? 'collapsed' : ''}`} aria-label="Folders">
       <div className="side-brand mobile-only"><MailLogo size="1.4em" /><span className="app-name">{settings.appName || 'Seamless'}</span></div>
       <div className="compose-actions">
