@@ -98,7 +98,7 @@ export async function healthReport(userId: number, isAdmin: boolean, now = Date.
   if (isAdmin) {
     const p = await storageProbe(now);
     const size = await one<{ b: string; c: string }>('SELECT COALESCE(SUM(size),0) AS b, COUNT(*) AS c FROM messages');
-    report.storage = { reachable: p.ok, latencyMs: p.ms, error: p.error, checkedAt: p.at, bytes: Number(size?.b ?? 0), messages: Number(size?.c ?? 0), status: (p.ok ? 'ok' : 'red') as Light };
+    report.storage = { reachable: p.ok, latencyMs: p.ms, error: p.error, checkedAt: p.at, bytes: Number(size?.b ?? 0), messages: Number(size?.c ?? 0), spool: !!(await one("SELECT 1 FROM storage_targets WHERE role = 'spool' AND active")), status: (p.ok ? 'ok' : 'red') as Light };
     report.backups = await backupHealth(now);
     let free: number | null = null;
     try { const s = fs.statfsSync(config.dataDir); free = Number(s.bavail) * Number(s.bsize); } catch { /* not supported here */ }

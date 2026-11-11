@@ -13,6 +13,7 @@ import RulesSettings from './RulesSettings.tsx';
 import AutomationSettings from './AutomationSettings.tsx';
 import LogsSettings from './LogsSettings.tsx';
 import HealthSettings from './HealthSettings.tsx';
+import StorageSettings from './StorageSettings.tsx';
 import DevicesSettings from './DevicesSettings.tsx';
 import BackupSettings from './BackupSettings.tsx';
 import SendingSettings from './SendingSettings.tsx';
@@ -24,7 +25,7 @@ import { useMail, scopeToSlug } from '../../state/mail.ts';
 import { navigate } from '../../router.ts';
 import {
   SettingsIcon, MailboxIcon, TagIcon, FilterIcon, SparkleIcon, UsersIcon, LogoutIcon, BackIcon, RulesIcon, ImportIcon,
-  LogsIcon, DevicesIcon, ContactsIcon, SentIcon, BackupIcon, PaletteIcon, TemplateIcon, BellIcon, LockIcon, HelpIcon, KeyboardIcon, HealthIcon, TimerIcon,
+  LogsIcon, DevicesIcon, ContactsIcon, SentIcon, BackupIcon, PaletteIcon, TemplateIcon, BellIcon, LockIcon, HelpIcon, KeyboardIcon, HealthIcon, TimerIcon, CloudIcon,
 } from '../../icons.tsx';
 import { useUi } from '../../state/ui.ts';
 
@@ -46,6 +47,7 @@ const TABS: { id: string; name: string; Icon: ComponentType<{ className?: string
   { id: 'devices', name: 'Devices', Icon: DevicesIcon, C: DevicesSettings },
   { id: 'health', name: 'Health', Icon: HealthIcon, C: HealthSettings },
   { id: 'logs', name: 'Logs', Icon: LogsIcon, C: LogsSettings },
+  { id: 'storage', name: 'Storage', Icon: CloudIcon, C: StorageSettings, admin: true },
   { id: 'backup', name: 'Backup', Icon: BackupIcon, C: BackupSettings, admin: true },
   { id: 'users', name: 'Users', Icon: UsersIcon, C: UserSettings, admin: true },
 ];

@@ -839,6 +839,29 @@ ALTER TABLE messages ADD COLUMN disposable_id INTEGER REFERENCES disposable_addr
 CREATE INDEX messages_disposable ON messages(disposable_id) WHERE disposable_id IS NOT NULL;
 `,
   },
+  {
+    id: 21,
+    sql: `
+-- T3 F-26: storage targets (mail / backup / spool buckets chosen in the UI). creds_enc = encrypt(JSON {accessKey, secretKey})
+CREATE TABLE storage_targets (
+  id SERIAL PRIMARY KEY,
+  role TEXT NOT NULL CHECK (role IN ('mail','backup','spool')),
+  provider TEXT NOT NULL,
+  endpoint TEXT NOT NULL,
+  region TEXT NOT NULL,
+  bucket TEXT NOT NULL,
+  prefix TEXT NOT NULL DEFAULT 'seamless/',
+  force_path_style BOOLEAN NOT NULL DEFAULT false,
+  creds_enc TEXT NOT NULL,
+  active BOOLEAN NOT NULL DEFAULT false,
+  accept_same_bucket BOOLEAN NOT NULL DEFAULT false,
+  created_at BIGINT NOT NULL,
+  verified_at BIGINT,
+  last_test TEXT
+);
+CREATE INDEX storage_targets_role ON storage_targets(role, active);
+`,
+  },
 ];
 
 /** Run `fn` in one transaction. Events emitted through the client are only turned into

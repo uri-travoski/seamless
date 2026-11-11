@@ -3,6 +3,8 @@ import type { ApiBackup } from '@seamless/shared';
 import { useSession } from '../state/session.ts';
 import { api } from '../api/client.ts';
 import { MailLogo } from '../icons.tsx';
+import StorageForm, { emptyForm, type FormValue } from './settings/StorageForm.tsx';
+import { toast } from '../toast.ts';
 import { cachedAppName } from '../state/session.ts';
 
 export default function Login() {
@@ -20,6 +22,9 @@ export default function Login() {
   const [code, setCode] = useState('');
   const loginMfa = useSession((s) => s.loginMfa);
   const isSetup = status === 'setup';
+  // optional first-run "Storage" step: skipped by default (the server's own settings are used)
+  const [useOwnStorage, setUseOwnStorage] = useState(false);
+  const [mailForm, setMailForm] = useState<FormValue>(emptyForm('mail'));
   const canSubmit = email.length > 0 && password.length > 0;
 
   // Disaster recovery lives here because this is the only screen a restored-from-nothing
@@ -101,6 +106,11 @@ export default function Login() {
         await loginMfa(mfaToken, code);
       } else if (isSetup) {
         await setup(email, name, password);
+        if (useOwnStorage && mailForm.bucket) {
+          // the admin exists and is signed in now, so the normal (admin-only) route can save it
+          await api.post('/api/storage/targets', { role: 'mail', ...mailForm })
+            .catch((e: any) => toast(`Storage was not saved: ${e?.message ?? 'test failed'}. You can set it up in Settings → Storage.`, 'error'));
+        }
       } else {
         const r = await login(email, password);
         if (r.mfaToken) { setMfaToken(r.mfaToken); setCode(''); }
@@ -182,6 +192,16 @@ export default function Login() {
         </button>
         <div className="login-err">{err}</div>
         </>)}
+
+        {isSetup && !restored && (
+          <div style={{ marginTop: 14 }}>
+            <label className="check">
+              <input type="checkbox" checked={useOwnStorage} onChange={(e) => setUseOwnStorage(e.target.checked)} /> Choose where mail is stored
+            </label>
+            {!useOwnStorage && <div className="hint">Skip — use the server’s settings. You can change this later in Settings → Storage.</div>}
+            {useOwnStorage && <StorageForm role="mail" value={mailForm} onChange={setMailForm} testUrl="/api/setup/storage-test" />}
+          </div>
+        )}
 
         {isSetup && restored && (
           <div style={{ marginTop: 12 }}>

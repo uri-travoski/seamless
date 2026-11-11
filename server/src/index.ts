@@ -31,6 +31,7 @@ import { registerCardDav } from './facade/carddav.ts';
 import { startContactHarvest } from './contacts.ts';
 import { startBackupScheduler } from './backup/schedule.ts';
 import { initMailStore } from './backup/mailref.ts';
+import { applyActiveTargets, backupEnvSet } from './storage/targets.ts';
 import { emitEvent, startEventPrune } from './events/emit.ts';
 import { pruneExpiredSessions, sessionToken } from './auth/sessions.ts';
 import { registerSecurityHeaders } from './security/headers.ts';
@@ -119,7 +120,8 @@ const mailSrc = await initMailStore().catch((err) => {
   console.error('mail store init failed:', err?.message ?? err);
   return { source: 'default' as const, bucket: config.s3.bucket };
 });
-console.log(`Mail blobs: bucket "${mailSrc.bucket}" (${mailSrc.source === 'restored' ? 'from restored backup' : mailSrc.source})`);
+await applyActiveTargets({ mail: true, backup: backupEnvSet() || config.s3FromEnv }).catch((err) => console.error('storage targets init failed:', err?.message ?? err));
+console.log(`Mail blobs: bucket "${mailSrc.bucket}" (${mailSrc.source === 'restored' ? 'from restored backup' : mailSrc.source === 'target' ? 'from Settings → Storage' : mailSrc.source})`);
 
 await ensureBucket().catch((err) => {
   console.error('S3 bucket check failed (blob storage unavailable):', err?.message ?? err);

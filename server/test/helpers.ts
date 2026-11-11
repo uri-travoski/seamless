@@ -13,7 +13,7 @@ vi.mock('../src/s3.ts', () => {
   };
   const list = async (prefix: string) => [...blobStore.keys()].filter((k) => k.startsWith(prefix)).sort();
   const del = async (key: string) => { blobStore.delete(key); };
-  const store = { put, get, list, del, bucket: 'seamless', ensure: async () => {} };
+  const store = { put, get, list, del, bucket: 'seamless', ensure: async () => {}, headBucket: async () => {} };
   // the mail store is repointable in production; the tests only need it to remember what it
   // was pointed at, so a restore can adopt the config the backup brought back
   let cfg = {
@@ -29,6 +29,8 @@ vi.mock('../src/s3.ts', () => {
     mailStoreConfig: () => ({ ...cfg }),
     mailStoreLocation: () => ({ endpoint: cfg.endpoint, region: cfg.region, bucket: cfg.bucket, forcePathStyle: cfg.forcePathStyle }),
     setMailStore: (next: typeof cfg) => { cfg = { ...next }; },
+    setBackupStore: (_next: typeof cfg) => {},
+    backupStoreConfig: () => ({ ...cfg }),
   };
 });
 
@@ -41,7 +43,7 @@ export let TEST_USER = 0;
 /** Wipe all data and recreate the default test user. */
 export async function resetDb(): Promise<void> {
   await run('TRUNCATE users RESTART IDENTITY CASCADE');
-  await run('TRUNCATE tracking_opens, op_queue, scheduled_sends, jobs RESTART IDENTITY');
+  await run('TRUNCATE tracking_opens, op_queue, scheduled_sends, jobs, storage_targets RESTART IDENTITY');
   await run("DELETE FROM settings WHERE key = 'state' OR key LIKE 'alert:%'");
   TEST_USER = await insertId('INSERT INTO users(email, name, password_hash, role, created_at) VALUES (?,?,?,?,?)',
     ['test@local', 'Test User', hashPassword('password123'), 'admin', Date.now()]);

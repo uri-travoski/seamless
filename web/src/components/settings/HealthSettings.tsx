@@ -11,7 +11,7 @@ interface Report {
   sending: { failed24h: number; failed7d: number; scheduled: number; holding: number; status: Light };
   jobs: { counts: Record<string, number>; oldestPendingAt: number | null; lateMs: number; failed: { id: number; kind: string; attempts: number; lastError: string; runAt: number }[]; status: Light };
   ai: { providers: number; status: Light; note: string };
-  storage?: { reachable: boolean; latencyMs: number; error: string; checkedAt: number; bytes: number; messages: number; status: Light };
+  storage?: { reachable: boolean; latencyMs: number; error: string; checkedAt: number; bytes: number; messages: number; spool?: boolean; status: Light };
   backups?: { enabled: boolean; lastAt: number | null; lastStatus: string | null; lastError: string; nextDueAt: number | null; status: Light; note: string };
   system?: { version: string; uptimeSec: number; dbBytes: number; rssBytes: number; freeBytes: number | null; status: Light };
 }
@@ -49,6 +49,7 @@ export default function HealthSettings() {
   const resync = async (id: number) => { try { await api.post(`/api/accounts/${id}/resync`); toast('Re-sync started'); setTimeout(load, 1500); } catch { toast('Could not start', 'error'); } };
   const setIgnored = async (id: number, ignored: boolean) => { try { await api.post(`/api/accounts/${id}/health-ignore`, { ignored }); toast(ignored ? 'Ignored: no status colour or alerts for this mailbox' : 'No longer ignored'); load(); } catch { toast('Could not change that', 'error'); } };
   const jobOp = async (id: number, op: 'retry' | 'cancel') => { try { await api.post(`/api/jobs/${id}/${op}`); load(); } catch { toast('Could not do that', 'error'); } };
+  const reingest = async () => { try { const x = await api.post<{ found: number; ingested: number; skipped: number; failed: number }>('/api/storage/spool/reingest'); toast(`Spool: ${x.found} found, ${x.ingested} imported, ${x.skipped} already there or unknown, ${x.failed} failed`); load(); } catch (e: any) { toast(e?.message ?? 'Could not re-ingest', 'error'); } };
   const checkStorage = async () => { try { await api.post('/api/health/storage-check'); load(); } catch { toast('Could not check', 'error'); } };
 
   return (
@@ -113,6 +114,7 @@ export default function HealthSettings() {
             </ul>
             {!r.storage.reachable && <div className="health-note red">{r.storage.error}</div>}
             <button className="btn ghost small" onClick={() => void checkStorage()}>Check now</button>
+            {r.storage.spool && <> <button className="btn ghost small" onClick={() => void reingest()}>Re-ingest spool</button></>}
           </Card>
         )}
 

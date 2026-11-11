@@ -15,7 +15,9 @@ export interface S3Config {
   accessKey: string; secretKey: string; forcePathStyle: boolean;
 }
 
-export function makeStore(cfg: S3Config): BlobStore & { bucket: string; ensure(): Promise<void> } {
+export type Store = BlobStore & { bucket: string; ensure(): Promise<void>; headBucket(): Promise<void> };
+
+export function makeStore(cfg: S3Config): Store {
   const client = new S3Client({
     endpoint: cfg.endpoint,
     region: cfg.region,
@@ -32,6 +34,11 @@ export function makeStore(cfg: S3Config): BlobStore & { bucket: string; ensure()
       } catch {
         await client.send(new CreateBucketCommand({ Bucket: cfg.bucket }));
       }
+    },
+
+    /** Auth + existence check, without creating anything (unlike `ensure`). */
+    async headBucket() {
+      await client.send(new HeadBucketCommand({ Bucket: cfg.bucket }));
     },
 
     async put(key, body, contentType = 'message/rfc822') {
@@ -84,6 +91,7 @@ export function mailStoreLocation(): { endpoint: string; region: string; bucket:
 export function setMailStore(cfg: S3Config): void {
   mailCfg = { ...cfg };
   mail = makeStore(mailCfg);
+  backupSharesMailBucket = computeShared();
 }
 
 /** Indirect on purpose: every caller below re-reads `mail`, so repointing the store takes
@@ -97,11 +105,29 @@ export const mailStore: BlobStore & { bucket: string; ensure(): Promise<void> } 
   del: (k) => mail.del(k),
 };
 
-export const backupStore = makeStore(config.s3Backup);
+/** The backup store is repointable too (a `storage_targets` row with role='backup'). */
+let backupCfg: S3Config = { ...config.s3Backup };
+let backup = makeStore(backupCfg);
 
+export function backupStoreConfig(): S3Config { return { ...backupCfg }; }
+export function setBackupStore(cfg: S3Config): void {
+  backupCfg = { ...cfg };
+  backup = makeStore(backupCfg);
+  backupSharesMailBucket = computeShared();
+}
+
+export const backupStore: BlobStore & { bucket: string; ensure(): Promise<void> } = {
+  get bucket() { return backupCfg.bucket; },
+  ensure: () => backup.ensure(),
+  put: (k, b, ct) => backup.put(k, b, ct),
+  get: (k) => backup.get(k),
+  list: (p) => backup.list(p),
+  del: (k) => backup.del(k),
+};
+
+const computeShared = () => backupCfg.bucket === mailCfg.bucket && backupCfg.endpoint === mailCfg.endpoint;
 /** Same bucket + endpoint means one store is doing both jobs (the default). */
-export const backupSharesMailBucket =
-  config.s3Backup.bucket === config.s3.bucket && config.s3Backup.endpoint === config.s3.endpoint;
+export let backupSharesMailBucket = computeShared();
 
 export async function ensureBucket(): Promise<void> {
   await mailStore.ensure();

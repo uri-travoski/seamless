@@ -1,6 +1,7 @@
 import { one, getSetting, setSetting } from '../db.ts';
 import { config } from '../config.ts';
 import { encrypt, decrypt, sha256 } from '../crypto.ts';
+import { activeTarget, toS3Config } from '../storage/targets.ts';
 import { setMailStore, mailStoreConfig, mailStoreLocation, getBlob, type S3Config } from '../s3.ts';
 
 /**
@@ -48,13 +49,21 @@ export async function loadMailStoreConfig(): Promise<S3Config | null> {
  * store (i.e. we were restored), use that. The built-in localhost defaults are the last
  * resort and must never silently override what a restore brought back.
  */
-export async function initMailStore(): Promise<{ source: 'env' | 'restored' | 'default'; bucket: string }> {
+export async function initMailStore(): Promise<{ source: 'env' | 'target' | 'restored' | 'default'; bucket: string }> {
   const stored = await loadMailStoreConfig();
 
   if (config.s3FromEnv) {
     setMailStore(config.s3);
     await saveMailStoreConfig(config.s3);          // keep the record current for the next backup
     return { source: 'env', bucket: config.s3.bucket };
+  }
+  // a target chosen in Settings → Storage (F-26) beats a restored record and the defaults
+  const target = await activeTarget('mail').catch(() => undefined);
+  if (target) {
+    const cfg = toS3Config(target);
+    setMailStore(cfg);
+    await saveMailStoreConfig(cfg);
+    return { source: 'target', bucket: cfg.bucket };
   }
   if (stored) {
     setMailStore(stored);
