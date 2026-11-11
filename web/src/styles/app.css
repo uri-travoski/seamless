@@ -1236,13 +1236,6 @@ kbd { font-family: var(--font-mono); font-size: 11.5px; padding: 1px 6px; border
 :root[data-theme="simply"] .msg-row .row-actions .icon-btn:hover { background: #e2e8f0; color: #1e324e; }
 
 /* header: tidy right cluster */
-:root[data-theme="simply"] .topbar .bell-btn {
-  width: 36px; height: 36px; border-radius: 999px; margin-left: 8px;
-  border: 1px solid color-mix(in srgb, var(--color-header-text) 22%, transparent);
-  background: color-mix(in srgb, var(--color-header-text) 6%, transparent);
-}
-:root[data-theme="simply"] .topbar .bell-btn:hover { background: color-mix(in srgb, var(--color-header-text) 12%, transparent); }
-:root[data-theme="simply"] .bell-badge { top: -4px; right: -4px; box-shadow: 0 0 0 2px #1e324e; }
 
 /* search box centred in the top bar (desktop) */
 @media (min-width: 901px) {
@@ -1287,10 +1280,6 @@ kbd { font-family: var(--font-mono); font-size: 11.5px; padding: 1px 6px; border
 .app-menu .side-item { color: var(--color-text); }
 .app-menu .side-item svg { color: var(--color-text-soft); }
 .app-menu .spin { animation: spin 0.9s linear infinite; }
-:root[data-theme="simply"] .topbar .menu-btn {
-  width: 36px; height: 36px; border-radius: 999px; border: 1px solid color-mix(in srgb, var(--color-header-text) 22%, transparent);
-  background: color-mix(in srgb, var(--color-header-text) 6%, transparent);
-}
 
 /* footer: size on the far left */
 .side-size { text-align: left; padding-left: 8px; font-weight: 500; }
@@ -1306,3 +1295,21 @@ kbd { font-family: var(--font-mono); font-size: 11.5px; padding: 1px 6px; border
   border: 1px solid color-mix(in srgb, var(--chip, #64748b) 32%, var(--color-surface));
   border-radius: 4px; font-size: 11px; font-weight: 600; padding: 1px 7px; line-height: 1.4;
 }
+
+/* top-right cluster, sized and styled like the mock-up (all themes) */
+.topbar-actions { gap: 10px; }
+.topbar .scope-btn {
+  height: 32px; padding: 0 12px; gap: 8px; font-size: 12.5px; font-weight: 500;
+  background: rgba(255, 255, 255, 0.1); border: 1px solid rgba(255, 255, 255, 0.12); border-radius: 999px; color: #fff;
+}
+.topbar .scope-btn:hover { background: rgba(255, 255, 255, 0.16); }
+.topbar .scope-btn .switch-count { background: #2563eb; color: #fff; font-size: 11px; font-weight: 600; padding: 1px 6px; border-radius: 999px; min-width: 0; }
+.topbar .conn-dot { width: 7px; height: 7px; }
+.topbar .bell-btn, .topbar .menu-btn {
+  position: relative; width: 32px; height: 32px; border-radius: 50%; padding: 0; margin: 0;
+  background: rgba(255, 255, 255, 0.1); border: 1px solid rgba(255, 255, 255, 0.12); color: #fff;
+}
+.topbar .bell-btn:hover, .topbar .menu-btn:hover, .topbar .menu-btn.active { background: rgba(255, 255, 255, 0.16); }
+.topbar .bell-btn svg, .topbar .menu-btn svg { width: 15px; height: 15px; }
+.topbar .app-menu { margin-left: 0; }
+.bell-badge { top: -4px; right: -4px; font-size: 10px; font-weight: 700; padding: 1px 5px; min-width: 0; height: auto; background: #ef4444; box-shadow: none; border: 2px solid var(--color-header-bg); line-height: 1.3; }

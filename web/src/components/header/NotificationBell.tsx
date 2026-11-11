@@ -62,7 +62,7 @@ export default function NotificationBell() {
   return (
     <div className="notif-bell" ref={ref}>
       <button className="icon-btn bell-btn" onClick={() => setOpen((v) => !v)} aria-label={`Notifications${unread ? `, ${unread} unread` : ''}`} title="Notifications">
-        <BellIcon size={20} />
+        <BellIcon size={15} />
         {unread > 0 && <span className="bell-badge">{unread > 99 ? '99+' : unread}</span>}
       </button>
       {open && (
