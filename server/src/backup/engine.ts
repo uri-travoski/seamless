@@ -231,7 +231,9 @@ export async function restoreBackup(dir: string, opts: { store?: BlobStore } = {
       const values: unknown[] = [];
       const tuples = batch.map((row, r) => {
         const ps = keep.map((_, c) => `$${r * keep.length + c + 1}`);
-        for (const i of keep) values.push(row[i]);
+        // node-pg turns a JS array into a Postgres array literal, which a jsonb column rejects:
+        // jsonb values that happen to be arrays (message_risk.reasons) must go in as JSON text
+        for (const i of keep) values.push(Array.isArray(row[i]) ? JSON.stringify(row[i]) : row[i]);
         return `(${ps.join(', ')})`;
       });
       await client.query(`INSERT INTO ${ident(table)} (${names}) VALUES ${tuples.join(', ')}`, values);
