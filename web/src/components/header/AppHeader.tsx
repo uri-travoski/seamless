@@ -1,13 +1,15 @@
 /**
  * App header (T1 F-08 / theme track): brand on the left, search, the live-connection dot,
  * the scope switcher and — in the far top-right corner — the notification bell.
- * (Settings, refresh and space used live in the sidebar footer; Help and shortcuts in Settings.)
+ * (Refresh sits left of the switcher; Settings, log out and space used live in the sidebar footer; Help and shortcuts in Settings.)
  */
 import { useState } from 'react';
 import { useSession } from '../../state/session.ts';
 import { useMail, scopeToSlug } from '../../state/mail.ts';
 import { useRouter, navigate } from '../../router.ts';
-import { MenuIcon, SearchIcon, CloseIcon, MailLogo } from '../../icons.tsx';
+import { MenuIcon, SearchIcon, CloseIcon, MailLogo, RedoIcon } from '../../icons.tsx';
+import { api } from '../../api/client.ts';
+import { toast } from '../../toast.ts';
 import { NO_AUTOFILL } from '../../state/ui.ts';
 import ScopeSwitcher from './ScopeSwitcher.tsx';
 import NotificationBell from './NotificationBell.tsx';
@@ -17,6 +19,20 @@ export default function AppHeader({ onMenu, connected }: { onMenu: () => void; c
   const online = useMail((s) => s.online);
   const route = useRouter((s) => s.route);
   const [search, setSearch] = useState(route.page === 'mail' && route.folder === 'search' ? route.q ?? '' : '');
+
+  const [fetching, setFetching] = useState(false);
+  const fetchAll = async () => {
+    if (fetching) return;
+    setFetching(true);
+    try {
+      const res = await api.post<{ accounts: number }>('/api/sync');
+      toast(res.accounts ? `Checking ${res.accounts} mailbox${res.accounts === 1 ? '' : 'es'} for new mail…` : 'No connected mailboxes to check');
+    } catch (e: any) {
+      toast(e?.message ?? 'Could not check for mail', 'error');
+    } finally {
+      setFetching(false);
+    }
+  };
 
   const slug = () => scopeToSlug(useMail.getState().scope, useMail.getState().overview);
   const runSearch = () => {
@@ -55,6 +71,8 @@ export default function AppHeader({ onMenu, connected }: { onMenu: () => void; c
         <span className={`conn-dot ${connected && online ? '' : 'offline'}`} role="status"
           title={connected && online ? 'Live: connected to the server — new mail and changes appear instantly' : 'Offline or reconnecting — changes will appear once the connection is back'}
           aria-label={connected && online ? 'Live connection' : 'Offline, reconnecting'} />
+        <button className={`icon-btn refresh-btn ${fetching ? 'busy' : ''}`} title="Check all mailboxes for new mail"
+          aria-label="Check all mailboxes for new mail" disabled={fetching} onClick={fetchAll}><RedoIcon size={18} weight="bold" /></button>
         <ScopeSwitcher />
         <NotificationBell />
       </div>

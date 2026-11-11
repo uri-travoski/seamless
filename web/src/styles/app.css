@@ -1129,8 +1129,8 @@ kbd { font-family: var(--font-mono); font-size: 11.5px; padding: 1px 6px; border
 .side-foot .icon-btn { width: 30px; height: 30px; color: var(--color-text-soft); }
 .side-foot .icon-btn.active { color: var(--color-accent-strong); background: var(--color-accent-soft); }
 .side-size { flex: 1; min-width: 0; text-align: center; font-size: 12px; font-weight: 600; color: var(--color-text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; padding: 0 4px; font-variant-numeric: tabular-nums; }
-.side-foot .refresh-btn.busy svg { animation: spin 0.9s linear infinite; }
-@media (prefers-reduced-motion: reduce) { .side-foot .refresh-btn.busy svg { animation: none; } }
+.refresh-btn.busy svg { animation: spin 0.9s linear infinite; }
+@media (prefers-reduced-motion: reduce) { .refresh-btn.busy svg { animation: none; } }
 .sidebar.collapsed .side-foot { flex-direction: column; border-top: 1px solid var(--color-border); }
 .sidebar.collapsed .side-size { display: none; }
 .settings-nav-foot { display: flex; align-items: center; gap: 2px; }

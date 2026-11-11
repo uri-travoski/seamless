@@ -8,7 +8,7 @@ You do not need to refresh manually; new mail appears on its own. The small **do
 
 ## The refresh button
 
-The **refresh** button (single circular arrow, like Gmail's) in the sidebar's footer bar, next to the show/hide-sidebar button, checks **all** of your mailboxes for new mail immediately. It is handy after your computer wakes from sleep, after a network change, or whenever you just want to be sure you are up to date. It nudges the existing connections rather than reconnecting, so it is cheap even with many accounts.
+The **refresh** button (single circular arrow, like Gmail's) in the top bar, just left of the mailbox switcher, checks **all** of your mailboxes for new mail immediately. It is handy after your computer wakes from sleep, after a network change, or whenever you just want to be sure you are up to date. It nudges the existing connections rather than reconnecting, so it is cheap even with many accounts.
 
 ## Pagination
 
