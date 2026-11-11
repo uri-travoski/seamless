@@ -1,15 +1,15 @@
-import nodemailer from 'nodemailer';
 import MailComposer from 'nodemailer/lib/mail-composer/index.js';
 import fs from 'node:fs';
 import path from 'node:path';
 import type { ComposePayload } from '@seamless/shared';
 import { q, one, run, insertId } from '../db.ts';
-import { decrypt, randomToken, sha256 } from '../crypto.ts';
+import { randomToken, sha256 } from '../crypto.ts';
 import { config } from '../config.ts';
 import { putBlob } from '../s3.ts';
 import { enqueueOp, syncManager, type AccountRow } from '../imap/sync.ts';
 import { setKeywords } from './store.ts';
 import { createPendingFollowup } from './followups.ts';
+import { transportForAccount, sendWithFallback } from '../transport/registry.ts';
 
 const uploadDir = path.join(config.dataDir, 'uploads');
 fs.mkdirSync(uploadDir, { recursive: true });
@@ -63,19 +63,7 @@ async function getAccount(userId: number, accountId: number): Promise<AccountRow
   return acct;
 }
 
-export async function smtpTransport(acct: AccountRow) {
-  const isOauth = acct.kind === 'gmail' || acct.kind === 'microsoft';
-  const { freshAccessToken } = await import('../oauth.ts');
-  return nodemailer.createTransport({
-    host: acct.smtp_host,
-    port: acct.smtp_port,
-    secure: !!acct.smtp_secure,
-    auth: isOauth
-      ? { type: 'OAuth2' as const, user: acct.smtp_user, accessToken: await freshAccessToken(acct.id) }
-      : { user: acct.smtp_user, pass: decrypt(acct.smtp_pass_enc) },
-    tls: { rejectUnauthorized: acct.smtp_host !== 'localhost' && acct.smtp_host !== '127.0.0.1' },
-  });
-}
+export { smtpTransport } from '../transport/outbound/smtp.ts';
 
 interface BuildOpts { draft?: boolean; date?: Date; messageId?: string; trackingToken?: string | null }
 
@@ -105,7 +93,7 @@ async function recordTrackedSend(userId: number, token: string, subject: string,
              ON CONFLICT (token) DO NOTHING`, [token, userId, opts.groupToken ?? null, opts.recipient ?? null, subject, sentAt]);
 }
 
-async function buildRaw(payload: ComposePayload, acct: AccountRow, extraFlags: BuildOpts): Promise<{ raw: Buffer; trackingToken: string | null }> {
+export async function buildRaw(payload: ComposePayload, acct: AccountRow, extraFlags: BuildOpts): Promise<{ raw: Buffer; trackingToken: string | null }> {
   let html = payload.html || '<p></p>';
   let trackingToken: string | null = null;
   if (extraFlags.trackingToken !== undefined) {
@@ -161,7 +149,8 @@ export async function sendEmail(userId: number, payload: ComposePayload): Promis
   const acct = await getAccount(userId, payload.accountId);
   const track = await trackingAllowed(userId, payload);
   const envelopeTo = [...payload.to, ...payload.cc, ...payload.bcc].map((a) => a.email);
-  const transport = await smtpTransport(acct);
+  const transport = await transportForAccount(userId, acct);
+  const ctx = { subject: payload.subject, accountId: acct.id };
   const now = Date.now();
   let raw: Buffer;
   let trackingToken: string | null = null;
@@ -178,7 +167,7 @@ export async function sendEmail(userId: number, payload: ComposePayload): Promis
       const t = randomToken(16);
       const copy = await buildRaw(payload, acct, { trackingToken: t, messageId: `<${randomToken(12)}@${host}>` });
       await recordTrackedSend(userId, t, payload.subject, now, { groupToken: trackingToken, recipient: rcpt });
-      await transport.sendMail({ envelope: { from: payload.fromEmail, to: [rcpt] }, raw: copy.raw });
+      await sendWithFallback(userId, transport, copy.raw, { from: payload.fromEmail, to: [rcpt] }, ctx);
     }
     raw = (await buildRaw(payload, acct, { trackingToken, messageId: followMsgId })).raw;
   } else {
@@ -186,7 +175,7 @@ export async function sendEmail(userId: number, payload: ComposePayload): Promis
     raw = built.raw;
     trackingToken = built.trackingToken;
     if (trackingToken) await recordTrackedSend(userId, trackingToken, payload.subject, now);
-    await transport.sendMail({ envelope: { from: payload.fromEmail, to: envelopeTo }, raw });
+    await sendWithFallback(userId, transport, raw, { from: payload.fromEmail, to: envelopeTo }, ctx);
   }
 
   // copy to the account's Sent mailbox via IMAP APPEND

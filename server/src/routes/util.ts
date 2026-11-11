@@ -30,5 +30,7 @@ export function accountToApi(r: AccountRow) {
     safeDeleteEnabled: !!r.safe_delete_enabled, safeDeleteMode: r.safe_delete_mode ?? 'trash',
     safeDeleteGraceDays: r.safe_delete_grace_days ?? 30,
     healthIgnored: !!r.health_ignored,
+    outboundTransportId: r.outbound_transport_id ?? null,
+    inboundKind: r.inbound_kind ?? 'imap',
   };
 }

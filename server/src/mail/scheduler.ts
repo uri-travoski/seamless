@@ -1,7 +1,7 @@
 import { q, one, run, bumpState } from '../db.ts';
 import { getBlob, putBlob } from '../s3.ts';
 import { sha256 } from '../crypto.ts';
-import { smtpTransport } from './send.ts';
+import { transportForAccount, sendWithFallback } from '../transport/registry.ts';
 import { setKeywords } from './store.ts';
 import { deleteMessageRow } from './ingest.ts';
 import { enqueueOp, syncManager, type AccountRow } from '../imap/sync.ts';
@@ -27,7 +27,7 @@ async function deliverOne(row: SchedRow): Promise<void> {
   const raw = await getBlob(row.s3_key);
   const envelopeTo = JSON.parse(row.envelope_to) as string[];
 
-  await (await smtpTransport(acct)).sendMail({ envelope: { from: row.envelope_from, to: envelopeTo }, raw });
+  await sendWithFallback(acct.user_id, await transportForAccount(acct.user_id, acct), raw, { from: row.envelope_from, to: envelopeTo }, { subject: '', accountId: acct.id });
 
   // remove the message from the Scheduled folder (local row + IMAP expunge)
   if (row.message_id) {

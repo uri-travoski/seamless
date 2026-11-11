@@ -435,3 +435,24 @@ export interface WsMessage {
 }
 
 export * from './templates.ts';
+
+// ---- outbound transports (T3 F-22) ----
+
+export type TransportKind = 'smtp' | 'sendgrid' | 'brevo' | 'ses' | 'mailgun' | 'postmark' | 'cloudflare';
+
+export interface ApiTransport {
+  id: number;
+  kind: TransportKind;
+  name: string;
+  /** Non-secret settings (host, port, region…). Secrets are never returned. */
+  config: Record<string, unknown>;
+  hasApiKey: boolean;
+  fallbackId: number | null;
+  dailyLimit: number | null;
+  createdAt: number;
+}
+
+export interface TransportTestResult {
+  ok: boolean;
+  steps: { name: string; ok: boolean; detail?: string }[];
+}

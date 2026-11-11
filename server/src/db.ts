@@ -728,6 +728,25 @@ CREATE TABLE trusted_senders (
 );
 `,
   },
+  {
+    id: 16,
+    sql: `
+-- T3 F-22: outbound transports (SMTP presets now, API providers later) + inbound kind per mailbox
+CREATE TABLE transports (
+  id SERIAL PRIMARY KEY,
+  user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  kind TEXT NOT NULL,
+  name TEXT NOT NULL,
+  config_enc TEXT NOT NULL,
+  fallback_id INTEGER REFERENCES transports(id) ON DELETE SET NULL,
+  daily_limit INTEGER,
+  created_at BIGINT NOT NULL
+);
+CREATE INDEX transports_user ON transports(user_id);
+ALTER TABLE accounts ADD COLUMN outbound_transport_id INTEGER REFERENCES transports(id) ON DELETE SET NULL;
+ALTER TABLE accounts ADD COLUMN inbound_kind TEXT NOT NULL DEFAULT 'imap' CHECK (inbound_kind IN ('imap','pop3','push','none'));
+`,
+  },
 ];
 
 /** Run `fn` in one transaction. Events emitted through the client are only turned into
