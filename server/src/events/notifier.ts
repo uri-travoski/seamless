@@ -37,6 +37,7 @@ export const DEFAULT_PREFS: Record<EventType, { inApp: boolean; push: boolean }>
   'storage.migration.done': { inApp: true, push: false },
   'storage.migration.failed': { inApp: true, push: false },
   'disposable.received': { inApp: true, push: false },
+  'disposable.leak': { inApp: true, push: true },
   'lead.captured': { inApp: true, push: true },
   'assignment.changed': { inApp: true, push: false },
   'security.login': { inApp: false, push: false },     // opt-in: one per sign-in is noisy
@@ -103,6 +104,8 @@ export function render(ev: EventRow): Rendered {
       return { title: p.risk === 'high' ? `Possible phishing: ${displayName(String(p.from ?? '')) || 'unknown sender'}` : displayName(String(p.from ?? '')) || 'New mail', body: String(p.subject || '(no subject)'), link: p.messageId ? `/mail/msg/m${p.messageId}` : null, groupKey: null, accountId };
     case 'disposable.received':
       return { title: `New mail to ${p.address ?? 'a disposable address'}`, body: String(p.subject ?? ''), link: p.messageId ? `/mail/msg/m${p.messageId}` : null, groupKey: null, accountId };
+    case 'disposable.leak':
+      return { title: `${p.label || p.address || 'A disposable address'} may have been leaked`, body: `Mail arrived from ${p.senderDomain ?? 'another domain'}, but you signed up with ${p.signupDomain ?? 'someone else'}`, link: p.messageId ? `/mail/msg/m${p.messageId}` : '/settings/disposable', groupKey: `leak:${p.disposableId}:${p.senderDomain}`, accountId };
     case 'mail.opened':
       return {
         title: `${p.recipient || 'Your recipient'} opened ${quote(p.subject)}`,

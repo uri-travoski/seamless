@@ -1340,3 +1340,6 @@ kbd { font-family: var(--font-mono); font-size: 11.5px; padding: 1px 6px; border
 .dns-row.bad { background: var(--color-danger-soft); }
 .dns-row.info { background: var(--color-surface); }
 .dns-row code { word-break: break-all; }
+
+.disposable-chip { margin: 6px 0 10px; font-size: 13px; display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.disposable-chip .chip { padding: 2px 8px; border-radius: 999px; background: var(--color-accent-soft); color: var(--color-accent); font-weight: 600; }

@@ -6,7 +6,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useMail, scopeToSlug, scopeName } from '../../state/mail.ts';
 import { useRouter, navigate, type Route } from '../../router.ts';
-import { CaretDownIcon, CategoryGlyph, SettingsIcon } from '../../icons.tsx';
+import { CaretDownIcon, CategoryGlyph, SettingsIcon, TimerIcon } from '../../icons.tsx';
 import { NO_AUTOFILL } from '../../state/ui.ts';
 
 interface Row { kind: 'category' | 'mailbox'; scope: string; name: string; sub?: string; unread: number; icon?: string; color: string }
@@ -133,6 +133,9 @@ export default function ScopeSwitcher({ dot }: { dot?: React.ReactNode }) {
               {boxes.map((r, i) => rowEl(r, cats.length + i))}
               {rows.length === 0 && <div className="menu-empty">Nothing matches “{filter}”</div>}
             </div>
+            <button className="switch-foot" onClick={() => { setOpen(false); navigate({ page: 'settings', tab: 'disposable' }); }}>
+              <TimerIcon size={15} /> Disposable addresses… + New address
+            </button>
             <button className="switch-foot" onClick={() => { setOpen(false); navigate({ page: 'settings', tab: 'mailboxes' }); }}>
               <SettingsIcon size={15} /> Manage mailboxes…
             </button>

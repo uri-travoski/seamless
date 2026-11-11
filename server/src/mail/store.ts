@@ -105,6 +105,8 @@ export async function rowToApi(r: MsgRow): Promise<ApiEmail> {
   const fu = await one<{ id: number; due_at: number; status: string }>(
     `SELECT id, due_at, status FROM followups WHERE message_id = ? AND user_id = ? AND status IN ('waiting','due') ORDER BY id DESC LIMIT 1`, [r.id, r.user_id]);
   const bounces = await q<{ recipient: string; status: string; diagnostic: string }>('SELECT recipient, status, diagnostic FROM bounces WHERE message_id = ? AND user_id = ? ORDER BY id', [r.id, r.user_id]);
+  const disp = await one<{ id: number; address: string; label: string; status: 'active' | 'paused' | 'disposed' }>(
+    'SELECT d.id, d.address, d.label, d.status FROM disposable_addresses d JOIN messages m ON m.disposable_id = d.id WHERE m.id = ?', [r.id]);
   return {
     id: `m${r.id}`,
     threadId: r.thread_id,
@@ -143,6 +145,7 @@ export async function rowToApi(r: MsgRow): Promise<ApiEmail> {
     followupId: fu?.id ?? null,
     followupDueAt: fu ? new Date(Number(fu.due_at)).toISOString() : null,
     bounced: bounces.length ? bounces : null,
+    disposable: disp ? { id: disp.id, address: disp.address, label: disp.label, status: disp.status } : null,
     followupStatus: fu ? (fu.status as 'waiting' | 'due') : null,
     snoozedUntil: r.snoozed_until && r.snoozed_until > Date.now() ? new Date(Number(r.snoozed_until)).toISOString() : null,
   };
@@ -234,6 +237,10 @@ export async function queryEmails(userId: number, req: EmailQueryRequest): Promi
     if (p.unread !== null) where.push(`m.unread = ${p.unread ? 'true' : 'false'}`);
     if (p.starred) where.push('m.flagged = true');
     if (p.hasAttachment) where.push('m.has_attachments = true');
+    if (p.disposable) {
+      if (p.disposable === 'any') where.push('m.disposable_id IS NOT NULL');
+      else { where.push('m.disposable_id = ?'); params.push(p.disposable); }
+    }
     if (p.risk) { where.push('EXISTS (SELECT 1 FROM message_risk r WHERE r.message_id = m.id AND r.level = ?)'); params.push(p.risk); }
     if (p.before !== null) { where.push('m.date < ?'); params.push(p.before); }
     if (p.after !== null) { where.push('m.date >= ?'); params.push(p.after); }

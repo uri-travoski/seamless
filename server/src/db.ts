@@ -809,6 +809,36 @@ CREATE TABLE push_seen (
 );
 `,
   },
+  {
+    id: 20,
+    sql: `
+-- T3 F-25: disposable addresses (aliases on a push/catch-all domain)
+CREATE TABLE disposable_addresses (
+  id SERIAL PRIMARY KEY,
+  user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  account_id INTEGER NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
+  address TEXT NOT NULL UNIQUE,
+  label TEXT NOT NULL DEFAULT '',
+  purpose TEXT NOT NULL DEFAULT '',
+  status TEXT NOT NULL DEFAULT 'active' CHECK (status IN ('active','paused','disposed')),
+  expires_at BIGINT,
+  forward_to_category INTEGER REFERENCES mailbox_categories(id) ON DELETE SET NULL,
+  notify BOOLEAN NOT NULL DEFAULT true,
+  received_count INTEGER NOT NULL DEFAULT 0,
+  dropped_count INTEGER NOT NULL DEFAULT 0,
+  last_received_at BIGINT,
+  last_sender TEXT NOT NULL DEFAULT '',
+  signup_domain TEXT,
+  leak_domains TEXT[] NOT NULL DEFAULT '{}',
+  disposed_at BIGINT,
+  created_at BIGINT NOT NULL
+);
+CREATE INDEX disposable_user ON disposable_addresses(user_id);
+CREATE INDEX disposable_account ON disposable_addresses(account_id);
+ALTER TABLE messages ADD COLUMN disposable_id INTEGER REFERENCES disposable_addresses(id) ON DELETE SET NULL;
+CREATE INDEX messages_disposable ON messages(disposable_id) WHERE disposable_id IS NOT NULL;
+`,
+  },
 ];
 
 /** Run `fn` in one transaction. Events emitted through the client are only turned into

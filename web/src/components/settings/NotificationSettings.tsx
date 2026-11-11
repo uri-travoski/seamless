@@ -14,7 +14,7 @@ interface Prefs {
 }
 
 const TYPE_NAMES: Partial<Record<EventType, string>> = {
-  'mail.received': 'New mail', 'disposable.received': 'Mail to a disposable address', 'mail.opened': 'Someone opened your email',
+  'mail.received': 'New mail', 'disposable.received': 'Mail to a disposable address', 'disposable.leak': 'A disposable address may have leaked', 'mail.opened': 'Someone opened your email',
   'reminder.due': 'Reminders', 'followup.due': 'Follow-ups due', 'snooze.woke': 'Snoozed mail is back',
   'send.failed': 'A message couldn’t be sent', 'mail.bounced': 'Bounces', 'sync.failed': 'A mailbox can’t sync', 'oauth.expiring': 'Sign-in expiring',
   'job.failed': 'A background task failed', 'storage.unreachable': 'Mail storage unreachable', 'backup.failed': 'Backup failed', 'backup.ok': 'Backup completed', 'storage.migration.done': 'Storage move finished', 'storage.migration.failed': 'Storage move failed',

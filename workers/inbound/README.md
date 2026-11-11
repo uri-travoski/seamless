@@ -11,3 +11,8 @@ message to `FALLBACK_ADDRESS` so nothing is lost.
 5. Cloudflare dashboard → Email → Email Routing → Routes: catch-all action "Send to a Worker" → `seamless-inbound`.
 
 `src/index.ts` exports `routeFor`, `sign` and `deliver` for tests; the Worker itself uses no dependencies.
+
+## Disposed addresses
+Before accepting a message the Worker fetches `GET /api/ingest/<token>/disposed` (signed with the same secret) and
+caches the list for 5 minutes. A message to a disposed address is refused at SMTP time with "Address disabled".
+If Seamless is unreachable the last known list is used; Seamless also drops disposed mail on arrival.

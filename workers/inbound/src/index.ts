@@ -46,7 +46,35 @@ export async function readRaw(raw: InboundMessage['raw']): Promise<Uint8Array> {
   return new Uint8Array(await new Response(raw as ReadableStream).arrayBuffer());
 }
 
-export interface DeliverOpts { fetchImpl?: FetchImpl; delaysMs?: number[]; now?: () => number; sleep?: (ms: number) => Promise<void> }
+const disposedCache = new Map<string, { at: number; list: Set<string> }>();
+export const DISPOSED_TTL_MS = 5 * 60_000;
+export type GetImpl = (url: string, headers: Record<string, string>) => Promise<{ status: number; json(): Promise<any> }>;
+
+/** Disposed addresses for an inbox (signed GET), cached 5 min. On any failure the previous list (or none) is used. */
+export async function disposedList(env: Env, token: string, opts: { getImpl?: GetImpl; now?: () => number } = {}): Promise<Set<string>> {
+  const now = (opts.now ?? Date.now)();
+  const hit = disposedCache.get(token);
+  if (hit && now - hit.at < DISPOSED_TTL_MS) return hit.list;
+  const secret = (JSON.parse(env.SECRETS || '{}') as Record<string, string>)[token];
+  if (!secret) return hit?.list ?? new Set();
+  const getImpl = opts.getImpl ?? ((url, headers) => fetch(url, { headers, signal: AbortSignal.timeout(3000) }));
+  try {
+    const ts = String(now);
+    const res = await getImpl(`${env.SEAMLESS_URL.replace(/\/$/, '')}/api/ingest/${token}/disposed`, {
+      'x-seamless-timestamp': ts, 'x-seamless-signature': await sign(secret, ts, new Uint8Array(0)),
+    });
+    if (res.status === 200) {
+      const list = new Set<string>(((await res.json()).addresses ?? []).map((a: string) => a.toLowerCase()));
+      disposedCache.set(token, { at: now, list });
+      return list;
+    }
+  } catch { /* keep the old list */ }
+  if (hit) disposedCache.set(token, { at: now, list: hit.list }); // back off for 5 min
+  return hit?.list ?? new Set();
+}
+export const clearDisposedCache = () => disposedCache.clear();
+
+export interface DeliverOpts { getImpl?: GetImpl; fetchImpl?: FetchImpl; delaysMs?: number[]; now?: () => number; sleep?: (ms: number) => Promise<void> }
 
 /** POST with retries (1 s, 4 s, 16 s) on network errors and 5xx/429. Returns true when Seamless accepted it (2xx). */
 export async function deliver(
@@ -82,6 +110,7 @@ export async function handleEmail(message: InboundMessage, env: Env, ctx?: { wai
   if (message.rawSize > max) { message.setReject('Message too large'); return; }
   const token = routeFor(message.to, env.ROUTES);
   if (!token) { message.setReject('Unknown recipient'); return; }
+  if ((await disposedList(env, token, opts)).has(message.to.trim().toLowerCase())) { message.setReject('Address disabled'); return; }
   const body = await readRaw(message.raw);
   if (env.SPOOL) {
     const put = env.SPOOL.put(`${Date.now()}-${token}-${Math.random().toString(36).slice(2)}.eml`, body);

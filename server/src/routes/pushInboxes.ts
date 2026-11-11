@@ -1,6 +1,6 @@
 /** Managing push inboxes ("Own domain (Cloudflare Email Routing)" mailboxes). Secrets are shown once. */
 import type { FastifyInstance } from 'fastify';
-import { q, one, insertId, bumpState } from '../db.ts';
+import { q, one, run, insertId, bumpState } from '../db.ts';
 import { encrypt } from '../crypto.ts';
 import { config } from '../config.ts';
 import { broadcast } from '../ws.ts';
@@ -54,6 +54,15 @@ export function register(app: FastifyInstance): void {
     await bumpState(); broadcast({ type: 'stateChange' }, userId);
     const row = (await mine(userId, token))!;
     return { ...view(row), secret };
+  });
+
+  app.put('/api/push-inboxes/:token', async (req, reply) => {
+    const row = await mine(uid(req), String((req.params as any).token));
+    if (!row) return reply.code(404).send({ error: 'not found' });
+    const policy = (req.body as any)?.unknownPolicy;
+    if (policy !== 'deliver' && policy !== 'reject') return reply.code(400).send({ error: 'unknownPolicy must be deliver or reject' });
+    await run('UPDATE push_inboxes SET unknown_policy = ? WHERE token = ?', [policy, row.token]);
+    return view((await mine(uid(req), row.token))!);
   });
 
   app.post('/api/push-inboxes/:token/rotate', async (req, reply) => {

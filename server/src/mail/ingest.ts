@@ -8,6 +8,7 @@ import { assignThreadId } from './threading.ts';
 import { resolvePendingFollowup } from './followups.ts';
 import { assessAndStore } from './risk.ts';
 import { recordBounce } from './dsn.ts';
+import { applyOnIngest } from './disposable.ts';
 import { evaluateFilters, loadFilters, type FilterableMessage } from './filters.ts';
 
 export function addressList(obj: AddressObject | AddressObject[] | undefined): ApiAddress[] {
@@ -137,7 +138,18 @@ export async function ingestMessage(args: IngestArgs): Promise<IngestResult | nu
     `${from.name} ${from.email} ` + [...to, ...cc].map((a) => `${a.name} ${a.email}`).join(' '),
   ]);
 
-  const isInboxLive = args.isLive && mailbox.role === 'inbox';
+  // disposable addresses (F-25): link the row; paused/disposed mail leaves the Inbox quietly
+  let disposableQuiet = false;
+  if (mailbox.role === 'inbox') {
+    const disp = await applyOnIngest({
+      userId, accountId: args.accountId, rowId, mailboxId: args.mailboxId, uid: args.uid, fromAddr: from.email, fromName: from.name,
+      candidates: [typeof deliveredTo === 'string' ? deliveredTo : null, ...to.map((a) => a.email), ...cc.map((a) => a.email)],
+      isInbox: args.isLive,
+    }).catch((err) => { console.error('[disposable] ingest hook failed:', err?.message ?? err); return null; });
+    disposableQuiet = !!disp?.quiet;
+  }
+
+  const isInboxLive = args.isLive && mailbox.role === 'inbox' && !disposableQuiet;
   let filterActions: IngestResult['filterActions'] = [];
   if (isInboxLive) {
     const fmsg: FilterableMessage = {

@@ -137,6 +137,7 @@ export interface ApiEmail {
   followupDueAt: string | null;
   followupStatus: 'waiting' | 'due' | null;
   bounced: { recipient: string; status: string; diagnostic: string }[] | null; // T3 F-22: delivery failed for these
+  disposable: { id: number; address: string; label: string; status: 'active' | 'paused' | 'disposed' } | null; // T3 F-25
 }
 
 export interface ApiAttachmentMeta {
@@ -381,12 +382,12 @@ export type EventType =
   | 'sync.failed' | 'oauth.expiring' | 'job.failed' | 'storage.unreachable'
   | 'backup.failed' | 'backup.ok'
   | 'storage.migration.done' | 'storage.migration.failed'
-  | 'disposable.received' | 'lead.captured' | 'assignment.changed'
+  | 'disposable.received' | 'disposable.leak' | 'lead.captured' | 'assignment.changed'
   | 'security.login' | 'security.2fa_changed';
 
 /** UI filter groups on the notifications page (each maps to one or more event types). */
 export const NOTIFICATION_GROUPS: { id: string; name: string; types: EventType[] }[] = [
-  { id: 'mail', name: 'New mail', types: ['mail.received', 'disposable.received'] },
+  { id: 'mail', name: 'New mail', types: ['mail.received', 'disposable.received', 'disposable.leak'] },
   { id: 'opened', name: 'Opened', types: ['mail.opened'] },
   { id: 'reminders', name: 'Reminders', types: ['reminder.due'] },
   { id: 'followups', name: 'Follow-ups', types: ['followup.due'] },
@@ -456,4 +457,13 @@ export interface ApiTransport {
 export interface TransportTestResult {
   ok: boolean;
   steps: { name: string; ok: boolean; detail?: string }[];
+}
+
+// ---- disposable addresses (T3 F-25) ----
+export interface ApiDisposable {
+  id: number; accountId: number; address: string; label: string; purpose: string;
+  status: 'active' | 'paused' | 'disposed'; expiresAt: number | null; notify: boolean;
+  receivedCount: number; droppedCount: number; lastReceivedAt: number | null; lastSender: string;
+  signupDomain: string | null; leakDomains: string[]; disposedAt: number | null; createdAt: number;
+  canUndo: boolean;
 }

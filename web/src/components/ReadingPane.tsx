@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { disposeWithUndo } from './settings/DisposableSettings.tsx';
 import type { ApiEmail, ApiEmailBody } from '@seamless/shared';
 import { useMail } from '../state/mail.ts';
 import { useSession } from '../state/session.ts';
@@ -74,6 +75,20 @@ function HtmlBody({ html, fontSize, fontFamily, blockLinks = false }: { html: st
   }, [doc, height]);
 
   return <iframe ref={ref} sandbox={blockLinks ? 'allow-same-origin' : 'allow-same-origin allow-popups'} srcDoc={doc} style={{ height }} title="Message" />;
+}
+
+/** Which disposable address this mail came in on, with a one-click Dispose (undo for 30 days). */
+function DisposableChip({ email }: { email: ApiEmail }) {
+  const refreshCurrent = useMail((s) => s.refreshCurrent);
+  const d = email.disposable;
+  if (!d) return null;
+  return (
+    <div className="disposable-chip" title={d.address}>
+      <span className="chip">{d.label || d.address}</span>
+      <span className="dim"> {d.status === 'active' ? d.address : `${d.address} (${d.status})`}</span>{' '}
+      {d.status !== 'disposed' && <button className="btn ghost danger" onClick={() => void disposeWithUndo(d.id, () => { void refreshCurrent(); })}>Dispose</button>}
+    </div>
+  );
 }
 
 /** Delivery failed for one or more recipients of this sent message (T3 F-22). */
@@ -377,6 +392,7 @@ function MessageCard({ email, expanded, onToggle }: { email: ApiEmail; expanded:
             </tbody></table>
           )}
           <BounceBanner email={email} />
+          <DisposableChip email={email} />
           <RiskBanner email={email} linksOn={linksOn} onEnableLinks={() => setLinksOn(true)} />
           {email.needsReview && <ReviewBanner email={email} />}
           {noteOpen && (

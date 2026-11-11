@@ -33,6 +33,9 @@ export async function listIdentities(userId: number): Promise<ApiIdentity[]> {
     for (const alias of JSON.parse(a.aliases) as string[]) {
       out.push({ accountId: a.id, email: alias, name: a.name, isAlias: true });
     }
+    for (const d of await q<{ address: string }>("SELECT address FROM disposable_addresses WHERE account_id = ? AND status = 'active' ORDER BY id", [a.id])) {
+      out.push({ accountId: a.id, email: d.address, name: a.name, isAlias: true });
+    }
   }
   return out;
 }

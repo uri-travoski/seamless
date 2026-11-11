@@ -7,6 +7,8 @@ import { one, run } from '../../db.ts';
 import { encrypt, decrypt, randomToken, sha256 } from '../../crypto.ts';
 import { ingestLocal } from '../../mail/localbox.ts';
 import { syncManager, type NewMailEvent } from '../../imap/sync.ts';
+import { dropIfDisposed, matchAddress, clean } from '../../mail/disposable.ts';
+import { simpleParser } from 'mailparser';
 
 export const MAX_INGEST_BYTES = 30 * 1024 * 1024;
 export const SKEW_MS = 5 * 60_000;
@@ -46,10 +48,26 @@ export async function rotateSecret(token: string): Promise<string> {
 
 export const inboxSecret = (row: PushInboxRow) => decrypt(row.secret_enc);
 
-export type IngestOutcome = { status: 202; id: number } | { status: 200; id: number | null; duplicate: true } | { status: 500; error: string };
+export type IngestOutcome = { status: 202; id: number } | { status: 200; dropped: true; reason: 'disposed' | 'unknown' } | { status: 200; id: number | null; duplicate: true } | { status: 500; error: string };
 
 /** Store one pushed message (already authenticated). Duplicate = same Message-ID + same bytes. */
 export async function ingestPush(inbox: PushInboxRow, raw: Buffer, rcpt: string | null): Promise<IngestOutcome> {
+  // disposable addresses: a disposed one is dropped (and counted) before anything is stored
+  const candidates = [rcpt];
+  if (!rcpt) {
+    const p = await simpleParser(raw.subarray(0, 65536)).catch(() => null);
+    const h = (n: string) => { const v = p?.headers.get(n) as any; return typeof v === 'string' ? v : v?.text ?? null; };
+    candidates.push(h('delivered-to'), h('x-original-to'), ...((Array.isArray(p?.to) ? p!.to : p?.to ? [p.to] : []).flatMap((a: any) => a.value.map((v: any) => v.address))));
+  }
+  if (await dropIfDisposed(inbox.account_id, candidates)) return { status: 200, dropped: true, reason: 'disposed' };
+  if (inbox.unknown_policy === 'reject' && rcpt) {
+    const addr = clean(rcpt);
+    const own = await one<{ email: string; aliases: string }>('SELECT email, aliases FROM accounts WHERE id = ?', [inbox.account_id]);
+    const mine = own && (own.email.toLowerCase() === addr || (JSON.parse(own.aliases) as string[]).some((a) => a.toLowerCase() === addr));
+    if (!mine && inbox.domains.includes(addr.split('@')[1] ?? '') && !(await matchAddress(inbox.account_id, [addr]))) {
+      return { status: 200, dropped: true, reason: 'unknown' };
+    }
+  }
   const head = raw.subarray(0, 16384).toString('latin1');
   const mid = /^message-id:[ \t]*(.+)$/im.exec(head)?.[1]?.trim() ?? '';
   const key = `${mid}|${sha256(raw)}`;

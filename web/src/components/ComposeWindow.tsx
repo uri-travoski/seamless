@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { createDisposableAddress } from './settings/DisposableSettings.tsx';
 import type { ReactNode } from 'react';
 import { useEditor, EditorContent } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
@@ -58,6 +59,20 @@ export default function ComposeWindow({ draft }: { draft: Draft }) {
   const [scheduleOpen, setScheduleOpen] = useState(false);
   const [customDt, setCustomDt] = useState('');
   const fileRef = useRef<HTMLInputElement>(null);
+  /** Sign-up forms: mint a throw-away address on the first own domain and send from it. */
+  const makeDisposable = async () => {
+    try {
+      const { domains } = await api.get<{ domains: { domain: string }[] }>('/api/disposable');
+      if (!domains.length) { toast('Set up an own-domain mailbox first (Settings > Mailboxes)', 'error'); return; }
+      const label = (draft.subject || '').trim().slice(0, 60);
+      const d = await createDisposableAddress({ domain: domains[0].domain, generator: 'words', label });
+      await useCompose.getState().loadIdentities();
+      const identity = useCompose.getState().identities.find((i) => i.email === d.address) ?? null;
+      update(draft.key, { identity });
+      void navigator.clipboard?.writeText(d.address).catch(() => {});
+      toast(`Sending from ${d.address} (copied)`);
+    } catch (e: any) { toast(e?.message ?? 'Could not create an address', 'error'); }
+  };
   const templates = useTemplates((s) => s.list);
   const [tplOpen, setTplOpen] = useState(false);
   const [tplFilter, setTplFilter] = useState('');
@@ -277,6 +292,7 @@ export default function ComposeWindow({ draft }: { draft: Draft }) {
               </option>
             ))}
           </select>
+          <button className="cc-toggle" title="Create a throw-away address on your own domain and send from it" onClick={() => void makeDisposable()}>Use a disposable address</button>
           <div style={{ flex: 1 }} />
           {!showCcBcc && <button className="cc-toggle" onClick={() => setShowCcBcc(true)}>Cc / Bcc</button>}
         </div>
