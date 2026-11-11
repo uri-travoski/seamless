@@ -132,6 +132,7 @@ export interface ApiEmail {
   deleteAt: string | null; // when the retention sweep will trash it (countdown badge)
   needsReview: boolean;
   snoozedUntil: string | null; // ISO while snoozed (hidden from the Inbox until then)
+  risk: { level: 'medium' | 'high'; reasons: { code: string; severity: 'medium' | 'high'; text: string }[] } | null; // T2 F-20
   followupId: number | null;   // T2 F-19: a live reminder on this sent message
   followupDueAt: string | null;
   followupStatus: 'waiting' | 'due' | null;

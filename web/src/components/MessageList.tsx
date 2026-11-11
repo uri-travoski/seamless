@@ -10,7 +10,7 @@ import { ContextMenu, type MenuPos } from './EmailMenu.tsx';
 import { IconContext } from '@phosphor-icons/react';
 import {
   StarIcon, EyeIcon, AttachClipIcon, EnvelopeIcon, EnvelopeOpenIcon, ArchiveIcon, JunkIcon, TrashIcon, RefreshIcon,
-  TableViewIcon, SplitViewIcon, CloseIcon, NoteIcon, RestoreMailIcon, ReplyIcon, InboxIcon, SnoozeIcon,
+  TableViewIcon, SplitViewIcon, CloseIcon, NoteIcon, RestoreMailIcon, ReplyIcon, InboxIcon, SnoozeIcon, ShieldWarnIcon,
 } from '../icons.tsx';
 import { useSession } from '../state/session.ts';
 import { useUi } from '../state/ui.ts';
@@ -69,6 +69,16 @@ function OpenBadge({ email }: { email: ApiEmail }) {
     );
   }
   return null;
+}
+
+/** Shield on rows with a phishing / lookalike warning. */
+function RiskFlag({ email }: { email: ApiEmail }) {
+  if (!email.risk) return null;
+  return (
+    <span className={`risk-flag ${email.risk.level}`} title={email.risk.reasons.map((r) => r.text).join('\n')}>
+      <ShieldWarnIcon size={16} weight="fill" aria-label={email.risk.level === 'high' ? 'Possible phishing' : 'Be careful'} />
+    </span>
+  );
 }
 
 /** Hover actions: archive, delete, read/unread, spam (T1 F-16). */
@@ -152,6 +162,7 @@ function Row({ email, selected, onMenu }: { email: ApiEmail; selected: boolean; 
           <div className="line1">
             <span className="from">{who}</span>
             <span className="meta-icons">
+              <RiskFlag email={email} />
               <OpenBadge email={email} />
               {email.hasNote && <NoteIcon size={18} weight="fill" className="note-flag" aria-label="Has a private note" />}
               {email.hasAttachment && <AttachClipIcon size={14} aria-label="Has attachment" />}
@@ -200,6 +211,7 @@ function TableRow({ email, selected, onMenu }: { email: ApiEmail; selected: bool
         {email.preview && <span className="tbl-snippet"> — {email.preview}</span>}
       </span>
       <span className="tbl-metas">
+        <RiskFlag email={email} />
         <OpenBadge email={email} />
         {email.hasNote && <NoteIcon size={18} weight="fill" className="note-flag" aria-label="Has a private note" />}
         {email.hasAttachment && <AttachClipIcon size={14} aria-label="Has attachment" />}

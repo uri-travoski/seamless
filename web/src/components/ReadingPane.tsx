@@ -16,7 +16,7 @@ import { actions } from '../state/actions.ts';
 import {
   EyeIcon, ImageIcon, AttachIcon, PencilIcon, ReplyIcon, ReplyAllIcon, ForwardIcon, DownloadIcon,
   EnvelopeOpenIcon, BackIcon, ArchiveIcon, JunkIcon, TrashIcon, EnvelopeIcon, SparkleIcon, CloseIcon,
-  KebabIcon, SourceIcon, NoteIcon, CaretDownIcon, RestoreMailIcon, StarIcon, InboxIcon, ChartIcon,
+  KebabIcon, SourceIcon, NoteIcon, CaretDownIcon, RestoreMailIcon, StarIcon, InboxIcon, ChartIcon, ShieldWarnIcon,
 } from '../icons.tsx';
 import { IconContext } from '@phosphor-icons/react';
 
@@ -39,7 +39,7 @@ function clientName(ua: string): string {
 }
 
 /** Sandboxed iframe (no scripts) with auto-height for HTML mail. */
-function HtmlBody({ html, fontSize, fontFamily }: { html: string; fontSize: number; fontFamily: string }) {
+function HtmlBody({ html, fontSize, fontFamily, blockLinks = false }: { html: string; fontSize: number; fontFamily: string; blockLinks?: boolean }) {
   const ref = useRef<HTMLIFrameElement>(null);
   const [height, setHeight] = useState(120);
 
@@ -57,6 +57,7 @@ function HtmlBody({ html, fontSize, fontFamily }: { html: string; fontSize: numb
     blockquote { border-left: 3px solid #cdd4da; margin: 0.4em 0; padding-left: 12px; color: #5b6570; }
     pre { white-space: pre-wrap; }
     table { max-width: 100%; }
+    ${blockLinks ? 'a { pointer-events: none; cursor: default; text-decoration: line-through; color: #8a8f98 !important; }' : ''}
   </style></head><body>${html}</body></html>`;
 
   useEffect(() => {
@@ -72,7 +73,35 @@ function HtmlBody({ html, fontSize, fontFamily }: { html: string; fontSize: numb
     return () => { iframe.removeEventListener('load', measure); clearTimeout(t1); clearTimeout(t2); };
   }, [doc, height]);
 
-  return <iframe ref={ref} sandbox="allow-same-origin allow-popups" srcDoc={doc} style={{ height }} title="Message" />;
+  return <iframe ref={ref} sandbox={blockLinks ? 'allow-same-origin' : 'allow-same-origin allow-popups'} srcDoc={doc} style={{ height }} title="Message" />;
+}
+
+/** Phishing / lookalike warning (T2 F-20). High risk also switches the links off until you say so. */
+function RiskBanner({ email, linksOn, onEnableLinks }: { email: ApiEmail; linksOn: boolean; onEnableLinks: () => void }) {
+  const r = email.risk;
+  const refreshCurrent = useMail((s) => s.refreshCurrent);
+  if (!r) return null;
+  const high = r.level === 'high';
+  const safe = async () => {
+    try { await api.post(`/api/risk/${email.id}/safe`); toast(`${email.from[0]?.email ?? 'The sender'} is now trusted`); await refreshCurrent(); }
+    catch { toast('Could not save', 'error'); }
+  };
+  const report = async () => {
+    try { await api.post(`/api/risk/${email.id}/report`); toast('Reported and moved to Spam'); await refreshCurrent(); }
+    catch { toast('Could not report', 'error'); }
+  };
+  return (
+    <div className={`risk-banner ${r.level}`} role="alert">
+      <div className="risk-head"><ShieldWarnIcon size={18} weight="fill" /> <strong>{high ? 'Be careful — this may be a scam' : 'Take care with this message'}</strong></div>
+      <ul>{r.reasons.map((x) => <li key={x.code}>{x.text}</li>)}</ul>
+      <div className="risk-actions">
+        <button className="btn danger small" onClick={() => void report()}>Report phishing</button>
+        <button className="btn small" onClick={() => void safe()}>This is safe</button>
+        {high && !linksOn && <button className="btn ghost small" onClick={onEnableLinks}>Enable links anyway</button>}
+        {high && linksOn && <span className="dim">Links are on — be careful.</span>}
+      </div>
+    </div>
+  );
 }
 
 /** Review lane: one-tap decision for mail the cascade would not guess about. */
@@ -231,6 +260,7 @@ function MessageCard({ email, expanded, onToggle }: { email: ApiEmail; expanded:
   const patchEmail = useMail((s) => s.patchEmail);
   const [body, setBody] = useState<ApiEmailBody | null>(null);
   const [remoteLoaded, setRemoteLoaded] = useState(false);
+  const [linksOn, setLinksOn] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [detailsOpen, setDetailsOpen] = useState(false);
   const [noteOpen, setNoteOpen] = useState(false);
@@ -335,6 +365,7 @@ function MessageCard({ email, expanded, onToggle }: { email: ApiEmail; expanded:
               <tr><th>Size:</th><td>{fmtSize(email.size)}</td></tr>
             </tbody></table>
           )}
+          <RiskBanner email={email} linksOn={linksOn} onEnableLinks={() => setLinksOn(true)} />
           {email.needsReview && <ReviewBanner email={email} />}
           {noteOpen && (
             <div className="note-box">
@@ -384,7 +415,7 @@ function MessageCard({ email, expanded, onToggle }: { email: ApiEmail; expanded:
           <div className="msg-body">
             {!body && <div style={{ color: 'var(--md-text-faint)', fontSize: 13 }}>Loading…</div>}
             {body && (body.html
-              ? <HtmlBody html={body.html} fontSize={settings.fontSize} fontFamily={settings.fontFamily} />
+              ? <HtmlBody html={body.html} fontSize={settings.fontSize} fontFamily={settings.fontFamily} blockLinks={email.risk?.level === 'high' && !linksOn} />
               : <div className="plain">{body.text ?? '(empty message)'}</div>)}
           </div>
           {body && body.attachments.length > 0 && (

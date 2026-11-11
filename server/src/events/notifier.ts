@@ -99,7 +99,7 @@ export function render(ev: EventRow): Rendered {
   const accountId = typeof p.accountId === 'number' ? p.accountId : null;
   switch (ev.type) {
     case 'mail.received':
-      return { title: displayName(String(p.from ?? '')) || 'New mail', body: String(p.subject || '(no subject)'), link: p.messageId ? `/mail/msg/m${p.messageId}` : null, groupKey: null, accountId };
+      return { title: p.risk === 'high' ? `Possible phishing: ${displayName(String(p.from ?? '')) || 'unknown sender'}` : displayName(String(p.from ?? '')) || 'New mail', body: String(p.subject || '(no subject)'), link: p.messageId ? `/mail/msg/m${p.messageId}` : null, groupKey: null, accountId };
     case 'disposable.received':
       return { title: `New mail to ${p.address ?? 'a disposable address'}`, body: String(p.subject ?? ''), link: p.messageId ? `/mail/msg/m${p.messageId}` : null, groupKey: null, accountId };
     case 'mail.opened':

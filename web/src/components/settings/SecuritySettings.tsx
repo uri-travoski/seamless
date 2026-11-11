@@ -134,6 +134,9 @@ export default function SecuritySettings() {
 
       <h3>Password</h3>
       <ChangePassword />
+
+      <h3>Trusted senders</h3>
+      <TrustedSenders />
     </div>
   );
 }
@@ -150,6 +153,38 @@ function ChangePassword() {
       <div className="field" style={{ marginBottom: 0 }}><label>Current password</label><input className="text-input" type="password" value={cur} onChange={(e) => setCur(e.target.value)} /></div>
       <div className="field" style={{ marginBottom: 0 }}><label>New password</label><input className="text-input" type="password" value={next} onChange={(e) => setNext(e.target.value)} /></div>
       <button className="btn" disabled={!cur || next.length < 8} onClick={() => void save()}>Change</button>
+    </div>
+  );
+}
+
+interface Trusted { id: number; kind: 'address' | 'domain'; value: string }
+
+/** Senders and domains that never get a phishing warning (added with “This is safe” on a warning). */
+function TrustedSenders() {
+  const [list, setList] = useState<Trusted[]>([]);
+  const [val, setVal] = useState('');
+  const load = () => { void api.get<Trusted[]>('/api/trusted-senders').then(setList).catch(() => {}); };
+  useEffect(load, []);
+  const add = async () => {
+    try { await api.post('/api/trusted-senders', { value: val }); setVal(''); load(); }
+    catch (e: any) { toast(e?.message ?? 'Could not add', 'error'); }
+  };
+  return (
+    <div>
+      <p className="settings-desc">Messages from these never show a phishing warning. Use it for people and companies you know are genuine.</p>
+      {list.length === 0 ? <p className="dim">None yet.</p> : (
+        <table className="plain-table"><thead><tr><th>Sender</th><th>Type</th><th /></tr></thead><tbody>
+          {list.map((t) => (
+            <tr key={t.id}><td>{t.value}</td><td>{t.kind === 'domain' ? 'Whole domain' : 'Address'}</td>
+              <td><button className="btn ghost small" onClick={async () => { await api.del(`/api/trusted-senders/${t.id}`); load(); }}>Remove</button></td></tr>
+          ))}
+        </tbody></table>
+      )}
+      <div className="field-row" style={{ alignItems: 'flex-end', maxWidth: 560, marginTop: 10 }}>
+        <div className="field" style={{ marginBottom: 0 }}><label>Add an address or domain</label>
+          <input className="text-input" value={val} placeholder="billing@supplier.com or supplier.com" onChange={(e) => setVal(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && val && void add()} /></div>
+        <button className="btn" disabled={!val.trim()} onClick={() => void add()}>Add</button>
+      </div>
     </div>
   );
 }

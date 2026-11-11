@@ -14,6 +14,7 @@ export interface ParsedSearch {
   unread: boolean | null;
   starred: boolean | null;
   hasAttachment: boolean | null;
+  risk: 'high' | 'medium' | null; // T2 F-20: risk:high / risk:medium
   before: number | null;      // epoch ms
   after: number | null;
 }
@@ -36,7 +37,7 @@ function ftsEscape(term: string): string {
 export function parseSearch(query: string): ParsedSearch {
   const out: ParsedSearch = {
     fts: null, from: null, to: null, label: null, category: null, inRole: null,
-    unread: null, starred: null, hasAttachment: null, before: null, after: null,
+    unread: null, starred: null, hasAttachment: null, risk: null, before: null, after: null,
   };
   const ftsTerms: string[] = [];
   // tokens: key:"quoted value" | key:value | "quoted phrase" | word
@@ -65,6 +66,7 @@ export function parseSearch(query: string): ParsedSearch {
         case 'has':
           if (val === 'attachment') out.hasAttachment = true;
           continue;
+        case 'risk': if (val === 'high' || val === 'medium') out.risk = val; continue;
         case 'before': { const t = Date.parse(val); if (!isNaN(t)) out.before = t; continue; }
         case 'after': { const t = Date.parse(val); if (!isNaN(t)) out.after = t; continue; }
         default: {

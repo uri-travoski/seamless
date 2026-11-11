@@ -700,6 +700,27 @@ CREATE INDEX followups_user ON followups(user_id, status);
 CREATE INDEX followups_header ON followups(message_id_header) WHERE message_id IS NULL;
 `,
   },
+  {
+    id: 14,
+    sql: `
+-- T2 F-20: phishing / lookalike risk per message + the user's "this sender is safe" list
+CREATE TABLE message_risk (
+  message_id INTEGER PRIMARY KEY REFERENCES messages(id) ON DELETE CASCADE,
+  score INTEGER NOT NULL,
+  level TEXT NOT NULL CHECK (level IN ('none','medium','high')),
+  reasons JSONB NOT NULL DEFAULT '[]',
+  created_at BIGINT NOT NULL
+);
+CREATE TABLE trusted_senders (
+  id SERIAL PRIMARY KEY,
+  user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  kind TEXT NOT NULL CHECK (kind IN ('address','domain')),
+  value TEXT NOT NULL,
+  created_at BIGINT NOT NULL,
+  UNIQUE (user_id, kind, value)
+);
+`,
+  },
 ];
 
 /** Run `fn` in one transaction. Events emitted through the client are only turned into

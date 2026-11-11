@@ -6,6 +6,7 @@ import { putBlob } from '../s3.ts';
 import { config } from '../config.ts';
 import { assignThreadId } from './threading.ts';
 import { resolvePendingFollowup } from './followups.ts';
+import { assessAndStore } from './risk.ts';
 import { evaluateFilters, loadFilters, type FilterableMessage } from './filters.ts';
 
 export function addressList(obj: AddressObject | AddressObject[] | undefined): ApiAddress[] {
@@ -147,6 +148,7 @@ export async function ingestMessage(args: IngestArgs): Promise<IngestResult | nu
     await applyLocalFilterActions(rowId, filterActions);
   }
 
+  await assessAndStore(userId, rowId, parsed, mailbox.role).catch((err) => console.error('[risk] assess failed:', err?.message ?? err));  // never breaks ingest
   if (mailbox.role === 'sent') await resolvePendingFollowup(userId, rowId, messageId, threadId).catch(() => {});
   await bumpState();
   return { rowId, userId, parsed, filterActions, isInboxLive };

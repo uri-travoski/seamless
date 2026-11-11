@@ -7,7 +7,7 @@ import path from 'node:path';
 import fs from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { config } from './config.ts';
-import { migrate, currentState } from './db.ts';
+import { migrate, currentState, one } from './db.ts';
 import { ensureBucket } from './s3.ts';
 import { registerRoutes, sessionUser } from './routes/index.ts';
 import { syncManager, type NewMailEvent } from './imap/sync.ts';
@@ -86,8 +86,9 @@ syncManager.on('newMail', (ev: NewMailEvent) => {
   broadcast({ type: 'newMail', accountId: ev.accountId, from: ev.from, subject: ev.subject, mailboxRole: 'inbox' }, ev.userId);
   kickClassifier();
   // in-app notification + push (per the user's notification prefs) via the event bus
-  void emitEvent(ev.userId, 'mail.received', { type: 'message', id: ev.rowId },
-    { messageId: ev.rowId, accountId: ev.accountId, from: ev.from, subject: ev.subject })
+  void one<{ level: string }>('SELECT level FROM message_risk WHERE message_id = ?', [ev.rowId]).catch(() => undefined)
+    .then((risk) => emitEvent(ev.userId, 'mail.received', { type: 'message', id: ev.rowId },
+      { messageId: ev.rowId, accountId: ev.accountId, from: ev.from, subject: ev.subject, ...(risk?.level === 'high' ? { risk: 'high' } : {}) }))
     .catch((err) => console.error('[events] mail.received failed:', err?.message ?? err));
   if (ev.aiCategorize) {
     categorizeEmail(ev.userId, ev.rowId)

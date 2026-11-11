@@ -101,6 +101,7 @@ export async function rowToApi(r: MsgRow): Promise<ApiEmail> {
     if (ta && ta.c > 0) { threadOpenCount = ta.c; threadOpenAt = new Date(ta.last!).toISOString(); }
   }
   const hasNote = !!(await one('SELECT 1 FROM notes WHERE user_id = ? AND email_id = ?', [r.user_id, `m${r.id}`]));
+  const risk = await one<{ level: string; reasons: any }>('SELECT level, reasons FROM message_risk WHERE message_id = ?', [r.id]);
   const fu = await one<{ id: number; due_at: number; status: string }>(
     `SELECT id, due_at, status FROM followups WHERE message_id = ? AND user_id = ? AND status IN ('waiting','due') ORDER BY id DESC LIMIT 1`, [r.id, r.user_id]);
   return {
@@ -137,6 +138,7 @@ export async function rowToApi(r: MsgRow): Promise<ApiEmail> {
     disposition: (r.disposition as 'keep' | 'delete') ?? 'keep',
     deleteAt: r.delete_at ? new Date(r.delete_at).toISOString() : null,
     needsReview: r.classify_state === 'needs_review',
+    risk: risk && risk.level !== 'none' ? { level: risk.level as 'medium' | 'high', reasons: risk.reasons } : null,
     followupId: fu?.id ?? null,
     followupDueAt: fu ? new Date(Number(fu.due_at)).toISOString() : null,
     followupStatus: fu ? (fu.status as 'waiting' | 'due') : null,
@@ -230,6 +232,7 @@ export async function queryEmails(userId: number, req: EmailQueryRequest): Promi
     if (p.unread !== null) where.push(`m.unread = ${p.unread ? 'true' : 'false'}`);
     if (p.starred) where.push('m.flagged = true');
     if (p.hasAttachment) where.push('m.has_attachments = true');
+    if (p.risk) { where.push('EXISTS (SELECT 1 FROM message_risk r WHERE r.message_id = m.id AND r.level = ?)'); params.push(p.risk); }
     if (p.before !== null) { where.push('m.date < ?'); params.push(p.before); }
     if (p.after !== null) { where.push('m.date >= ?'); params.push(p.after); }
     // search excludes trash/junk unless explicitly requested
