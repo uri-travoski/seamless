@@ -1,4 +1,4 @@
-import { S3Client, PutObjectCommand, GetObjectCommand, CreateBucketCommand, HeadBucketCommand, DeleteObjectCommand, ListObjectsV2Command } from '@aws-sdk/client-s3';
+import { S3Client, PutObjectCommand, GetObjectCommand, CreateBucketCommand, HeadBucketCommand, DeleteObjectCommand, ListObjectsV2Command, HeadObjectCommand } from '@aws-sdk/client-s3';
 import { config } from './config.ts';
 
 /** The blob operations the app needs. S3/R2 in production; the tests swap in an
@@ -8,6 +8,8 @@ export interface BlobStore {
   get(key: string): Promise<Buffer>;
   list(prefix: string): Promise<string[]>;
   del(key: string): Promise<void>;
+  /** Size in bytes, or null when the object does not exist. Optional: the in-memory test store falls back to get(). */
+  head?(key: string): Promise<number | null>;
 }
 
 export interface S3Config {
@@ -52,6 +54,16 @@ export function makeStore(cfg: S3Config): Store {
 
     async del(key) {
       await client.send(new DeleteObjectCommand({ Bucket: cfg.bucket, Key: key }));
+    },
+
+    async head(key) {
+      try {
+        const r = await client.send(new HeadObjectCommand({ Bucket: cfg.bucket, Key: key }));
+        return Number(r.ContentLength ?? 0);
+      } catch (err: any) {
+        if (err?.$metadata?.httpStatusCode === 404 || err?.name === 'NotFound') return null;
+        throw err;
+      }
     },
 
     /** Paged, so a bucket holding years of mail still enumerates a prefix fully. */

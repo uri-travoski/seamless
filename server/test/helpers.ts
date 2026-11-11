@@ -43,7 +43,7 @@ export let TEST_USER = 0;
 /** Wipe all data and recreate the default test user. */
 export async function resetDb(): Promise<void> {
   await run('TRUNCATE users RESTART IDENTITY CASCADE');
-  await run('TRUNCATE tracking_opens, op_queue, scheduled_sends, jobs, storage_targets RESTART IDENTITY');
+  await run('TRUNCATE tracking_opens, op_queue, scheduled_sends, jobs, storage_targets, storage_migrations, storage_migration_items RESTART IDENTITY');
   await run("DELETE FROM settings WHERE key = 'state' OR key LIKE 'alert:%'");
   TEST_USER = await insertId('INSERT INTO users(email, name, password_hash, role, created_at) VALUES (?,?,?,?,?)',
     ['test@local', 'Test User', hashPassword('password123'), 'admin', Date.now()]);

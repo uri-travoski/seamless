@@ -34,7 +34,7 @@ A backup stored in the same bucket as your mail is lost together with it. Seamle
 2. The active target saved here
 3. The server's built-in defaults (or the bucket a restored backup remembers)
 
-If you already have mail stored, a new mail target is saved but **not** switched on — moving mail to another bucket needs the migration (a later release), so nothing is stranded.
+If you already have mail stored, a new mail target is saved but **not** switched on — moving mail to another bucket needs a migration (next section), so nothing is stranded.
 
 ## First run
 
@@ -43,3 +43,17 @@ The setup screen has an optional **Choose where mail is stored** box. Leave it o
 ## Re-ingest spool
 
 If you set up a spool, **Settings → Health → Mail storage → Re-ingest spool** reads every saved email from it and delivers it again. It is safe to press more than once: messages already received are skipped.
+
+## Moving to another bucket
+
+Add the new bucket as a storage target first (it is tested when you save it), then **Settings → Storage → Moving to another bucket → Move to another bucket…**. The same works for backups.
+
+1. Pick what to move and where. You see how many objects and roughly how long it will take.
+2. **Start.** Seamless makes a list of everything, copies it in batches (you can leave the page; it carries on, and carries on after a server restart), then checks the copy: every object's size, a checksum on a sample (10 % plus the newest 1000, or every object if you tick *Check every object byte by byte*), 20 random messages are opened from the new bucket and compared with the database, and the counts must match.
+3. **Switch over.** Mail is held for a few seconds (at most 30) while anything that arrived during the copy is copied and checked, then Seamless starts using the new bucket. Admins get a notification when it finishes or fails.
+
+If the check finds a problem the migration stops with **Stopped — nothing was switched**; use *Retry failed objects* (which copies them again) or *Cancel*.
+
+**Your old bucket is kept for 14 days and never deleted automatically.** Until then *Switch back to …* copies anything new back to the old bucket and switches to it again. After 14 days *Clean up old storage* appears; it deletes the old copies only after you type the old bucket's name.
+
+If the server's environment names the mail bucket (`S3_*`), that still wins after a restart. Remove those variables to keep the new bucket.

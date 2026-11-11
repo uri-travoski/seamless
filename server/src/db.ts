@@ -862,6 +862,53 @@ CREATE TABLE storage_targets (
 CREATE INDEX storage_targets_role ON storage_targets(role, active);
 `,
   },
+  {
+    id: 22,
+    sql: `
+-- T3 F-27: verified storage migration. source_enc / dest_enc = encrypt(JSON S3Config) so rollback and cleanup
+-- still work when the source was the environment's bucket (no storage_targets row).
+CREATE TABLE storage_migrations (
+  id SERIAL PRIMARY KEY,
+  role TEXT NOT NULL CHECK (role IN ('mail','backup')),
+  kind TEXT NOT NULL DEFAULT 'forward' CHECK (kind IN ('forward','rollback')),
+  mode TEXT NOT NULL DEFAULT 'sample' CHECK (mode IN ('sample','strict')),
+  status TEXT NOT NULL DEFAULT 'planning',
+  from_target_id INTEGER,
+  to_target_id INTEGER,
+  source_enc TEXT NOT NULL,
+  dest_enc TEXT NOT NULL,
+  source_bucket TEXT NOT NULL,
+  dest_bucket TEXT NOT NULL,
+  source_prefix TEXT NOT NULL DEFAULT '',
+  related_id INTEGER,
+  total_items INTEGER NOT NULL DEFAULT 0,
+  total_bytes BIGINT NOT NULL DEFAULT 0,
+  copied_items INTEGER NOT NULL DEFAULT 0,
+  copied_bytes BIGINT NOT NULL DEFAULT 0,
+  verified_items INTEGER NOT NULL DEFAULT 0,
+  retain_until BIGINT,
+  error TEXT,
+  started_by INTEGER,
+  created_at BIGINT NOT NULL,
+  updated_at BIGINT NOT NULL,
+  started_at BIGINT,
+  finished_at BIGINT,
+  switched_at BIGINT,
+  cleaned_at BIGINT
+);
+CREATE TABLE storage_migration_items (
+  id BIGSERIAL PRIMARY KEY,
+  migration_id INTEGER NOT NULL REFERENCES storage_migrations(id) ON DELETE CASCADE,
+  key TEXT NOT NULL,
+  size BIGINT NOT NULL DEFAULT 0,
+  status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending','copied','verified','failed')),
+  to_verify BOOLEAN NOT NULL DEFAULT false,
+  error TEXT,
+  UNIQUE (migration_id, key)
+);
+CREATE INDEX storage_migration_items_status ON storage_migration_items(migration_id, status);
+`,
+  },
 ];
 
 /** Run `fn` in one transaction. Events emitted through the client are only turned into

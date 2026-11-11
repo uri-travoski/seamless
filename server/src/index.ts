@@ -32,6 +32,7 @@ import { startContactHarvest } from './contacts.ts';
 import { startBackupScheduler } from './backup/schedule.ts';
 import { initMailStore } from './backup/mailref.ts';
 import { applyActiveTargets, backupEnvSet } from './storage/targets.ts';
+import { resumeMigrations } from './storage/migrate.ts';
 import { emitEvent, startEventPrune } from './events/emit.ts';
 import { pruneExpiredSessions, sessionToken } from './auth/sessions.ts';
 import { registerSecurityHeaders } from './security/headers.ts';
@@ -133,6 +134,7 @@ setScheduleCanceller((messageId) => cancelScheduleByMessageId(messageId));
 onScheduledSend(async () => broadcast({ type: 'stateChange', state: await currentState() }));
 startScheduler();
 startJobRunner();
+resumeMigrations().catch((err) => console.error('storage migration resume failed:', err?.message ?? err));
 startHealthAlerts();
 
 // classification + retention workers

@@ -3,6 +3,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { api } from '../../api/client.ts';
 import { toast } from '../../toast.ts';
 import { formatBytes } from '../Sidebar.tsx';
+import StorageMigration from './StorageMigration.tsx';
 import StorageForm, { TestSteps, emptyForm, PROVIDERS, type FormValue, type Role, type TestResult } from './StorageForm.tsx';
 
 interface Target {
@@ -76,8 +77,9 @@ export default function StorageSettings() {
           {usage && <li>{usage.objects.toLocaleString()} messages · about {formatBytes(usage.bytes)}</li>}
         </ul>
         {data.envOverride.mail && <div className="health-note">This server has <code>S3_*</code> set in its environment, which takes priority over anything saved here. Remove those variables to use a bucket chosen in this page.</div>}
-        <button className="btn ghost small" disabled title="Available in the next update">Migrate…</button>
       </section>
+
+      <StorageMigration targets={data.targets} onChanged={() => void load()} />
 
       {(['mail', 'backup', 'spool'] as Role[]).map((role) => {
         const rows = data.targets.filter((t) => t.role === role);

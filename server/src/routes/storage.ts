@@ -11,6 +11,10 @@ import {
 } from '../storage/targets.ts';
 import { reingestSpool } from '../storage/spool.ts';
 import { run } from '../db.ts';
+import {
+  listMigrations, getMigration, startMigration, startRollback, cancelMigration, retryMigration, cleanupSource,
+  planSummary, failedItems, view as migrationView,
+} from '../storage/migrate.ts';
 
 function parse(b: any, fallback?: TargetRow): TargetInput | string {
   const role = (b.role ?? fallback?.role) as Role;
@@ -50,6 +54,7 @@ async function sameBucketProblem(i: TargetInput): Promise<string | null> {
 }
 
 export function register(app: FastifyInstance): void {
+  registerMigrations(app);
   const guard = (req: any, reply: any) => (isAdmin(req) ? false : (reply.code(403).send({ error: 'admin only' }), true));
 
   app.get('/api/storage/targets', async (req, reply) => {
@@ -101,7 +106,7 @@ export function register(app: FastifyInstance): void {
     let active = true;
     if (i.role === 'mail' && (await mailObjectCount()) > 0) {
       active = false;
-      note = 'Saved but not switched on: you already have mail stored elsewhere. Moving it needs the migration (coming next).';
+      note = 'Saved but not switched on: you already have mail stored elsewhere. Use “Move to another bucket” on this page to move your mail there.';
     }
     const id = await insertTarget({ ...i, accessKey: i.accessKey, secretKey: i.secretKey }, active, test);
     const row = (await getTarget(id))!;
@@ -165,4 +170,52 @@ async function applyRow(row: TargetRow): Promise<void> {
   if (overridden(row.role)) return;
   if (row.role === 'mail') { const c = toS3Config(row); setMailStore(c); await saveMailStoreConfig(c); }
   else if (row.role === 'backup') setBackupStore(toS3Config(row));
+}
+
+/** Storage migrations (F-27). Admin only. */
+export function registerMigrations(app: FastifyInstance): void {
+  const guard = (req: any, reply: any) => (isAdmin(req) ? false : (reply.code(403).send({ error: 'admin only' }), true));
+  const id = (req: any) => Number(req.params.id);
+
+  app.get('/api/storage/migrations', async (req, reply) => {
+    if (guard(req, reply)) return;
+    return { migrations: (await listMigrations()).map(migrationView) };
+  });
+
+  app.get('/api/storage/migrations/plan', async (req, reply) => {
+    if (guard(req, reply)) return;
+    const role = String((req.query as any).role ?? 'mail');
+    if (role !== 'mail' && role !== 'backup') return reply.code(400).send({ error: 'role must be mail or backup' });
+    return planSummary(role);
+  });
+
+  app.post('/api/storage/migrations', async (req, reply) => {
+    if (guard(req, reply)) return;
+    const b = (req.body ?? {}) as any;
+    if (b.role !== 'mail' && b.role !== 'backup') return reply.code(400).send({ error: 'role must be mail or backup' });
+    const r = await startMigration({ role: b.role, toTargetId: Number(b.toTargetId), mode: b.mode, userId: (req as any).sessionUser?.id });
+    if ('error' in r) return reply.code(400).send(r);
+    return r;
+  });
+
+  app.get('/api/storage/migrations/:id', async (req, reply) => {
+    if (guard(req, reply)) return;
+    const m = await getMigration(id(req));
+    if (!m) return reply.code(404).send({ error: 'not found' });
+    return { ...migrationView(m), failures: await failedItems(m.id) };
+  });
+
+  const act = (path: string, fn: (mid: number, req: any) => Promise<any>) =>
+    app.post(`/api/storage/migrations/:id/${path}`, async (req, reply) => {
+      if (guard(req, reply)) return;
+      if (!(await getMigration(id(req)))) return reply.code(404).send({ error: 'not found' });
+      const r = await fn(id(req), req);
+      if (r && r.error) return reply.code(400).send(r);
+      if (r === false) return reply.code(400).send({ error: 'not possible in this state' });
+      return r === true ? { ok: true } : r;
+    });
+  act('retry', (mid) => retryMigration(mid));
+  act('cancel', (mid) => cancelMigration(mid));
+  act('rollback', (mid, req) => startRollback(mid, req.sessionUser?.id));
+  act('cleanup', (mid, req) => cleanupSource(mid, String(req.body?.bucket ?? '')));
 }

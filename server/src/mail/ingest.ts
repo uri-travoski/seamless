@@ -3,6 +3,7 @@ import type { ApiAddress, ApiAttachmentMeta } from '@seamless/shared';
 import { one, run, insertId, bumpState } from '../db.ts';
 import { sha256 } from '../crypto.ts';
 import { putBlob } from '../s3.ts';
+import { waitIfPaused } from '../storage/pause.ts';
 import { config } from '../config.ts';
 import { assignThreadId } from './threading.ts';
 import { resolvePendingFollowup } from './followups.ts';
@@ -69,6 +70,7 @@ export interface IngestResult {
 }
 
 export async function ingestMessage(args: IngestArgs): Promise<IngestResult | null> {
+  await waitIfPaused();   // a storage migration is flipping buckets (≤ 30 s)
   const exists = await one('SELECT id FROM messages WHERE mailbox_id = ? AND uid = ?', [args.mailboxId, args.uid]);
   if (exists) return null;
 
