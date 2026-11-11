@@ -9,7 +9,7 @@ import { fileURLToPath } from 'node:url';
 import { config } from './config.ts';
 import { migrate, currentState } from './db.ts';
 import { ensureBucket } from './s3.ts';
-import { registerRoutes, sessionUser } from './routes.ts';
+import { registerRoutes, sessionUser } from './routes/index.ts';
 import { syncManager, type NewMailEvent } from './imap/sync.ts';
 import { addClient, broadcast } from './ws.ts';
 import { initPush, notifyUser } from './push.ts';
