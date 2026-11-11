@@ -206,6 +206,19 @@ export interface ApiIdentity {
   email: string;
   name: string;
   isAlias: boolean;
+  /** T4 F-30: identity record (absent for disposable addresses) */
+  id?: number;
+  businessId?: number | null;
+  isDefault?: boolean;
+  signatureHtml?: string | null;
+  replyTo?: string | null;
+  bccSelf?: boolean;
+  transportId?: number | null;
+}
+
+export interface ApiBusiness {
+  id: number; name: string; shortName: string; hasLogo: boolean; brandColor: string; website: string; phone: string;
+  abn: string; address: string; defaultSignatureHtml: string; disclaimerHtml: string;
 }
 
 export interface ComposePayload {

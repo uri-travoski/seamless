@@ -1,6 +1,7 @@
 /* In-process Fastify app for HTTP-level tests (fastify.inject, no network). */
 import Fastify, { type FastifyInstance } from 'fastify';
 import cookie from '@fastify/cookie';
+import multipart from '@fastify/multipart';
 import { registerRoutes } from '../src/routes/index.ts';
 import { registerSecurityHeaders } from '../src/security/headers.ts';
 import { authLimiter, pixelLimiter, pixelDedupe, ingestFailLimiter, ingestLimiter } from '../src/security/ratelimit.ts';
@@ -8,6 +9,7 @@ import { authLimiter, pixelLimiter, pixelDedupe, ingestFailLimiter, ingestLimite
 export async function makeApp(): Promise<FastifyInstance> {
   const app = Fastify({ logger: false });
   await app.register(cookie);
+  await app.register(multipart, { limits: { fileSize: 50 * 1024 * 1024 } });
   await registerSecurityHeaders(app);
   registerRoutes(app);
   await app.ready();

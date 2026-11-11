@@ -25,13 +25,17 @@ export async function jmapSession() {
 }
 
 export async function listIdentities(userId: number): Promise<ApiIdentity[]> {
-  const accounts = await q<{ id: number; name: string; email: string; aliases: string }>(
-    'SELECT id, name, email, aliases FROM accounts WHERE user_id = ? AND enabled = true ORDER BY id', [userId]);
+  const accounts = await q<{ id: number; name: string; email: string }>(
+    'SELECT id, name, email FROM accounts WHERE user_id = ? AND enabled = true ORDER BY id', [userId]);
+  const rows = await q<any>('SELECT * FROM identities WHERE user_id = ? ORDER BY is_default DESC, id', [userId]);
   const out: ApiIdentity[] = [];
   for (const a of accounts) {
-    out.push({ accountId: a.id, email: a.email, name: a.name, isAlias: false });
-    for (const alias of JSON.parse(a.aliases) as string[]) {
-      out.push({ accountId: a.id, email: alias, name: a.name, isAlias: true });
+    for (const r of rows.filter((x) => x.account_id === a.id)) {
+      out.push({
+        accountId: a.id, email: r.email, name: r.display_name, isAlias: !r.is_default,
+        id: r.id, businessId: r.business_id, isDefault: r.is_default, signatureHtml: r.signature_html,
+        replyTo: r.reply_to, bccSelf: r.bcc_self, transportId: r.transport_id,
+      });
     }
     for (const d of await q<{ address: string }>("SELECT address FROM disposable_addresses WHERE account_id = ? AND status = 'active' ORDER BY id", [a.id])) {
       out.push({ accountId: a.id, email: d.address, name: a.name, isAlias: true });

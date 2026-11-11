@@ -32,7 +32,7 @@ export async function insertId(sql: string, params: unknown[] = []): Promise<num
   return res.rows[0] ? Number(res.rows[0].id) : 0;
 }
 
-const MIGRATIONS: { id: number; sql: string }[] = [
+export const MIGRATIONS: { id: number; sql: string }[] = [
   {
     id: 1,
     sql: `
@@ -921,6 +921,50 @@ CREATE TABLE backup_blob_index (
   mirrored_at BIGINT NOT NULL,
   prefix TEXT NOT NULL DEFAULT ''
 );
+`,
+  },
+  {
+    id: 24,
+    sql: `
+-- T4 F-30: businesses and per-address identities.
+CREATE TABLE businesses (
+  id SERIAL PRIMARY KEY,
+  user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  name TEXT NOT NULL,
+  short_name TEXT NOT NULL DEFAULT '',
+  logo_key TEXT,
+  brand_color TEXT NOT NULL DEFAULT '#2f7ed8',
+  website TEXT NOT NULL DEFAULT '',
+  phone TEXT NOT NULL DEFAULT '',
+  abn TEXT NOT NULL DEFAULT '',
+  address TEXT NOT NULL DEFAULT '',
+  default_signature_html TEXT NOT NULL DEFAULT '',
+  disclaimer_html TEXT NOT NULL DEFAULT '',
+  created_at BIGINT NOT NULL
+);
+CREATE INDEX businesses_user ON businesses(user_id);
+CREATE TABLE identities (
+  id SERIAL PRIMARY KEY,
+  user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  account_id INTEGER NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
+  business_id INTEGER REFERENCES businesses(id) ON DELETE SET NULL,
+  email TEXT NOT NULL,
+  display_name TEXT NOT NULL,
+  signature_html TEXT,
+  reply_to TEXT,
+  bcc_self BOOLEAN NOT NULL DEFAULT false,
+  transport_id INTEGER REFERENCES transports(id) ON DELETE SET NULL,
+  is_default BOOLEAN NOT NULL DEFAULT false,
+  UNIQUE (account_id, email)
+);
+CREATE INDEX identities_user ON identities(user_id);
+INSERT INTO identities(user_id, account_id, email, display_name, signature_html, is_default)
+  SELECT user_id, id, email, CASE WHEN name <> '' THEN name ELSE email END, NULLIF(signature, ''), true FROM accounts
+  ON CONFLICT DO NOTHING;
+INSERT INTO identities(user_id, account_id, email, display_name, is_default)
+  SELECT a.user_id, a.id, al.v, CASE WHEN a.name <> '' THEN a.name ELSE al.v END, false
+  FROM accounts a, LATERAL jsonb_array_elements_text(a.aliases::jsonb) AS al(v)
+  ON CONFLICT DO NOTHING;
 `,
   },
 ];

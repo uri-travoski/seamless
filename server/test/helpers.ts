@@ -1,3 +1,4 @@
+import { syncAccountIdentities } from '../src/business/identities.ts';
 import { vi } from 'vitest';
 
 // in-memory S3 stand-in shared by all tests
@@ -69,12 +70,14 @@ export async function makeUser(email: string, role: 'admin' | 'member' = 'member
 }
 
 export async function makeAccount(email: string, opts: { aliases?: string[]; name?: string; userId?: number } = {}): Promise<number> {
-  return insertId(`
+  const id = await insertId(`
     INSERT INTO accounts(user_id, name, email, aliases, imap_host, imap_port, imap_secure, imap_user, imap_pass_enc,
       smtp_host, smtp_port, smtp_secure, smtp_user, smtp_pass_enc, created_at)
     VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
   `, [opts.userId ?? TEST_USER, opts.name ?? email.split('@')[0], email, JSON.stringify(opts.aliases ?? []),
     'imap.test', 993, true, email, encrypt('pw'), 'smtp.test', 465, true, email, encrypt('pw'), Date.now()]);
+  await syncAccountIdentities(id);
+  return id;
 }
 
 export async function makeMailbox(accountId: number, path: string, role: string | null): Promise<number> {

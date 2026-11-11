@@ -1,4 +1,5 @@
 /** Mailboxes (connected accounts; "Accounts" in the API for compatibility) + tests + sync kick + safe delete. */
+import { syncAccountIdentities } from '../business/identities.ts';
 import type { FastifyInstance } from 'fastify';
 import { ImapFlow } from 'imapflow';
 import nodemailer from 'nodemailer';
@@ -56,6 +57,7 @@ export function register(app: FastifyInstance): void {
       Math.max(1, Number(b.pop3IntervalMin) || 5), b.pop3LeaveOnServer !== false,
       b.pop3DeleteAfterDays ? Math.max(1, Number(b.pop3DeleteAfterDays)) : null,
     ]);
+    await syncAccountIdentities(id);
     if (pop3) await ensureLocalMailboxes(id);
     if (Array.isArray(b.categoryIds)) await setAccountCategories(uid(req), id, b.categoryIds);
     await syncManager.restartAccount(id);
@@ -89,6 +91,7 @@ export function register(app: FastifyInstance): void {
       !!b.aiCategorize, b.enabled !== false, b.healthIgnored === undefined ? !!existing.health_ignored : !!b.healthIgnored, id,
     ]);
     if (Array.isArray(b.categoryIds)) await setAccountCategories(uid(req), id, b.categoryIds);
+    await syncAccountIdentities(id);
     await syncManager.restartAccount(id);
     await bumpState();
     broadcast({ type: 'stateChange' }, uid(req));

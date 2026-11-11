@@ -10,6 +10,7 @@ import { ingestLocal } from './localbox.ts';
 import { enqueueOp, syncManager, type AccountRow } from '../imap/sync.ts';
 import { setKeywords } from './store.ts';
 import { createPendingFollowup } from './followups.ts';
+import { logoAttachments } from '../business/logo.ts';
 import { transportForAccount, sendWithFallback } from '../transport/registry.ts';
 
 const uploadDir = path.join(config.dataDir, 'uploads');
@@ -108,7 +109,8 @@ export async function buildRaw(payload: ComposePayload, acct: AccountRow, extraF
   const attachments = payload.attachmentIds
     .map(loadUpload)
     .filter((u): u is NonNullable<typeof u> => !!u)
-    .map((u) => ({ filename: u.meta.filename, contentType: u.meta.contentType, content: u.data }));
+    .map((u): Record<string, unknown> => ({ filename: u.meta.filename, contentType: u.meta.contentType, content: u.data }));
+  attachments.push(...await logoAttachments(acct.user_id, html));
 
   let references: string | undefined;
   if (payload.inReplyTo) {

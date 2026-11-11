@@ -7,7 +7,6 @@ import { queueSend, undoSend, pendingSends } from '../mail/undoSend.ts';
 import { saveDraft, saveUpload, scheduleEmail } from '../mail/send.ts';
 import { matchReplyIdentity } from '../mail/replyfrom.ts';
 import { getMsgRow } from '../mail/store.ts';
-import { listIdentities } from '../jmap/api.ts';
 import { broadcast } from '../ws.ts';
 import { uid } from './util.ts';
 import { emitEvent } from '../events/emit.ts';
@@ -86,5 +85,4 @@ export function register(app: FastifyInstance): void {
     });
   });
 
-  app.get('/api/identities', async (req) => listIdentities(uid(req)));
 }

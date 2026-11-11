@@ -18,6 +18,7 @@ import DevicesSettings from './DevicesSettings.tsx';
 import BackupSettings from './BackupSettings.tsx';
 import SendingSettings from './SendingSettings.tsx';
 import DisposableSettings from './DisposableSettings.tsx';
+import BusinessSettings from './BusinessSettings.tsx';
 import ContactsSettings from './ContactsSettings.tsx';
 import TemplatesView from '../TemplatesView.tsx';
 import { useSession } from '../../state/session.ts';
@@ -33,6 +34,7 @@ const TABS: { id: string; name: string; Icon: ComponentType<{ className?: string
   { id: 'general', name: 'General', Icon: SettingsIcon, C: GeneralSettings },
   { id: 'appearance', name: 'Appearance', Icon: PaletteIcon, C: AppearanceSettings },
   { id: 'mailboxes', name: 'Mailboxes', Icon: MailboxIcon, C: MailboxSettings },
+  { id: 'businesses', name: 'Businesses', Icon: ContactsIcon, C: BusinessSettings },
   { id: 'disposable', name: 'Disposable', Icon: TimerIcon, C: DisposableSettings },
   { id: 'sending', name: 'Sending', Icon: SentIcon, C: SendingSettings },
   { id: 'labels', name: 'Labels', Icon: TagIcon, C: LabelSettings },

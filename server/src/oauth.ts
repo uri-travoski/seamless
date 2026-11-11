@@ -1,3 +1,4 @@
+import { syncAccountIdentities } from './business/identities.ts';
 import { q, one, run, insertId } from './db.ts';
 import { encrypt, decrypt, randomToken } from './crypto.ts';
 import { config } from './config.ts';
@@ -131,6 +132,7 @@ export async function handleCallback(provider: 'google' | 'microsoft', code: str
     provider === 'google' ? '#d93025' : '#0f6cbd',
     encrypt(tok.refresh_token), encrypt(tok.access_token), expiresAt, Date.now(),
   ]);
+  await syncAccountIdentities(id);
   return { accountId: id, email, created: true };
 }
 

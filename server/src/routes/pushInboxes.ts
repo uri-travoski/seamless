@@ -1,4 +1,5 @@
 /** Managing push inboxes ("Own domain (Cloudflare Email Routing)" mailboxes). Secrets are shown once. */
+import { syncAccountIdentities } from '../business/identities.ts';
 import type { FastifyInstance } from 'fastify';
 import { q, one, run, insertId, bumpState } from '../db.ts';
 import { encrypt } from '../crypto.ts';
@@ -47,6 +48,7 @@ export function register(app: FastifyInstance): void {
         inbound_kind, outbound_transport_id)
       VALUES (?,?,?,?,'',0,false,'',?,'',0,false,'',?,?,'',true,false,true,?,'push',?)
     `, [userId, String(b.name ?? '').trim() || email, email, '[]', encrypt(''), encrypt(''), '#2f7ed8', Date.now(), transportId]);
+    await syncAccountIdentities(id);
     await ensureLocalMailboxes(id);
     const { token, secret } = await createInbox(id, domains);
     const acct = await one<AccountRow>('SELECT * FROM accounts WHERE id = ?', [id]);
