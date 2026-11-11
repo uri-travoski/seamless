@@ -24,6 +24,7 @@ import { ComposeIcon } from './icons.tsx';
 const Settings = lazy(() => import('./components/settings/Settings.tsx'));
 const HelpModal = lazy(() => import('./components/HelpModal.tsx'));
 const NotificationsPage = lazy(() => import('./components/NotificationsPage.tsx'));
+const LeadsPage = lazy(() => import('./components/LeadsPage.tsx'));
 const OpenReport = lazy(() => import('./components/OpenReport.tsx'));
 const TemplatesView = lazy(() => import('./components/TemplatesView.tsx'));
 
@@ -202,6 +203,7 @@ export default function App() {
         <Suspense fallback={<div className="page-loading" />}>
           {route.page === 'mail' && route.folder === 'templates' && <TemplatesView />}
           {route.page === 'notifications' && <NotificationsPage params={route.params} />}
+          {route.page === 'leads' && <LeadsPage params={route.params} />}
           {route.page === 'opens' && <OpenReport emailId={route.emailId} />}
           {route.page === 'settings' && <Settings tab={route.tab} />}
         </Suspense>

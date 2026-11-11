@@ -23,7 +23,7 @@ import { toast } from '../toast.ts';
 import { useShared } from '../state/shared.ts';
 import { useViews } from '../state/views.ts';
 import { ViewGlyph } from './viewIcons.tsx';
-import { PencilSimple } from '@phosphor-icons/react';
+import { PencilSimple, UserPlus } from '@phosphor-icons/react';
 import LabelColorPicker from './LabelColorPicker.tsx';
 
 const FOLDER_ICON: Record<string, ComponentType<{ className?: string }>> = {
@@ -86,6 +86,8 @@ export default function Sidebar({ open, onNavigate, onAddLabel }: { open: boolea
   const suggestions = useViews((st) => st.suggestions);
   useEffect(() => { void useViews.getState().load(); }, [overview]);
   const pinned = views.filter((v) => v.pinned);
+  const [newLeads, setNewLeads] = useState(0);
+  useEffect(() => { api.get<{ total: number }>('/api/leads?status=new&limit=1').then((r) => setNewLeads(r.total)).catch(() => {}); }, [overview]);
   const openView = (v: { query: string; scope: string }) => { navigate({ page: 'mail', scope: scopeToSlug(v.scope, overview), folder: 'search', q: v.query }); onNavigate(); };
   const viewActive = (v: { query: string; scope: string }) =>
     route.page === 'mail' && route.folder === 'search' && route.q === v.query && route.scope === scopeToSlug(v.scope, overview);
@@ -180,6 +182,13 @@ export default function Sidebar({ open, onNavigate, onAddLabel }: { open: boolea
         </div>
         {tree.map((n) => labelNode(n, 0))}
         {labels.length === 0 && <button className="side-item side-hint" onClick={onAddLabel}><span className="name">+ New label</span></button>}
+      </div>
+
+      <div className="side-section" aria-label="Leads">
+        <button className={`side-item ${route.page === 'leads' ? 'active' : ''}`} onClick={() => { navigate({ page: 'leads', params: {} }); onNavigate(); }} title="Leads captured from web forms">
+          <UserPlus className="glyph" /><span className="name">Leads</span>
+          {newLeads > 0 && <span className="count">{newLeads}</span>}
+        </button>
       </div>
 
       {(pinned.length > 0 || suggestions.length > 0) && (

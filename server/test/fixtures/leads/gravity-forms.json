@@ -1,0 +1,14 @@
+{
+ "name": "gravity-forms",
+ "from": "Gravity <wp@pest.example>",
+ "subject": "New submission from Contact",
+ "replyTo": null,
+ "text": null,
+ "html": "<html><body><table><tr><td><strong>Name</strong></td></tr><tr><td>Priya Shah</td></tr><tr><td><strong>Email</strong></td></tr><tr><td><a href=\"mailto:priya@shah.example\">priya@shah.example</a></td></tr><tr><td><strong>Phone</strong></td></tr><tr><td>0400 111 222</td></tr><tr><td><strong>Message</strong></td></tr><tr><td>Termites in the garage.</td></tr></table></body></html>",
+ "expect": {
+  "name": "Priya Shah",
+  "email": "priya@shah.example",
+  "phone": "+61400111222",
+  "message_has": "Termites"
+ }
+}

@@ -152,6 +152,8 @@ export function render(ev: EventRow): Rendered {
       return { title: `New in ${quote(p.viewName)}`, body: [p.from ? displayName(String(p.from)) : '', p.subject || '(no subject)'].filter(Boolean).join(': '), link: p.messageId ? `/mail/msg/m${p.messageId}` : null, groupKey: null, accountId };
     case 'comment.mention':
       return { title: `${p.by ?? 'Someone'} mentioned you`, body: `${p.subject ? quote(p.subject) + ': ' : ''}${p.excerpt ?? ''}`, link: p.messageId ? `/mail/msg/m${p.messageId}` : null, groupKey: null, accountId };
+    case 'lead.captured':
+      return { title: `${p.repeat ? 'Repeat enquiry' : 'New lead'}: ${String(p.name || p.email || p.phone || 'unknown').slice(0, 80)}`, body: [p.service, p.suburb, p.businessName || p.source].filter(Boolean).join(' · '), link: `/leads?lead=${p.leadId}`, groupKey: null, accountId };
     case 'webhook.failed':
       return { title: `Webhook "${String(p.name ?? 'webhook').slice(0, 60)}" is failing`, body: `Gave up delivering ${p.eventType ?? 'an event'}: ${String(p.error ?? '').slice(0, 200)}`, link: '/settings/integrations', groupKey: `webhook:${p.webhookId}`, accountId: null };
     case 'reminder.due':

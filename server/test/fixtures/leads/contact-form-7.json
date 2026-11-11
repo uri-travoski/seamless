@@ -1,0 +1,14 @@
+{
+ "name": "contact-form-7",
+ "from": "Site <wordpress@carpets.example>",
+ "subject": "Quote: Carpet steam clean",
+ "replyTo": null,
+ "text": "From: Bob Builder <bob@builder.example>\nSubject: Carpet steam clean\n\nMessage Body:\nThree bedrooms and a hallway. Phone me on (08) 9381 1234.\n\n-- \nThis e-mail was sent from a contact form on Carpets (https://carpets.example)",
+ "html": null,
+ "expect": {
+  "name": "Bob Builder",
+  "email": "bob@builder.example",
+  "service": "Carpet steam clean",
+  "message_has": "Three bedrooms"
+ }
+}

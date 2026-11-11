@@ -169,9 +169,11 @@ export async function ingestMessage(args: IngestArgs): Promise<IngestResult | nu
     await queueIntegrationActions(userId, rowId, filterActions).catch((err) => console.error('[connectors] rule action failed:', err?.message ?? err));  // never blocks ingest
   }
 
+  if (isInboxLive) await import('../leads/leads.ts').then((m) => m.captureLead(userId, rowId, parsed)).catch((err) => console.error('[leads] capture failed:', err?.message ?? err));   // lazy import: leads → store → sync → ingest would be a cycle; never blocks ingest
   await ingestInvites(userId, args.accountId, rowId, parsed);
   await assessAndStore(userId, rowId, parsed, mailbox.role).catch((err) => console.error('[risk] assess failed:', err?.message ?? err));  // never breaks ingest
   if (isInboxLive) await recordBounce(userId, parsed).catch((err) => console.error('[dsn] bounce handling failed:', err?.message ?? err));
+  if (mailbox.role === 'sent') await import('../leads/leads.ts').then((m) => m.markLeadReplies(userId, [...to, ...cc].map((a) => a.email), date)).catch((err) => console.error('[leads] reply stamp failed:', err?.message ?? err));
   if (mailbox.role === 'sent') await resolvePendingFollowup(userId, rowId, messageId, threadId).catch(() => {});
   await bumpState();
   return { rowId, userId, parsed, filterActions, isInboxLive };

@@ -7,7 +7,7 @@ import { sha256 } from './crypto.ts';
  * exposed to phones via CardDAV.
  */
 
-async function upsertContact(userId: number, email: string, name: string, kind: 'sent' | 'received', when: number): Promise<void> {
+export async function upsertContact(userId: number, email: string, name: string, kind: 'sent' | 'received', when: number): Promise<void> {
   const lc = email.trim().toLowerCase();
   if (!lc.includes('@') || lc.includes('no-reply') || lc.includes('noreply')) return;
   const existing = await one<{ id: number; display_name: string }>(`

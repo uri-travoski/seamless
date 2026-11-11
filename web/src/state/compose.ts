@@ -33,6 +33,8 @@ interface ComposeState {
   openTemplate: (t: ApiTemplate) => Promise<void>;
   openReply: (email: ApiEmail, mode: 'reply' | 'replyAll' | 'forward', template?: ApiTemplate) => Promise<void>;
   openFromPayload: (p: ComposePayload) => void;
+  /** T5.4: quick reply to a lead — addressed to the lead's own email, sent as the business's identity. */
+  openLead: (o: { to: ApiAddress[]; subject: string; identityId: number | null; accountId: number | null }) => Promise<void>;
   openDraft: (email: ApiEmail, body: ApiEmailBody) => Promise<void>;
   update: (key: string, patch: Partial<Draft>) => void;
   close: (key: string) => void;
@@ -127,6 +129,21 @@ export const useCompose = create<ComposeState>((set, get) => ({
         to: p.to, cc: p.cc, bcc: p.bcc, subject: p.subject, initialHtml: p.html,
         inReplyTo: p.inReplyTo, replyToEmailId: p.replyToEmailId, draftId: p.draftId,
         attachments: p.attachments ?? [], track: p.track, perRecipientTracking: !!p.perRecipientTracking, followupDays: p.followupDays,
+        minimized: false, maximized: false,
+      }],
+    });
+  },
+
+  openLead: async (o) => {
+    const identities = get().identities;
+    const identity = (o.identityId ? identities.find((i) => i.id === o.identityId) : null)
+      ?? (o.accountId ? identities.find((i) => i.accountId === o.accountId && !i.isAlias) : null) ?? identities[0] ?? null;
+    const sig = await signatureHtml(identity);
+    set({
+      windows: [...get().windows, {
+        key: `c${++counter}`, identity, to: o.to, cc: [], bcc: [], subject: o.subject, initialHtml: withSignature('<p></p>', sig),
+        attachments: [], track: useSession.getState().settings.trackByDefault,
+        perRecipientTracking: useSession.getState().settings.perRecipientTracking,
         minimized: false, maximized: false,
       }],
     });

@@ -1,0 +1,14 @@
+{
+ "name": "wpforms",
+ "from": "WPForms <noreply@wp.example>",
+ "subject": "Quote Request",
+ "replyTo": null,
+ "text": "Name\nAnna Kowalski\n\nEmail\nanna@kowalski.example\n\nPhone\n+61 8 9444 5555\n\nSuburb\nJoondalup\n\nComment or Message\nCan you quote for window cleaning?\n\nSent from Window Cleaners",
+ "html": null,
+ "expect": {
+  "name": "Anna Kowalski",
+  "email": "anna@kowalski.example",
+  "phone": "+61894445555",
+  "suburb": "Joondalup"
+ }
+}

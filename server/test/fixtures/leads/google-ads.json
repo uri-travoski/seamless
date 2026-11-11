@@ -1,0 +1,15 @@
+{
+ "name": "google-ads",
+ "from": "Google Ads <ads-noreply@google.com>",
+ "subject": "New lead from Google Ads",
+ "replyTo": null,
+ "text": "You have a new lead from your Google Ads lead form.\n\nFull Name: Maria Rossi\nUser Email: maria@rossi.example\nUser Phone: 0455 123 987\nPostal Code: 6000\nCampaign ID: 12345\nForm ID: 777\nLead ID: abc-123\nutm_source: google\nutm_campaign: spring-clean",
+ "html": null,
+ "expect": {
+  "name": "Maria Rossi",
+  "email": "maria@rossi.example",
+  "phone": "+61455123987",
+  "suburb": "6000",
+  "utm_source": "google"
+ }
+}

@@ -1,0 +1,17 @@
+{
+ "name": "elementor",
+ "from": "Site <wordpress@gutters.example>",
+ "subject": "New message from Gutters",
+ "replyTo": null,
+ "text": null,
+ "html": "<p><b>Name:</b> Tom Lee</p><p><b>Email:</b> tom@lee.example</p><p><b>Mobile:</b> 0433 999 000</p><p><b>Location:</b> Fremantle</p><p><b>Enquiry Type:</b> Gutter cleaning</p><p><b>Message:</b> Two storey house, leaves everywhere.</p><p><b>Page URL:</b> https://gutters.example/contact/</p>",
+ "expect": {
+  "name": "Tom Lee",
+  "email": "tom@lee.example",
+  "phone": "+61433999000",
+  "suburb": "Fremantle",
+  "service": "Gutter cleaning",
+  "message_has": "Two storey",
+  "sourcePage": "https://gutters.example/contact/"
+ }
+}

@@ -45,6 +45,7 @@ import { register as views } from './views.ts';
 import { register as vips } from './vips.ts';
 import { register as webhooks } from './webhooks.ts';
 import { register as apiv1 } from './apiv1.ts';
+import { register as leads } from './leads.ts';
 import { sessionToken } from '../auth/sessions.ts';
 import { authenticate, ApiError, onApiCall } from '../api/tokens.ts';
 
@@ -128,4 +129,5 @@ export function registerRoutes(app: FastifyInstance): void {
   vips(app);
   webhooks(app);
   apiv1(app);
+  leads(app);
 }

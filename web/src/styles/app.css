@@ -1401,3 +1401,20 @@ mark[data-ai-pending], mark[data-unknown-var] { outline: 1px dashed var(--md-bor
 .modal-actions { display: flex; align-items: center; gap: 8px; margin-top: 12px; }
 .modal-actions .spacer { flex: 1; }
 .modal-body .check { display: flex; align-items: center; gap: 8px; margin: 6px 0; font-size: 13px; }
+
+/* leads (T5.4) */
+.main.page-mode:has(.leads-page) .sidebar { display: flex; }
+.leads-layout { display: flex; gap: 16px; align-items: flex-start; }
+.leads-table-wrap { flex: 1; min-width: 0; overflow-x: auto; }
+.leads-page .tbl { background: var(--color-surface); }
+.leads-page .tbl tr.selected td { background: var(--color-accent-soft, var(--color-surface-2)); }
+.lead-drawer { width: 360px; flex: 0 0 auto; border: 1px solid var(--color-border); border-radius: var(--radius-md); background: var(--color-surface); padding: 14px 16px; }
+.lead-drawer .page-title { font-size: 18px; margin: 0; }
+.lead-dl { display: grid; grid-template-columns: 110px minmax(0, 1fr); gap: 4px 10px; margin: 8px 0; font-size: 13px; }
+.lead-dl dt { color: var(--color-text-muted); }
+.lead-dl dd { margin: 0; overflow-wrap: anywhere; }
+.lead-details { white-space: pre-wrap; font-size: 13.5px; }
+@media (max-width: 800px) {
+  .leads-layout { flex-direction: column; }
+  .lead-drawer { width: 100%; }
+}

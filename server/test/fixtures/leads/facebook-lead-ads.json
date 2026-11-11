@@ -1,0 +1,14 @@
+{
+ "name": "facebook-lead-ads",
+ "from": "Facebook <notification@facebookmail.com>",
+ "subject": "New lead: Carpet cleaning offer",
+ "replyTo": null,
+ "text": "You have a new lead.\n\nfull_name: Dave Nguyen\nemail: dave@nguyen.example\nphone_number: p:+61477888999\ncity: Perth\nwhich_service_do_you_need?: Carpet cleaning",
+ "html": null,
+ "expect": {
+  "name": "Dave Nguyen",
+  "email": "dave@nguyen.example",
+  "phone": "+61477888999",
+  "suburb": "Perth"
+ }
+}

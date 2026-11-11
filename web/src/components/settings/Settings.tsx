@@ -29,6 +29,7 @@ import {
   SettingsIcon, MailboxIcon, TagIcon, FilterIcon, SparkleIcon, UsersIcon, LogoutIcon, BackIcon, RulesIcon, ImportIcon,
   LogsIcon, DevicesIcon, ContactsIcon, SentIcon, BackupIcon, PaletteIcon, TemplateIcon, BellIcon, LockIcon, HelpIcon, KeyboardIcon, HealthIcon, TimerIcon, CloudIcon,
 } from '../../icons.tsx';
+import LeadSettings from './LeadSettings.tsx';
 import { useUi } from '../../state/ui.ts';
 
 const TABS: { id: string; name: string; Icon: ComponentType<{ className?: string }>; C: ComponentType; admin?: boolean }[] = [
@@ -47,6 +48,7 @@ const TABS: { id: string; name: string; Icon: ComponentType<{ className?: string
   { id: 'filters', name: 'Filters', Icon: FilterIcon, C: FilterSettings },
   { id: 'ai', name: 'AI', Icon: SparkleIcon, C: AiSettings },
   { id: 'integrations', name: 'Integrations', Icon: CloudIcon, C: IntegrationsSettings },
+  { id: 'leads', name: 'Leads', Icon: ContactsIcon, C: LeadSettings },
   { id: 'contacts', name: 'Contacts', Icon: ContactsIcon, C: ContactsSettings },
   { id: 'devices', name: 'Devices', Icon: DevicesIcon, C: DevicesSettings },
   { id: 'health', name: 'Health', Icon: HealthIcon, C: HealthSettings },

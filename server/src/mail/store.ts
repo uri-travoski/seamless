@@ -253,6 +253,7 @@ export async function queryEmails(userId: number, req: EmailQueryRequest): Promi
       params.push(p.fts);
     }
     if (p.from) { where.push('(m.from_addr ILIKE ? OR m.from_name ILIKE ?)'); params.push(`%${p.from}%`, `%${p.from}%`); }
+    if (p.subject) { where.push('m.subject ILIKE ?'); params.push(`%${p.subject.replace(/[\\%_]/g, '\\$&')}%`); }
     if (p.to) { where.push('m.to_json ILIKE ?'); params.push(`%${p.to}%`); }
     if (p.label) {
       where.push('EXISTS (SELECT 1 FROM message_labels ml JOIN labels l ON l.id = ml.label_id WHERE ml.message_id = m.id AND lower(l.name) = lower(?))');

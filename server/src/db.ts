@@ -1160,6 +1160,39 @@ CREATE TABLE api_tokens (
 CREATE INDEX api_tokens_user ON api_tokens(user_id);
 `,
   },
+  {
+    id: 34,
+    sql: `
+-- T5.4 F-38: lead capture (sources are search-language queries; leads keep the parsed form fields)
+CREATE TABLE lead_sources (
+  id SERIAL PRIMARY KEY,
+  user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  business_id INTEGER REFERENCES businesses(id) ON DELETE SET NULL,
+  name TEXT NOT NULL,
+  query TEXT NOT NULL,
+  enabled BOOLEAN NOT NULL DEFAULT true,
+  created_at BIGINT NOT NULL
+);
+CREATE INDEX lead_sources_user ON lead_sources(user_id);
+CREATE TABLE leads (
+  id SERIAL PRIMARY KEY,
+  user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  business_id INTEGER REFERENCES businesses(id) ON DELETE SET NULL,
+  message_id INTEGER REFERENCES messages(id) ON DELETE SET NULL,
+  source_id INTEGER REFERENCES lead_sources(id) ON DELETE SET NULL,
+  source TEXT NOT NULL,
+  name TEXT, email TEXT, phone TEXT, suburb TEXT, service TEXT, details TEXT,
+  fields JSONB NOT NULL DEFAULT '{}',
+  status TEXT NOT NULL DEFAULT 'new' CHECK (status IN ('new','contacted','quoted','won','lost','spam')),
+  repeat_count INTEGER NOT NULL DEFAULT 0,
+  first_reply_at BIGINT,
+  created_at BIGINT NOT NULL,
+  updated_at BIGINT NOT NULL
+);
+CREATE INDEX leads_user_created ON leads(user_id, created_at DESC);
+CREATE INDEX leads_user_email ON leads(user_id, lower(email));
+`,
+  },
 ];
 
 /** Run `fn` in one transaction. Events emitted through the client are only turned into

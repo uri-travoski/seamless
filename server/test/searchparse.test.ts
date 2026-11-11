@@ -47,3 +47,10 @@ describe('search query parser', () => {
     }
   });
 });
+
+describe('subject: operator (T5.4)', () => {
+  it('parses a quoted or bare subject and keeps it out of the full-text terms', () => {
+    expect(parseSearch('subject:"New quote request" from:wp@x.test')).toMatchObject({ subject: 'New quote request', from: 'wp@x.test', fts: null });
+    expect(parseSearch('subject:invoice').subject).toBe('invoice');
+  });
+});

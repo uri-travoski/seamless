@@ -10,6 +10,7 @@
  *   /mail/msg/<emailId>                 open one message (from a notification)
  *   /mail/msg/<emailId>/opens           open report
  *   /notifications?status=&types=&...
+ *   /leads?business=&status=&service=&tab=stats&lead=<id>
  *   /settings/<tab>
  */
 import { create } from 'zustand';
@@ -19,6 +20,7 @@ export type Route =
   | { page: 'message'; emailId: string }
   | { page: 'opens'; emailId: string }
   | { page: 'notifications'; params: Record<string, string> }
+  | { page: 'leads'; params: Record<string, string> }
   | { page: 'settings'; tab: string };
 
 export function parsePath(pathname: string, search: string): Route {
@@ -26,6 +28,7 @@ export function parsePath(pathname: string, search: string): Route {
   const qs = Object.fromEntries(new URLSearchParams(search));
   if (parts[0] === 'settings') return { page: 'settings', tab: parts[1] || 'general' };
   if (parts[0] === 'notifications') return { page: 'notifications', params: qs };
+  if (parts[0] === 'leads') return { page: 'leads', params: qs };
   if (parts[0] === 'mail' && parts[1] === 'msg' && parts[2]) {
     return parts[3] === 'opens' ? { page: 'opens', emailId: parts[2] } : { page: 'message', emailId: parts[2] };
   }
@@ -45,6 +48,10 @@ export function routePath(r: Route): string {
     case 'notifications': {
       const qs = new URLSearchParams(Object.entries(r.params).filter(([, v]) => v !== '' && v != null)).toString();
       return `/notifications${qs ? `?${qs}` : ''}`;
+    }
+    case 'leads': {
+      const qs = new URLSearchParams(Object.entries(r.params).filter(([, v]) => v !== '' && v != null)).toString();
+      return `/leads${qs ? `?${qs}` : ''}`;
     }
     case 'message': return `/mail/msg/${r.emailId}`;
     case 'opens': return `/mail/msg/${r.emailId}/opens`;

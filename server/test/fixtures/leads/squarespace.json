@@ -1,0 +1,15 @@
+{
+ "name": "squarespace",
+ "from": "Squarespace <form-submission@squarespace.info>",
+ "subject": "Form Submission - Get a quote",
+ "replyTo": null,
+ "text": "Sent via form submission from Cleaners\n\nName: Li Wei\nEmail: li@wei.example\nPhone: 0421 000 111\nPostcode: 6008\nMessage: Move-out clean for a 2x1 apartment.\nBudget: $350",
+ "html": null,
+ "expect": {
+  "name": "Li Wei",
+  "email": "li@wei.example",
+  "phone": "+61421000111",
+  "suburb": "6008",
+  "budget": "$350"
+ }
+}

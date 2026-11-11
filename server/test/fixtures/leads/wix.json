@@ -1,0 +1,14 @@
+{
+ "name": "wix",
+ "from": "Wix <no-reply@wix.com>",
+ "subject": "New form submission",
+ "replyTo": null,
+ "text": "You've received a new submission from Contact Us.\n\nFirst Name: Sam\nLast Name: O'Neil\nEmail: sam@oneil.example\nPhone: 0498 765 432\nMessage: Do you service Rockingham?\n\nView in Wix",
+ "html": null,
+ "expect": {
+  "name": "Sam O'Neil",
+  "email": "sam@oneil.example",
+  "phone": "+61498765432",
+  "message_has": "Rockingham"
+ }
+}

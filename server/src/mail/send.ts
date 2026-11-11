@@ -14,6 +14,7 @@ import { createPendingFollowup } from './followups.ts';
 import { logoAttachments } from '../business/logo.ts';
 import { transportForAccount, sendWithFallback } from '../transport/registry.ts';
 import { resolveSendIdentity, effectivePayload, type SendIdentity } from '../business/sending.ts';
+import { markLeadReplies } from '../leads/leads.ts';
 
 const uploadDir = path.join(config.dataDir, 'uploads');
 fs.mkdirSync(uploadDir, { recursive: true });
@@ -213,6 +214,7 @@ export async function sendEmail(userId: number, original: ComposePayload): Promi
     }
   }
 
+  await markLeadReplies(userId, envelopeTo, Date.now()).catch((err) => console.error('[leads] reply stamp failed:', err?.message ?? err));   // F-38 response-time metric
   if (followMsgId) {
     await createPendingFollowup(userId, followMsgId, now + payload.followupDays! * 86_400_000, { subject: payload.subject, to: envelopeTo });
   }

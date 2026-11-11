@@ -1,0 +1,16 @@
+{
+ "name": "wordpress-default",
+ "from": "WordPress <wordpress@officecleaners.com.au>",
+ "subject": "New quote request",
+ "replyTo": "jane@example.com",
+ "text": "Name: Jane Citizen\nEmail: jane@example.com\nPhone: 0412 345 678\nSuburb: Subiaco\nService: Office cleaning\nMessage:\nWe need a weekly clean for a 120sqm office.\nPlease call after 3pm: 5:30 is best.\n\n-- \nThis e-mail was sent from a contact form on Office Cleaners (https://officecleaners.com.au)",
+ "html": null,
+ "expect": {
+  "name": "Jane Citizen",
+  "email": "jane@example.com",
+  "phone": "+61412345678",
+  "suburb": "Subiaco",
+  "service": "Office cleaning",
+  "message_has": "weekly clean"
+ }
+}

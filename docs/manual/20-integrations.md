@@ -108,3 +108,7 @@ minute; after that you get `429`. The list shows when each token was last used.
 
 A "trigger" is a saved view plus a webhook: when you add a webhook, choose **Use a saved view…** under *Only mail
 matching* and the webhook fires only for mail that view matches.
+
+### Leads
+
+The `lead.captured` event fires for every new lead and repeat enquiry — see [Leads](21-leads.md).
