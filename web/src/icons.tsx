@@ -132,6 +132,8 @@ export {
   Bell as BellFillIcon,
   Users as PeopleIcon,
   ShieldWarning as ShieldWarnIcon,
+  ClockClockwise as SnoozeIcon,
+  Hourglass as WaitingIcon,
   CloudArrowUp as CloudIcon,
   Key as KeyIcon,
   Envelope as MailboxIcon,

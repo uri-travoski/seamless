@@ -8,11 +8,12 @@ import { q, one, insertId, bumpState } from '../db.ts';
 import { broadcast } from '../ws.ts';
 import { queryEmails, getMsgRow, setKeywords, moveEmail, setLabels, destroyEmail } from '../mail/store.ts';
 import { randomToken } from '../crypto.ts';
+import { snoozeThread, unsnoozeThread } from '../mail/snooze.ts';
 import { uid } from './util.ts';
 
-export type BulkAction = 'read' | 'unread' | 'star' | 'unstar' | 'archive' | 'inbox' | 'spam' | 'delete' | 'move' | 'label' | 'unlabel';
+export type BulkAction = 'read' | 'unread' | 'star' | 'unstar' | 'archive' | 'inbox' | 'spam' | 'delete' | 'move' | 'label' | 'unlabel' | 'snooze';
 
-interface Snapshot { id: string; mailboxId: number; unread: boolean; flagged: boolean; labelIds: number[]; removed: boolean }
+interface Snapshot { id: string; mailboxId: number; unread: boolean; flagged: boolean; labelIds: number[]; removed: boolean; threadId: string; snoozedUntil: number | null }
 
 const UNDO_MS = 10 * 60_000;
 const MAX = 20_000;
@@ -22,7 +23,7 @@ async function snapshot(userId: number, emailId: string): Promise<Snapshot | nul
   const row = await getMsgRow(userId, emailId);
   if (!row) return null;
   const labels = await q<{ label_id: number }>('SELECT label_id FROM message_labels WHERE message_id = ?', [row.id]);
-  return { id: `m${row.id}`, mailboxId: row.mailbox_id, unread: row.unread, flagged: row.flagged, labelIds: labels.map((l) => l.label_id), removed: false };
+  return { id: `m${row.id}`, mailboxId: row.mailbox_id, unread: row.unread, flagged: row.flagged, labelIds: labels.map((l) => l.label_id), removed: false, threadId: row.thread_id, snoozedUntil: row.snoozed_until ? Number(row.snoozed_until) : null };
 }
 
 async function applyOne(userId: number, emailId: string, action: BulkAction, value: string | number | undefined, snap: Snapshot): Promise<void> {
@@ -35,6 +36,7 @@ async function applyOne(userId: number, emailId: string, action: BulkAction, val
     case 'inbox': return moveEmail(userId, emailId, 'u:inbox');
     case 'spam': return moveEmail(userId, emailId, 'u:junk');
     case 'move': return moveEmail(userId, emailId, String(value ?? ''));
+    case 'snooze': { await snoozeThread(userId, emailId, Number(value)); return; }
     case 'label': return setLabels(userId, emailId, [...new Set([...snap.labelIds, Number(value)])]);
     case 'unlabel': return setLabels(userId, emailId, snap.labelIds.filter((l) => l !== Number(value)));
     case 'delete': {
@@ -91,6 +93,8 @@ export async function undoBulk(userId: number, token: string): Promise<number> {
     await setKeywords(userId, s.id, { $seen: !s.unread, $flagged: s.flagged });
     const now = (await q<{ label_id: number }>('SELECT label_id FROM message_labels WHERE message_id = ?', [row.id])).map((l) => l.label_id).sort();
     if (now.join() !== [...s.labelIds].sort().join()) await setLabels(userId, s.id, s.labelIds);
+    if (!s.snoozedUntil && row.snoozed_until) await unsnoozeThread(userId, s.threadId, { wake: false });
+    else if (s.snoozedUntil && s.snoozedUntil > Date.now() && Number(row.snoozed_until) !== s.snoozedUntil) await snoozeThread(userId, s.id, s.snoozedUntil).catch(() => {});
     n++;
   }
   await bumpState();
@@ -98,13 +102,14 @@ export async function undoBulk(userId: number, token: string): Promise<number> {
   return n;
 }
 
-const ACTIONS = new Set<BulkAction>(['read', 'unread', 'star', 'unstar', 'archive', 'inbox', 'spam', 'delete', 'move', 'label', 'unlabel']);
+const ACTIONS = new Set<BulkAction>(['read', 'unread', 'star', 'unstar', 'archive', 'inbox', 'spam', 'delete', 'move', 'label', 'unlabel', 'snooze']);
 
 export function register(app: FastifyInstance): void {
   app.post('/api/bulk', async (req, reply) => {
     const b = req.body as { ids?: string[]; filter?: EmailQueryFilter; action: BulkAction; value?: string | number };
     if (!ACTIONS.has(b?.action)) return reply.code(400).send({ error: 'unknown action' });
     if ((b.action === 'label' || b.action === 'unlabel') && !Number(b.value)) return reply.code(400).send({ error: 'label id required' });
+    if (b.action === 'snooze' && !(Number(b.value) > Date.now())) return reply.code(400).send({ error: 'snooze time must be in the future' });
     if (b.action === 'move' && !/^(mb|u):/.test(String(b.value ?? ''))) return reply.code(400).send({ error: 'target mailbox required' });
     return runBulk(uid(req), b);
   });

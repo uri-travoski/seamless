@@ -131,6 +131,7 @@ export interface ApiEmail {
   disposition: 'keep' | 'delete';
   deleteAt: string | null; // when the retention sweep will trash it (countdown badge)
   needsReview: boolean;
+  snoozedUntil: string | null; // ISO while snoozed (hidden from the Inbox until then)
 }
 
 export interface ApiAttachmentMeta {
@@ -167,6 +168,7 @@ export interface ApiEmailBody {
 }
 
 export interface EmailQueryFilter {
+  snoozed?: boolean;         // T2: only mail currently snoozed, soonest first
   scope?: ScopeId;           // T1: unified | category:<id> | account:<id> (default unified)
   inMailbox?: string;        // "mb:<id>" or "u:<role>"
   label?: number;

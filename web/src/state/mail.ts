@@ -6,7 +6,7 @@ import { cache } from '../api/cache.ts';
 export const PAGE = 120;
 
 export interface View {
-  kind: 'mailbox' | 'label' | 'search' | 'review';
+  kind: 'mailbox' | 'label' | 'search' | 'review' | 'snoozed';
   mailboxId?: string;
   labelId?: number;
   query?: string;
@@ -17,6 +17,7 @@ function baseFilter(view: View): EmailQueryFilter {
   if (view.kind === 'mailbox') return { inMailbox: view.mailboxId };
   if (view.kind === 'label') return { label: view.labelId };
   if (view.kind === 'review') return { needsReview: true };
+  if (view.kind === 'snoozed') return { snoozed: true };
   return { text: view.query ?? '' };
 }
 

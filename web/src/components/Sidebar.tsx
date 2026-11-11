@@ -11,11 +11,11 @@ import type { ComponentType } from 'react';
 import type { ApiLabel } from '@seamless/shared';
 import { useMail, scopeToSlug } from '../state/mail.ts';
 import { useCompose } from '../state/compose.ts';
-import { useSession, DEFAULT_SIDEBAR } from '../state/session.ts';
+import { useSession, DEFAULT_SIDEBAR, SIDEBAR_FOLDERS } from '../state/session.ts';
 import { useRouter, navigate, FOLDER_ROLE, FOLDER_TITLE } from '../router.ts';
 import {
   InboxIcon, DraftsIcon, SentIcon, ScheduledIcon, ArchiveIcon, JunkIcon, TrashIcon, FolderIcon, ComposeIcon,
-  CaretDownIcon, CaretRightIcon, StarIcon, ReviewIcon, RefreshIcon, TemplateIcon, MailLogo, SidebarCollapseIcon, SettingsIcon,
+  CaretDownIcon, CaretRightIcon, StarIcon, ReviewIcon, RefreshIcon, TemplateIcon, MailLogo, SidebarCollapseIcon, SettingsIcon, SnoozeIcon, WaitingIcon,
 } from '../icons.tsx';
 import { IconContext } from '@phosphor-icons/react';
 import { api } from '../api/client.ts';
@@ -25,6 +25,7 @@ import LabelColorPicker from './LabelColorPicker.tsx';
 const FOLDER_ICON: Record<string, ComponentType<{ className?: string }>> = {
   inbox: InboxIcon, starred: StarIcon, drafts: DraftsIcon, scheduled: ScheduledIcon, sent: SentIcon,
   templates: TemplateIcon, spam: JunkIcon, bin: TrashIcon, archive: ArchiveIcon, review: ReviewIcon,
+  snoozed: SnoozeIcon, waiting: WaitingIcon,
 };
 
 interface LabelNode { label: ApiLabel; children: LabelNode[] }
@@ -60,7 +61,9 @@ export default function Sidebar({ open, onNavigate, onAddLabel }: { open: boolea
   const [collapsedLabels, setCollapsedLabels] = useState<Set<number>>(new Set());
   const [fetching, setFetching] = useState(false);
 
-  const sidebar = settings.sidebar ?? DEFAULT_SIDEBAR;
+  const saved = settings.sidebar ?? DEFAULT_SIDEBAR;
+  // folders added after the user saved their layout (Snoozed, Waiting for reply) show up under "More"
+  const sidebar = { order: saved.order, more: [...saved.more, ...SIDEBAR_FOLDERS.filter((f) => !saved.order.includes(f) && !saved.more.includes(f))] };
   const slug = scopeToSlug(scope, overview);
   const unifiedByRole = new Map(mailboxes.filter((m) => m.accountId === null).map((m) => [m.role, m]));
   const singleAccount = scope.startsWith('account:') ? Number(scope.slice(8)) : null;

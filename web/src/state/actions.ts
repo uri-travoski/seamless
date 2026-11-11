@@ -8,6 +8,7 @@ import { useCompose } from './compose.ts';
 import { api, emailSet, fetchBody } from '../api/client.ts';
 import { toast, undoToast } from '../toast.ts';
 import { navigate } from '../router.ts';
+import { fmtSnoozeLong } from '../snoozeTimes.ts';
 
 const mail = () => useMail.getState();
 const email = (id: string): ApiEmail | undefined => mail().emails[id];
@@ -28,6 +29,19 @@ export const actions = {
   notSpam: (id: string) => moveWithUndo(id, 'u:inbox', 'Moved to Inbox'),
   restore: (id: string) => moveWithUndo(id, 'u:inbox', 'Restored to Inbox'),
   move: (id: string, target: string, name: string) => moveWithUndo(id, target, `Moved to ${name}`),
+
+  /** Snooze the conversation until `until` (epoch ms); Undo puts it back in the Inbox. */
+  snooze: async (id: string, until: number) => {
+    const e = email(id);
+    if (!e) return;
+    try {
+      await api.post('/api/snooze', { emailId: id, until });
+      undoToast(`Snoozed until ${fmtSnoozeLong(until)}`, () => {
+        void api.del(`/api/snooze/${encodeURIComponent(e.threadId)}`).then(() => mail().refreshCurrent());
+      });
+      await mail().refreshCurrent();
+    } catch (err: any) { toast(err?.message ?? 'Could not snooze', 'error'); }
+  },
 
   /** Delete → Bin (undoable). In Bin/Spam it's permanent, so ask first. */
   trash: (id: string) => {
@@ -104,12 +118,12 @@ export const actions = {
   openReport: (id: string) => navigate({ page: 'opens', emailId: id }),
 };
 
-export type BulkAction = 'read' | 'unread' | 'star' | 'unstar' | 'archive' | 'inbox' | 'spam' | 'delete' | 'move' | 'label' | 'unlabel';
+export type BulkAction = 'read' | 'unread' | 'star' | 'unstar' | 'archive' | 'inbox' | 'spam' | 'delete' | 'move' | 'label' | 'unlabel' | 'snooze';
 
-const REMOVES = new Set<BulkAction>(['archive', 'inbox', 'spam', 'delete', 'move']);
+const REMOVES = new Set<BulkAction>(['archive', 'inbox', 'spam', 'delete', 'move', 'snooze']);
 const VERB: Record<BulkAction, string> = {
   read: 'Marked read', unread: 'Marked unread', star: 'Starred', unstar: 'Unstarred', archive: 'Archived', inbox: 'Moved to Inbox',
-  spam: 'Moved to Spam', delete: 'Deleted', move: 'Moved', label: 'Labelled', unlabel: 'Label removed',
+  spam: 'Moved to Spam', delete: 'Deleted', move: 'Moved', label: 'Labelled', unlabel: 'Label removed', snooze: 'Snoozed',
 };
 
 /** Bulk bar: the checked rows, or every message matching the view when "all matching" is on. */

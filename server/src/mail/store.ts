@@ -15,9 +15,10 @@ const UNIFIED_NAMES: Record<string, string> = {
 export async function listMailboxes(userId: number, scope?: string): Promise<ApiMailbox[]> {
   const inScope = await scopeAccountIds(userId, scope);
   const counts = await q<{ mailbox_id: number; total: number; unread: number }>(`
-    SELECT m.mailbox_id, COUNT(*) AS total, COUNT(*) FILTER (WHERE m.unread) AS unread
+    SELECT m.mailbox_id, COUNT(*) AS total,
+           COUNT(*) FILTER (WHERE m.unread AND (m.snoozed_until IS NULL OR m.snoozed_until <= ?)) AS unread
     FROM messages m WHERE m.user_id = ? GROUP BY m.mailbox_id
-  `, [userId]);
+  `, [Date.now(), userId]);
   const byId = new Map(counts.map((c) => [c.mailbox_id, c]));
 
   const rows = await q(`
@@ -61,6 +62,7 @@ export interface MsgRow {
   account_email: string; account_color: string; mailbox_role: string | null;
   message_id: string | null; references_ids: string;
   disposition: string; delete_at: number | null; classify_state: string;
+  snoozed_until: number | null; sort_date: number | null;
 }
 
 const BASE_SELECT = `
@@ -133,6 +135,7 @@ export async function rowToApi(r: MsgRow): Promise<ApiEmail> {
     disposition: (r.disposition as 'keep' | 'delete') ?? 'keep',
     deleteAt: r.delete_at ? new Date(r.delete_at).toISOString() : null,
     needsReview: r.classify_state === 'needs_review',
+    snoozedUntil: r.snoozed_until && r.snoozed_until > Date.now() ? new Date(Number(r.snoozed_until)).toISOString() : null,
   };
 }
 
@@ -193,6 +196,12 @@ export async function queryEmails(userId: number, req: EmailQueryRequest): Promi
   if (f.notKeyword === '$seen') where.push('m.unread = true');
   if (f.hasKeyword === '$flagged') where.push('m.flagged = true');
   if (f.needsReview) where.push("m.classify_state = 'needs_review'");
+  if (f.snoozed) {
+    where.push('m.snoozed_until > ?'); params.push(Date.now());
+  } else if (f.inMailbox) {
+    // snoozed mail is out of the Inbox until it wakes
+    where.push("NOT (mb.role = 'inbox' AND COALESCE(m.snoozed_until, 0) > ?)"); params.push(Date.now());
+  }
 
   if (f.text) {
     const p = parseSearch(f.text);
@@ -225,7 +234,7 @@ export async function queryEmails(userId: number, req: EmailQueryRequest): Promi
   const totalRow = await one<{ c: number }>(
     `SELECT COUNT(*) AS c FROM messages m JOIN mailboxes mb ON mb.id = m.mailbox_id ${whereSql}`, params);
   const rows = await q<MsgRow>(
-    `${BASE_SELECT} ${whereSql} ORDER BY m.date DESC, m.id DESC LIMIT ? OFFSET ?`,
+    `${BASE_SELECT} ${whereSql} ORDER BY ${f.snoozed ? 'm.snoozed_until ASC' : 'COALESCE(m.sort_date, m.date) DESC'}, m.id DESC LIMIT ? OFFSET ?`,
     [...params, req.limit, req.position]);
 
   return {

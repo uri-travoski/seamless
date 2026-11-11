@@ -10,9 +10,12 @@ import { ContextMenu, type MenuPos } from './EmailMenu.tsx';
 import { IconContext } from '@phosphor-icons/react';
 import {
   StarIcon, EyeIcon, AttachClipIcon, EnvelopeIcon, EnvelopeOpenIcon, ArchiveIcon, JunkIcon, TrashIcon, RefreshIcon,
-  TableViewIcon, SplitViewIcon, CloseIcon, NoteIcon, RestoreMailIcon, ReplyIcon, InboxIcon,
+  TableViewIcon, SplitViewIcon, CloseIcon, NoteIcon, RestoreMailIcon, ReplyIcon, InboxIcon, SnoozeIcon,
 } from '../icons.tsx';
 import { useSession } from '../state/session.ts';
+import { useUi } from '../state/ui.ts';
+import SnoozeButton, { SnoozePopup } from './SnoozeMenu.tsx';
+import { fmtSnoozeLong } from '../snoozeTimes.ts';
 import { DENSITY } from '../theme/registry.ts';
 
 const TOOLBAR_ICONS = { weight: 'regular' as const, size: 18 };
@@ -23,6 +26,12 @@ function fmtDate(iso: string): string {
   if (d.toDateString() === now.toDateString()) return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
   if (d.getFullYear() === now.getFullYear()) return d.toLocaleDateString([], { month: 'short', day: 'numeric' });
   return d.toLocaleDateString([], { year: '2-digit', month: 'short', day: 'numeric' });
+}
+
+/** Received date — or, in the Snoozed view, when the message comes back. */
+function dateCell(email: ApiEmail): React.ReactNode {
+  if (!email.snoozedUntil) return fmtDate(email.receivedAt);
+  return <span className="snooze-wake" title="Comes back to your Inbox then"><SnoozeIcon size={13} /> {fmtSnoozeLong(new Date(email.snoozedUntil).getTime())}</span>;
 }
 
 /** Countdown chip for mail the retention sweep will trash ("3d" = three days left). */
@@ -78,6 +87,10 @@ function RowActions({ email }: { email: ApiEmail }) {
         {unread ? <EnvelopeOpenIcon size={17} /> : <EnvelopeIcon size={17} />}
       </button>
       {!inSpam && <button className="icon-btn" title="Report spam (!)" onClick={stop(() => actions.spam(email.id))}><JunkIcon size={17} /></button>}
+      {email.mailboxRole === 'inbox' && (
+        <button className="icon-btn" title="Snooze (b)" aria-label="Snooze"
+          onClick={(e) => { e.stopPropagation(); const r = e.currentTarget.getBoundingClientRect(); useUi.getState().set({ snoozeFor: { id: email.id, x: r.left - 180, y: r.bottom + 4 } }); }}><SnoozeIcon size={17} /></button>
+      )}
     </span>
   );
 }
@@ -144,7 +157,7 @@ function Row({ email, selected, onMenu }: { email: ApiEmail; selected: boolean; 
               {email.hasAttachment && <AttachClipIcon size={14} aria-label="Has attachment" />}
               <TtlBadge email={email} />
             </span>
-            <span className="date">{fmtDate(email.receivedAt)}</span>
+            <span className="date">{dateCell(email)}</span>
           </div>
           <div className="line2">
             <span className="subject">
@@ -191,7 +204,7 @@ function TableRow({ email, selected, onMenu }: { email: ApiEmail; selected: bool
         {email.hasNote && <NoteIcon size={18} weight="fill" className="note-flag" aria-label="Has a private note" />}
         {email.hasAttachment && <AttachClipIcon size={14} aria-label="Has attachment" />}
         <TtlBadge email={email} />
-        <span className="tbl-date">{fmtDate(email.receivedAt)}</span>
+        <span className="tbl-date">{dateCell(email)}</span>
       </span>
       <RowActions email={email} />
     </div>
@@ -293,6 +306,12 @@ export default function MessageList() {
       else if (k === 'r') { handled(); actions.reply(sel); }
       else if (k === 'a') { handled(); actions.replyAll(sel); }
       else if (k === 'f') { handled(); actions.forward(sel); }
+      else if (k === 'b') {
+        handled();
+        const row = document.querySelector('.msg-row.selected') as HTMLElement | null;
+        const r = row?.getBoundingClientRect();
+        useUi.getState().set({ snoozeFor: { id: sel, x: (r?.left ?? 200) + 60, y: (r?.bottom ?? 200) } });
+      }
       else if (k === 'l' || k === 'v') {
         handled();
         const em = st.emails[sel];
@@ -326,6 +345,7 @@ export default function MessageList() {
           <button className="icon-btn" title="Star" onClick={() => void runBulk('star')}><StarIcon /></button>
           <LabelPicker value={[]} onChange={(ids2) => ids2.forEach((id) => void runBulk('label', id))} />
           <MoveMenu onPick={(target) => void runBulk('move', target)} />
+          <SnoozeButton title="Snooze" onPick={(at) => void runBulk('snooze', at)} />
           <div style={{ flex: 1 }} />
           <button className="icon-btn" title="Clear selection" onClick={() => clearChecked()}><CloseIcon /></button>
         </div>
@@ -369,6 +389,7 @@ export default function MessageList() {
         </div>
       </div>
       {menu && <ContextMenu email={menu.email} pos={menu.pos} onClose={() => setMenu(null)} />}
+      <SnoozePopup />
     </section>
   );
 }

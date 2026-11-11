@@ -19,6 +19,7 @@ export const SHORTCUTS: [string, string][][] = [
     ['!', 'Report spam'],
     ['s', 'Star / unstar'],
     ['Shift+I / Shift+U', 'Mark read / unread'],
+    ['b', 'Snooze'],
     ['l', 'Label'],
     ['v', 'Move to'],
   ],

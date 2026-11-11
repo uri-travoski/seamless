@@ -1,9 +1,17 @@
 import { create } from 'zustand';
 
 /** App-level dialogs that can be opened from anywhere (settings nav, keyboard). */
-export const useUi = create<{ helpOpen: boolean; shortcutsOpen: boolean; set: (p: Partial<{ helpOpen: boolean; shortcutsOpen: boolean }>) => void }>((set) => ({
+interface UiState {
+  helpOpen: boolean;
+  shortcutsOpen: boolean;
+  /** Snooze picker anchored at a screen point for one message (row clock icon, keyboard b). */
+  snoozeFor: { id: string; x: number; y: number } | null;
+  set: (p: Partial<Omit<UiState, 'set'>>) => void;
+}
+export const useUi = create<UiState>((set) => ({
   helpOpen: false,
   shortcutsOpen: false,
+  snoozeFor: null,
   set: (p) => set(p),
 }));
 

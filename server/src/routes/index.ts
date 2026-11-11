@@ -27,6 +27,7 @@ import { register as categories } from './categories.ts';
 import { register as templates } from './templates.ts';
 import { register as bulk } from './bulk.ts';
 import { register as prefs } from './prefs.ts';
+import { register as snooze } from './snooze.ts';
 import { sessionToken } from '../auth/sessions.ts';
 
 export { sessionUser, type SessionUser } from './util.ts';
@@ -71,4 +72,5 @@ export function registerRoutes(app: FastifyInstance): void {
   templates(app);
   bulk(app);
   prefs(app);
+  snooze(app);
 }

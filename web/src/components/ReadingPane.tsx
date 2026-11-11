@@ -7,6 +7,7 @@ import { fetchBody, api, saveNote, fetchTracking } from '../api/client.ts';
 import type { TrackingInfo } from '@seamless/shared';
 import { cache } from '../api/cache.ts';
 import { toast } from '../toast.ts';
+import SnoozeButton from './SnoozeMenu.tsx';
 import LabelPicker from './LabelPicker.tsx';
 import { readableTextOn } from './LabelColorPicker.tsx';
 import { EmailMenuItems } from './EmailMenu.tsx';
@@ -496,6 +497,7 @@ export default function ReadingPane() {
         <button className="icon-btn" title="Mark unread (Shift+U)" onClick={() => { markRead(selected.id, false); void select(null); }}><EnvelopeIcon /></button>
         <button className={`icon-btn ${selected.keywords.$flagged ? 'active' : ''}`} title="Star (s)" onClick={() => actions.star(selected.id)}><StarIcon weight={selected.keywords.$flagged ? 'fill' : 'regular'} /></button>
         <LabelPicker value={selected.labelIds} onChange={(ids) => applyLabels(selected.id, ids)} />
+        {selected.mailboxRole === 'inbox' && <SnoozeButton onPick={(at) => void actions.snooze(selected.id, at)} />}
         <span className="tb-sep" />
         {!selected.keywords.$draft && <>
           <button className="icon-btn" title="Reply (r)" onClick={() => actions.reply(selected.id)}><ReplyIcon /></button>

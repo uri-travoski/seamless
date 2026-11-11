@@ -48,6 +48,21 @@ Labels are colored, work across all accounts, and each carries its own **retenti
 - **Recolor** — click the **color dot** in front of a label (in the sidebar or in Settings > Labels) to open the color palette and pick a new color; it updates everywhere.
 - **Create / edit** — **Settings > Labels**, or the **+** next to the sidebar LABELS heading. Give it a name, a description (which the AI uses to categorize), a color, and retention rules.
 
+## Snooze
+
+Snooze hides a conversation from your Inbox and brings it back, unread and at the top, at the time you choose.
+
+- Click the **clock** icon on a row (hover it), in the reading toolbar or in the bulk bar, use **Snooze** in the
+  right-click menu, or press **b**.
+- Choose **Later today**, **This evening**, **Tomorrow** (8 am), **This weekend** (Saturday 8 am), **Next week**
+  (Monday 8 am), **Someday** (30 days) or **Pick date and time…**. Times are in Perth time; choices that have already
+  passed today aren't offered.
+- The whole conversation is snoozed, and snoozed mail doesn't count as unread. Look in **Snoozed** (sidebar, under
+  *More*) to see what's waiting — the list shows when each one returns. Right-click > **Remove snooze** brings one back now.
+- If someone replies while a conversation is snoozed it comes back straight away (turn this off in
+  **Settings > General > Sending and snoozing**).
+- When it returns you get a **Back in your Inbox** notification.
+
 ## Private notes
 
 Open a message and add a **private note** — a personal reminder attached to that email. It is only visible to you and is never sent. This is different from **Teach the AI**, which changes how future mail is handled.
