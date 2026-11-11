@@ -116,10 +116,14 @@ describe('F-15 tracking', () => {
     await recordOpen(tokens[1], '192.0.2.1', 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148');
     const report = (await openReport(TEST_USER, `m${id}`))!;
     expect(report.perRecipient).toBe(true);
-    expect(report.opens[0]).toMatchObject({ recipient: 'cara@y.test', client: 'Apple Mail (iOS)' });
+    expect(report.opens[0]).toMatchObject({ recipient: 'Cara <cara@y.test>', client: 'Apple Mail (iOS)' });
     expect((await getEmails(TEST_USER, [`m${id}`]))[0].openCount).toBe(1);
     const n = await one<any>("SELECT title FROM notifications WHERE type = 'mail.opened'");
-    expect(n.title).toBe('cara@y.test opened "Quote for office cleaning"');
+    expect(n.title).toBe('Cara opened "Quote for office cleaning"');
+    // Bob opening his own copy is a separate notification, not a bump on Cara's
+    await recordOpen(tokens[0], '192.0.2.2', 'Mozilla/5.0 (X11; Linux x86_64) Thunderbird/115.0');
+    const titles = (await q<any>("SELECT title, count FROM notifications WHERE type = 'mail.opened' ORDER BY id")).map((x: any) => `${x.title}|${x.count}`);
+    expect(titles).toEqual(['Cara opened "Quote for office cleaning"|1', 'Bob opened "Quote for office cleaning"|1']);
     void queryEmails;
   });
 

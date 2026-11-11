@@ -6,7 +6,7 @@ import { useCompose } from '../../state/compose.ts';
 import { useSession } from '../../state/session.ts';
 
 /** Google / Microsoft connect buttons + (admin) the one-time OAuth app registration. */
-function OauthSection({ onConnected }: { onConnected: () => void }) {
+export function OauthSection({ onConnected }: { onConnected: () => void }) {
   const me = useSession((s) => s.user);
   const [apps, setApps] = useState<{ provider: string; clientId: string }[]>([]);
   const [editing, setEditing] = useState<'google' | 'microsoft' | null>(null);
@@ -92,7 +92,7 @@ function OauthSection({ onConnected }: { onConnected: () => void }) {
 }
 
 /** Per-account safe delete: origin cleanup after verified archive. */
-function SafeDeletePanel({ account, onClose, onSaved }: { account: any; onClose: () => void; onSaved: () => void }) {
+export function SafeDeletePanel({ account, onClose, onSaved }: { account: any; onClose: () => void; onSaved: () => void }) {
   const [enabled, setEnabled] = useState<boolean>(account.safeDeleteEnabled);
   const [mode, setMode] = useState<string>(account.safeDeleteMode ?? 'trash');
   const [graceDays, setGraceDays] = useState<number>(account.safeDeleteGraceDays ?? 30);
@@ -150,7 +150,7 @@ function SafeDeletePanel({ account, onClose, onSaved }: { account: any; onClose:
 }
 
 /** Learn-from-Gmail onboarding: analyse labelled history, propose rules, seed the AI memory. */
-function GmailLearnPanel({ account, onClose }: { account: any; onClose: () => void }) {
+export function GmailLearnPanel({ account, onClose }: { account: any; onClose: () => void }) {
   const [importId, setImportId] = useState<number | null>(null);
   const [status, setStatus] = useState<string>('');
   const [stats, setStats] = useState<any>({});

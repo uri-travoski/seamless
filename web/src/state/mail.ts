@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import type { ApiEmail, ApiLabel, ApiMailbox, EmailQueryFilter } from '@seamless/shared';
+import type { ApiEmail, ApiLabel, ApiMailbox, EmailQueryFilter, ApiCategoryOverview, ScopeId } from '@seamless/shared';
 import { api, fetchMailboxes, queryEmailPage, getEmailsByIds, getThread, emailSet } from '../api/client.ts';
 import { cache } from '../api/cache.ts';
 
@@ -13,18 +13,54 @@ export interface View {
   title: string;
 }
 
-function viewFilter(view: View): EmailQueryFilter {
+function baseFilter(view: View): EmailQueryFilter {
   if (view.kind === 'mailbox') return { inMailbox: view.mailboxId };
   if (view.kind === 'label') return { label: view.labelId };
   if (view.kind === 'review') return { needsReview: true };
   return { text: view.query ?? '' };
 }
 
-function viewKey(view: View): string {
-  return JSON.stringify(viewFilter(view));
+/** The list filter for a view inside the current scope (T1 F-07). */
+export function viewFilter(view: View, scope: ScopeId = useMail.getState().scope): EmailQueryFilter {
+  const f = baseFilter(view);
+  return scope && scope !== 'unified' ? { ...f, scope } : f;
+}
+
+function viewKey(view: View, scope: ScopeId = useMail.getState().scope): string {
+  return JSON.stringify(viewFilter(view, scope));
+}
+
+// ---- scope <-> URL slug ----
+
+export function scopeToSlug(scope: ScopeId, overview: ApiCategoryOverview | null): string {
+  const m = scope.match(/^(category|account):(\d+)$/);
+  if (!m) return 'unified';
+  if (m[1] === 'account') return `mb-${m[2]}`;
+  return overview?.categories.find((c) => c.id === Number(m[2]))?.key ?? 'unified';
+}
+
+export function slugToScope(slug: string, overview: ApiCategoryOverview | null): ScopeId | null {
+  if (!slug || slug === 'unified') return 'unified';
+  const mb = slug.match(/^mb-(\d+)$/);
+  if (mb) return `account:${mb[1]}`;
+  const cat = overview?.categories.find((c) => c.key === slug);
+  return cat ? `category:${cat.id}` : null;
+}
+
+export function scopeName(scope: ScopeId, overview: ApiCategoryOverview | null): string {
+  const m = scope.match(/^(category|account):(\d+)$/);
+  if (!m) return 'Unified';
+  if (m[1] === 'account') {
+    const mb = overview?.mailboxes.find((x) => x.id === Number(m[2]));
+    return mb ? (mb.name || mb.email) : 'Mailbox';
+  }
+  return overview?.categories.find((c) => c.id === Number(m[2]))?.name ?? 'Category';
 }
 
 interface MailState {
+  scope: ScopeId;                   // unified | category:<id> | account:<id>
+  overview: ApiCategoryOverview | null;
+  allMatching: boolean;             // bulk bar: "select all N matching" (server-side)
   mailboxes: ApiMailbox[];
   labels: ApiLabel[];
   reviewCount: number;
@@ -40,6 +76,11 @@ interface MailState {
   checked: Set<string>;             // ids selected via row checkboxes for bulk actions
 
   boot: () => Promise<void>;
+  setScope: (scope: ScopeId) => void;
+  /** Apply a route: scope + view together (one fetch, not two). */
+  show: (scope: ScopeId, view: View) => void;
+  refreshCategories: () => Promise<void>;
+  setAllMatching: (on: boolean) => void;
   refreshMailboxes: () => Promise<void>;
   refreshLabels: () => Promise<void>;
   setView: (view: View) => void;
@@ -64,6 +105,9 @@ interface MailState {
 }
 
 export const useMail = create<MailState>((set, get) => ({
+  scope: 'unified',
+  overview: null,
+  allMatching: false,
   mailboxes: [],
   labels: [],
   reviewCount: 0,
@@ -91,15 +135,39 @@ export const useMail = create<MailState>((set, get) => ({
       for (const e of cachedEmails) if (e) emails[e.id] = e;
       set({ ids: cachedQuery.ids, total: cachedQuery.total, emails, loadedPages: new Set([0]) });
     }
-    await Promise.all([get().refreshMailboxes(), get().refreshLabels(), get().refreshCurrent()]);
+    await Promise.all([get().refreshCategories(), get().refreshMailboxes(), get().refreshLabels(), get().refreshCurrent()]);
   },
+
+  /** Switch Unified ⇄ category ⇄ single mailbox. Same folder, new account set. */
+  setScope: (scope) => {
+    if (scope === get().scope) return;
+    set({ scope });
+    void get().refreshMailboxes();
+    void get().refreshLabels();
+    get().setView({ ...get().view });
+  },
+
+  show: (scope, view) => {
+    const scopeChanged = scope !== get().scope;
+    if (scopeChanged) set({ scope });
+    if (scopeChanged || viewKey(view, scope) !== viewKey(get().view, scope)) get().setView(view);
+    else if (view.title !== get().view.title) set({ view });
+    if (scopeChanged) { void get().refreshMailboxes(); void get().refreshLabels(); }
+  },
+
+  refreshCategories: async () => {
+    try { set({ overview: await api.get<ApiCategoryOverview>('/api/categories') }); } catch { /* offline */ }
+  },
+
+  setAllMatching: (on) => set({ allMatching: on }),
 
   refreshMailboxes: async () => {
     try {
-      const mailboxes = await fetchMailboxes();
+      const mailboxes = await fetchMailboxes(get().scope);
       set({ mailboxes, online: true });
       void cache.putMailboxes(mailboxes);
       void api.get<{ count: number }>('/api/review/count').then((r) => set({ reviewCount: r.count })).catch(() => {});
+      void get().refreshCategories();
     } catch {
       set({ online: false });
     }
@@ -107,13 +175,14 @@ export const useMail = create<MailState>((set, get) => ({
 
   refreshLabels: async () => {
     try {
-      const labels = await api.get<ApiLabel[]>('/api/labels');
+      const scope = get().scope;
+      const labels = await api.get<ApiLabel[]>(`/api/labels${scope !== 'unified' ? `?scope=${encodeURIComponent(scope)}` : ''}`);
       set({ labels });
     } catch { /* offline */ }
   },
 
   setView: (view) => {
-    set({ view, ids: [], total: 0, loadedPages: new Set(), loadingPages: new Set(), selectedId: null, threadIds: [], checked: new Set() });
+    set({ view, ids: [], total: 0, loadedPages: new Set(), loadingPages: new Set(), selectedId: null, threadIds: [], checked: new Set(), allMatching: false });
     // cached page 0 first for instant switch
     void cache.getQuery(viewKey(view)).then(async (cached) => {
       if (!cached || viewKey(get().view) !== viewKey(view)) return;
@@ -280,11 +349,11 @@ export const useMail = create<MailState>((set, get) => ({
   },
 
   setAllChecked: (on) => {
-    if (!on) { set({ checked: new Set() }); return; }
+    if (!on) { set({ checked: new Set(), allMatching: false }); return; }
     set({ checked: new Set(get().ids.filter(Boolean)) });
   },
 
-  clearChecked: () => set({ checked: new Set() }),
+  clearChecked: () => set({ checked: new Set(), allMatching: false }),
 
   bulkMarkRead: (read) => {
     const ids = [...get().checked];

@@ -60,7 +60,7 @@ function firstName(name: string | undefined, email: string | undefined): string 
 }
 
 /** Fill the placeholders. `html` escapes the inserted values (template body is HTML). */
-export function renderTemplate(text: string, ctx: TemplateContext, opts: { html?: boolean } = {}): string {
+export function renderTemplate(text: string, ctx: TemplateContext, opts: { html?: boolean; keepRecipientTokens?: boolean } = {}): string {
   const now = ctx.now ?? new Date();
   const tz = ctx.timeZone || 'Australia/Perth';
   const fmt = (d: Date) => new Intl.DateTimeFormat('en-AU', { timeZone: tz, day: 'numeric', month: 'long', year: 'numeric' }).format(d);
@@ -69,6 +69,8 @@ export function renderTemplate(text: string, ctx: TemplateContext, opts: { html?
     const key = rawKey.trim();
     if (key.startsWith('?')) return esc(ctx.answers?.[key.slice(1).trim()] ?? '');
     const lk = key.toLowerCase();
+    // compose inserts a template before the To field is filled: recipient tokens wait for send
+    if (opts.keepRecipientTokens && lk.startsWith('recipient.') && !ctx.recipient?.email) return whole;
     const dm = lk.match(/^date\s*([+-]\s*\d+\s*[dwmy])?$/);
     if (dm) return esc(fmt(dm[1] ? shiftDate(now, dm[1].replace(/\s+/g, '')) : now));
     switch (lk) {
@@ -95,3 +97,8 @@ export const TEMPLATE_PLACEHOLDERS: { token: string; help: string }[] = [
   { token: '{{subject}}', help: 'The message subject' },
   { token: '{{?Question}}', help: 'Ask when inserting, e.g. {{?Quote amount}}' },
 ];
+
+/** True while recipient placeholders are still waiting to be filled (checked at send). */
+export function hasRecipientTokens(text: string): boolean {
+  return /\{\{\s*recipient\./i.test(text);
+}

@@ -9,10 +9,12 @@ import { cache } from '../api/cache.ts';
 import { toast } from '../toast.ts';
 import LabelPicker from './LabelPicker.tsx';
 import { readableTextOn } from './LabelColorPicker.tsx';
+import { EmailMenuItems } from './EmailMenu.tsx';
+import { actions } from '../state/actions.ts';
 import {
   EyeIcon, ImageIcon, AttachIcon, PencilIcon, ReplyIcon, ReplyAllIcon, ForwardIcon, DownloadIcon,
   EnvelopeOpenIcon, BackIcon, ArchiveIcon, JunkIcon, TrashIcon, EnvelopeIcon, SparkleIcon, CloseIcon,
-  KebabIcon, SourceIcon, NoteIcon, CaretDownIcon, RestoreMailIcon,
+  KebabIcon, SourceIcon, NoteIcon, CaretDownIcon, RestoreMailIcon, StarIcon, InboxIcon, ChartIcon,
 } from '../icons.tsx';
 import { IconContext } from '@phosphor-icons/react';
 
@@ -45,7 +47,8 @@ function HtmlBody({ html, fontSize, fontFamily }: { html: string; fontSize: numb
 
   const doc = `<!doctype html><html><head><meta charset="utf-8"><base target="_blank"><style>
     ${fontImport}
-    body { margin: 0; font-family: ${stack};
+    html { background: #ffffff; }
+    body { margin: 0; padding: 2px 4px; font-family: ${stack}; background: #ffffff;
       font-size: ${fontSize}px; line-height: 1.55; color: #23282e; word-wrap: break-word; }
     img { max-width: 100%; height: auto; }
     img.md-blocked-img { min-width: 60px; min-height: 24px; background: #f0f2f4 url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20"><text y="15" font-size="14">🖼</text></svg>') center no-repeat; border: 1px dashed #cdd4da; }
@@ -308,13 +311,8 @@ function MessageCard({ email, expanded, onToggle }: { email: ApiEmail; expanded:
         <div className="card-kebab" ref={menuRef} onClick={(e) => e.stopPropagation()}>
           <button className={`icon-btn ${menuOpen ? 'active' : ''}`} title="More" onClick={() => setMenuOpen((v) => !v)}><KebabIcon /></button>
           {menuOpen && (
-            <div className="dropdown">
-              <button className="side-item" onClick={() => { window.open(`/api/message/${email.id}/original`, '_blank', 'noopener'); setMenuOpen(false); }}>
-                <SourceIcon size={15} /><span className="name">Show original</span>
-              </button>
-              <a className="side-item" href={`/api/raw/${email.id}`} onClick={() => setMenuOpen(false)} style={{ textDecoration: 'none' }}>
-                <DownloadIcon size={15} /><span className="name">Download .eml</span>
-              </a>
+            <div className="dropdown card-menu" role="menu">
+              <EmailMenuItems email={email} close={() => setMenuOpen(false)} />
             </div>
           )}
         </div>
@@ -350,8 +348,10 @@ function MessageCard({ email, expanded, onToggle }: { email: ApiEmail; expanded:
                 <EyeIcon size={14} /> {email.openCount === 0
                   ? 'Tracking active — not opened yet.'
                   : `Opened ${email.openCount} time${email.openCount === 1 ? '' : 's'}${email.lastOpenAt ? ` · last ${new Date(email.lastOpenAt).toLocaleString()}` : ''}`}
+                {(email.autoOpenCount ?? 0) > 0 && <span className="track-auto"> · {email.autoOpenCount} probable automatic</span>}
                 {email.openCount > 0 && <CaretDownIcon size={12} style={{ marginLeft: 'auto', transform: trackOpen ? 'rotate(180deg)' : 'none' }} />}
               </button>
+              <button className="btn ghost small track-report" onClick={() => actions.openReport(email.id)}><ChartIcon size={14} /> Open report</button>
               {trackOpen && (
                 <div className="track-log">
                   {!tracking ? <div className="track-loading">Loading opens…</div> : (
@@ -413,13 +413,29 @@ function MessageCard({ email, expanded, onToggle }: { email: ApiEmail; expanded:
   );
 }
 
+/** "More" in the reading toolbar: the full per-email menu. */
+function ToolbarMore({ email }: { email: ApiEmail }) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!open) return;
+    const onDown = (e: MouseEvent) => { if (!ref.current?.contains(e.target as Node)) setOpen(false); };
+    window.addEventListener('mousedown', onDown);
+    return () => window.removeEventListener('mousedown', onDown);
+  }, [open]);
+  return (
+    <div className="label-menu" ref={ref}>
+      <button className={`icon-btn ${open ? 'active' : ''}`} title="More actions" aria-haspopup="menu" onClick={() => setOpen((v) => !v)}><KebabIcon /></button>
+      {open && <div className="dropdown" role="menu"><EmailMenuItems email={email} close={() => setOpen(false)} /></div>}
+    </div>
+  );
+}
+
 export default function ReadingPane() {
   const selectedId = useMail((s) => s.selectedId);
   const threadIds = useMail((s) => s.threadIds);
   const emails = useMail((s) => s.emails);
   const select = useMail((s) => s.select);
-  const moveTo = useMail((s) => s.moveTo);
-  const destroy = useMail((s) => s.destroy);
   const markRead = useMail((s) => s.markRead);
   const applyLabels = useMail((s) => s.applyLabels);
   const labels = useMail((s) => s.labels);
@@ -470,13 +486,23 @@ export default function ReadingPane() {
     <section className="read-pane">
       <IconContext.Provider value={{ weight: 'regular', size: 18 }}>
       <div className="read-toolbar">
-        <button className="icon-btn" title="Back" onClick={() => void select(null)}><BackIcon /></button>
-        {inBin && <button className="icon-btn" title="Restore to Inbox" onClick={() => moveTo(selected.id, 'u:inbox')}><RestoreMailIcon /></button>}
-        {!inBin && <button className="icon-btn" title="Archive" onClick={() => moveTo(selected.id, 'u:archive')}><ArchiveIcon /></button>}
-        {selected.mailboxRole !== 'junk' && <button className="icon-btn" title="Junk" onClick={() => moveTo(selected.id, 'u:junk')}><JunkIcon /></button>}
-        <button className="icon-btn" title="Delete" onClick={() => destroy(selected.id)}><TrashIcon /></button>
-        <button className="icon-btn" title="Mark unread" onClick={() => { markRead(selected.id, false); void select(null); }}><EnvelopeIcon /></button>
+        <button className="icon-btn" title="Back to list (u)" onClick={() => void select(null)}><BackIcon /></button>
+        {inBin
+          ? <button className="icon-btn" title={selected.mailboxRole === 'junk' ? 'Not spam' : 'Restore to Inbox'} onClick={() => (selected.mailboxRole === 'junk' ? actions.notSpam(selected.id) : actions.restore(selected.id))}><RestoreMailIcon /></button>
+          : <button className="icon-btn" title="Archive (e)" onClick={() => actions.archive(selected.id)}><ArchiveIcon /></button>}
+        {selected.mailboxRole !== 'junk' && <button className="icon-btn" title="Report spam (!)" onClick={() => actions.spam(selected.id)}><JunkIcon /></button>}
+        <button className="icon-btn" title={inBin ? 'Delete forever' : 'Delete (#)'} onClick={() => actions.trash(selected.id)}><TrashIcon /></button>
+        <span className="tb-sep" />
+        <button className="icon-btn" title="Mark unread (Shift+U)" onClick={() => { markRead(selected.id, false); void select(null); }}><EnvelopeIcon /></button>
+        <button className={`icon-btn ${selected.keywords.$flagged ? 'active' : ''}`} title="Star (s)" onClick={() => actions.star(selected.id)}><StarIcon weight={selected.keywords.$flagged ? 'fill' : 'regular'} /></button>
         <LabelPicker value={selected.labelIds} onChange={(ids) => applyLabels(selected.id, ids)} />
+        <span className="tb-sep" />
+        {!selected.keywords.$draft && <>
+          <button className="icon-btn" title="Reply (r)" onClick={() => actions.reply(selected.id)}><ReplyIcon /></button>
+          <button className="icon-btn" title="Reply all (a)" onClick={() => actions.replyAll(selected.id)}><ReplyAllIcon /></button>
+          <button className="icon-btn" title="Forward (f)" onClick={() => actions.forward(selected.id)}><ForwardIcon /></button>
+        </>}
+        <ToolbarMore email={selected} />
         <button className={`icon-btn ${teachOpen ? 'active' : ''}`} title="Teach the AI about emails like this" onClick={() => setTeachOpen((v) => !v)}><SparkleIcon /></button>
         <div style={{ flex: 1 }} />
         <button className="btn ghost" disabled={summarizing} onClick={summarize}><SparkleIcon /> {summarizing ? 'Summarizing…' : 'Summarize'}</button>

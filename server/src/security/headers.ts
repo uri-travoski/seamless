@@ -34,7 +34,9 @@ export async function registerSecurityHeaders(app: FastifyInstance): Promise<voi
   await app.register(helmet, {
     contentSecurityPolicy: { useDefaults: false, directives: { ...cspDirectives(), ...(httpsInstance ? { upgradeInsecureRequests: [] } : {}) } },
     crossOriginEmbedderPolicy: false,
-    crossOriginOpenerPolicy: { policy: 'same-origin-allow-popups' },
+    // browsers ignore (and log an error for) COOP / origin-keying on plain-http origins such as a LAN IP
+    crossOriginOpenerPolicy: httpsInstance ? { policy: 'same-origin-allow-popups' } : false,
+    originAgentCluster: httpsInstance,
     crossOriginResourcePolicy: { policy: 'same-site' },
     referrerPolicy: { policy: 'no-referrer' },
     xFrameOptions: { action: 'sameorigin' },

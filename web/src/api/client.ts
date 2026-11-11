@@ -41,8 +41,8 @@ export async function jmap(methodCalls: MethodCall[]): Promise<Record<string, an
   return byTag;
 }
 
-export async function fetchMailboxes(): Promise<ApiMailbox[]> {
-  const r = await jmap([['Mailbox/get', {}, 'a']]);
+export async function fetchMailboxes(scope?: string): Promise<ApiMailbox[]> {
+  const r = await jmap([['Mailbox/get', scope && scope !== 'unified' ? { scope } : {}, 'a']]);
   return r.a.list;
 }
 

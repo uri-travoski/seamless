@@ -1,7 +1,11 @@
-import { useState } from 'react';
+/** Settings shell (AD-6): left nav + content, one URL per page (/settings/<tab>). */
+import type { ComponentType } from 'react';
 import GeneralSettings from './GeneralSettings.tsx';
-import AccountSettings from './AccountSettings.tsx';
+import AppearanceSettings from './AppearanceSettings.tsx';
+import MailboxSettings from './MailboxSettings.tsx';
 import LabelSettings from './LabelSettings.tsx';
+import NotificationSettings from './NotificationSettings.tsx';
+import SecuritySettings from './SecuritySettings.tsx';
 import FilterSettings from './FilterSettings.tsx';
 import AiSettings from './AiSettings.tsx';
 import UserSettings from './UserSettings.tsx';
@@ -11,63 +15,59 @@ import LogsSettings from './LogsSettings.tsx';
 import DevicesSettings from './DevicesSettings.tsx';
 import BackupSettings from './BackupSettings.tsx';
 import ContactsSettings from './ContactsSettings.tsx';
+import TemplatesView from '../TemplatesView.tsx';
 import { useSession } from '../../state/session.ts';
-import type { ComponentType } from 'react';
-import { SettingsIcon, AccountIcon, TagIcon, FilterIcon, SparkleIcon, UsersIcon, LogoutIcon, BackIcon, RulesIcon, ImportIcon, LogsIcon, DevicesIcon, ContactsIcon, BackupIcon } from '../../icons.tsx';
+import { useMail, scopeToSlug } from '../../state/mail.ts';
+import { navigate } from '../../router.ts';
+import {
+  SettingsIcon, MailboxIcon, TagIcon, FilterIcon, SparkleIcon, UsersIcon, LogoutIcon, BackIcon, RulesIcon, ImportIcon,
+  LogsIcon, DevicesIcon, ContactsIcon, BackupIcon, PaletteIcon, TemplateIcon, BellIcon, LockIcon,
+} from '../../icons.tsx';
 
-const TABS: { id: string; name: string; Icon: ComponentType<{ className?: string }> }[] = [
-  { id: 'general', name: 'General', Icon: SettingsIcon },
-  { id: 'accounts', name: 'Accounts', Icon: AccountIcon },
-  { id: 'labels', name: 'Labels', Icon: TagIcon },
-  { id: 'rules', name: 'Rules', Icon: RulesIcon },
-  { id: 'automation', name: 'Import & Retention', Icon: ImportIcon },
-  { id: 'filters', name: 'Filters', Icon: FilterIcon },
-  { id: 'ai', name: 'AI', Icon: SparkleIcon },
-  { id: 'contacts', name: 'Contacts', Icon: ContactsIcon },
-  { id: 'devices', name: 'Devices', Icon: DevicesIcon },
-  { id: 'logs', name: 'Logs', Icon: LogsIcon },
-  { id: 'backup', name: 'Backup', Icon: BackupIcon },
-  { id: 'users', name: 'Users', Icon: UsersIcon },
+const TABS: { id: string; name: string; Icon: ComponentType<{ className?: string }>; C: ComponentType; admin?: boolean }[] = [
+  { id: 'general', name: 'General', Icon: SettingsIcon, C: GeneralSettings },
+  { id: 'appearance', name: 'Appearance', Icon: PaletteIcon, C: AppearanceSettings },
+  { id: 'mailboxes', name: 'Mailboxes', Icon: MailboxIcon, C: MailboxSettings },
+  { id: 'labels', name: 'Labels', Icon: TagIcon, C: LabelSettings },
+  { id: 'templates', name: 'Templates', Icon: TemplateIcon, C: () => <><h2>Templates</h2><TemplatesView embedded /></> },
+  { id: 'notifications', name: 'Notifications', Icon: BellIcon, C: NotificationSettings },
+  { id: 'security', name: 'Security', Icon: LockIcon, C: SecuritySettings },
+  { id: 'rules', name: 'Rules', Icon: RulesIcon, C: RulesSettings },
+  { id: 'automation', name: 'Import & Retention', Icon: ImportIcon, C: AutomationSettings },
+  { id: 'filters', name: 'Filters', Icon: FilterIcon, C: FilterSettings },
+  { id: 'ai', name: 'AI', Icon: SparkleIcon, C: AiSettings },
+  { id: 'contacts', name: 'Contacts', Icon: ContactsIcon, C: ContactsSettings },
+  { id: 'devices', name: 'Devices', Icon: DevicesIcon, C: DevicesSettings },
+  { id: 'logs', name: 'Logs', Icon: LogsIcon, C: LogsSettings },
+  { id: 'backup', name: 'Backup', Icon: BackupIcon, C: BackupSettings, admin: true },
+  { id: 'users', name: 'Users', Icon: UsersIcon, C: UserSettings, admin: true },
 ];
 
-export default function Settings({ onClose, initialTab, autoAddLabel }: { onClose: () => void; initialTab?: string; autoAddLabel?: boolean }) {
-  const [tab, setTab] = useState<string>(initialTab && TABS.some((t) => t.id === initialTab) ? initialTab : 'general');
+export default function Settings({ tab }: { tab: string }) {
   const logout = useSession((s) => s.logout);
+  const isAdmin = useSession((s) => s.user?.role === 'admin');
+  const id = tab === 'accounts' ? 'mailboxes' : tab;
+  const current = TABS.find((t) => t.id === id) ?? TABS[0];
+  const tabs = TABS.filter((t) => !t.admin || isAdmin);
+  const back = () => navigate({ page: 'mail', scope: scopeToSlug(useMail.getState().scope, useMail.getState().overview), folder: 'inbox' });
 
   return (
-    <div className="overlay" onMouseDown={(e) => { if (e.target === e.currentTarget) onClose(); }}>
-      <div className="modal">
-        <div className="settings-nav">
-          {TABS.map((t) => (
-            <button key={t.id} className={`side-item ${tab === t.id ? 'active' : ''}`} onClick={() => setTab(t.id)}>
-              <t.Icon className="glyph" />
-              <span className="name">{t.name}</span>
-            </button>
-          ))}
-          <div style={{ marginTop: 18, borderTop: '1px solid var(--md-border)', paddingTop: 10 }}>
-            <button className="side-item" onClick={() => void logout()}>
-              <LogoutIcon className="glyph" /><span className="name">Log out</span>
-            </button>
-            <button className="side-item" onClick={onClose}>
-              <BackIcon className="glyph" /><span className="name">Back to mail</span>
-            </button>
-          </div>
+    <section className="page settings-page">
+      <nav className="settings-nav" aria-label="Settings">
+        <button className="side-item back-to-mail" onClick={back}><BackIcon className="glyph" /><span className="name">Back to mail</span></button>
+        {tabs.map((t) => (
+          <button key={t.id} className={`side-item ${current.id === t.id ? 'active' : ''}`} onClick={() => navigate({ page: 'settings', tab: t.id })}>
+            <t.Icon className="glyph" />
+            <span className="name">{t.name}</span>
+          </button>
+        ))}
+        <div className="settings-nav-foot">
+          <button className="side-item" onClick={() => void logout()}><LogoutIcon className="glyph" /><span className="name">Log out</span></button>
         </div>
-        <div className="settings-content">
-          {tab === 'general' && <GeneralSettings />}
-          {tab === 'accounts' && <AccountSettings />}
-          {tab === 'labels' && <LabelSettings autoAdd={autoAddLabel} />}
-          {tab === 'filters' && <FilterSettings />}
-          {tab === 'ai' && <AiSettings />}
-          {tab === 'rules' && <RulesSettings />}
-          {tab === 'automation' && <AutomationSettings />}
-          {tab === 'contacts' && <ContactsSettings />}
-          {tab === 'devices' && <DevicesSettings />}
-          {tab === 'logs' && <LogsSettings />}
-          {tab === 'backup' && <BackupSettings />}
-          {tab === 'users' && <UserSettings />}
-        </div>
+      </nav>
+      <div className="settings-content">
+        <current.C />
       </div>
-    </div>
+    </section>
   );
 }

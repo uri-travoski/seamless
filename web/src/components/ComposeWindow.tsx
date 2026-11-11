@@ -1,4 +1,4 @@
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 import { useEditor, EditorContent } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
@@ -10,7 +10,8 @@ import Highlight from '@tiptap/extension-highlight';
 import TextAlign from '@tiptap/extension-text-align';
 import Image from '@tiptap/extension-image';
 import Placeholder from '@tiptap/extension-placeholder';
-import type { ComposePayload } from '@seamless/shared';
+import { renderTemplate, hasRecipientTokens, type ComposePayload, type ApiTemplate } from '@seamless/shared';
+import { useTemplates, fillTemplate } from '../state/templates.ts';
 import { useCompose, type Draft } from '../state/compose.ts';
 import AddressField from './AddressField.tsx';
 import { useMail } from '../state/mail.ts';
@@ -20,7 +21,7 @@ import {
   MinimizeIcon, MaximizeIcon, RestoreIcon, CloseIcon, UndoIcon, RedoIcon, BoldIcon, ItalicIcon,
   UnderlineIcon, StrikethroughIcon, HighlightIcon, BulletListIcon, NumberedListIcon,
   AlignLeftIcon, AlignCenterIcon, AlignRightIcon, LinkIcon, ImageIcon, ClearFormatIcon, AttachIcon, SparkleIcon, EyeIcon, TrashIcon,
-  ScheduledIcon, CaretDownIcon,
+  ScheduledIcon, CaretDownIcon, TemplateIcon, KebabIcon,
 } from '../icons.tsx';
 import { IconContext } from '@phosphor-icons/react';
 
@@ -55,8 +56,46 @@ export default function ComposeWindow({ draft }: { draft: Draft }) {
   const [scheduleOpen, setScheduleOpen] = useState(false);
   const [customDt, setCustomDt] = useState('');
   const fileRef = useRef<HTMLInputElement>(null);
+  const templates = useTemplates((s) => s.list);
+  const [tplOpen, setTplOpen] = useState(false);
+  const [tplFilter, setTplFilter] = useState('');
+  const [moreOpen, setMoreOpen] = useState(false);
+  useEffect(() => { if (!useTemplates.getState().loaded) void useTemplates.getState().refresh(); }, []);
+
+  // latest draft for the editor's key handler (it's created once)
+  const draftRef = useRef(draft);
+  draftRef.current = draft;
+
+  /** Insert a template at the cursor (subject too, if empty). */
+  const insertTemplate = async (t: ApiTemplate, replaceRange?: { from: number; to: number }) => {
+    const d = draftRef.current;
+    const filled = await fillTemplate(t, { identity: d.identity, to: d.to, subject: d.subject });
+    if (!filled || !editorRef.current) return;
+    const chain = editorRef.current.chain().focus();
+    if (replaceRange) chain.deleteRange(replaceRange);
+    chain.insertContent(filled.html).run();
+    if (!d.subject && filled.subject) update(d.key, { subject: filled.subject });
+  };
+  const insertRef = useRef(insertTemplate);
+  insertRef.current = insertTemplate;
+  const editorRef = useRef<ReturnType<typeof useEditor>>(null);
 
   const editor = useEditor({
+    editorProps: {
+      // ;shortcut + space / Tab / Enter expands the matching template
+      handleKeyDown: (view, event) => {
+        if (event.key !== ' ' && event.key !== 'Tab' && event.key !== 'Enter') return false;
+        const { $from } = view.state.selection;
+        const before = $from.parent.textBetween(0, $from.parentOffset, undefined, '\ufffc');
+        const m = before.match(/(?:^|\s)(;[a-z0-9_-]{1,30})$/i);
+        if (!m) return false;
+        const t = useTemplates.getState().list.find((x) => x.shortcut === m[1].toLowerCase());
+        if (!t) return false;
+        event.preventDefault();
+        void insertRef.current(t, { from: $from.pos - m[1].length, to: $from.pos });
+        return true;
+      },
+    },
     extensions: [
       StarterKit,
       Underline,
@@ -70,26 +109,38 @@ export default function ComposeWindow({ draft }: { draft: Draft }) {
     ],
     content: draft.initialHtml,
   });
+  editorRef.current = editor;
 
-  const payload = useCallback((): ComposePayload => ({
+  const payload = useCallback((forSend = false): ComposePayload => {
+    let html = editor?.getHTML() ?? '';
+    let subject = draft.subject;
+    // template placeholders waiting for a recipient are filled now
+    if (forSend && (hasRecipientTokens(html) || hasRecipientTokens(subject))) {
+      const ctx = { recipient: draft.to[0] ?? null };
+      html = renderTemplate(html, ctx, { html: true });
+      subject = renderTemplate(subject, ctx);
+    }
+    return {
     accountId: draft.identity?.accountId ?? 0,
     fromEmail: draft.identity?.email ?? '',
     to: draft.to, cc: draft.cc, bcc: draft.bcc,
-    subject: draft.subject,
-    html: editor?.getHTML() ?? '',
+    subject,
+    html,
     inReplyTo: draft.inReplyTo,
     replyToEmailId: draft.replyToEmailId,
     attachmentIds: draft.attachments.map((a) => a.id),
     track: draft.track,
+    perRecipientTracking: draft.track && draft.perRecipientTracking,
     draftId: draft.draftId,
-  }), [draft, editor]);
+  };
+  }, [draft, editor]);
 
   const doSend = async () => {
     if (!draft.identity) { toast('Add an account first (Settings > Accounts)', 'error'); return; }
     if (draft.to.length === 0) { toast('Add at least one recipient', 'error'); return; }
     setSending(true);
     try {
-      await sendMail(payload());
+      await sendMail(payload(true));
       toast('Message sent');
       close(draft.key);
       void useMail.getState().refreshCurrent();
@@ -106,7 +157,7 @@ export default function ComposeWindow({ draft }: { draft: Draft }) {
     setScheduleOpen(false);
     setSending(true);
     try {
-      await scheduleMail(payload(), at);
+      await scheduleMail(payload(true), at);
       toast(`Scheduled for ${new Date(at).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' })}`);
       close(draft.key);
       void useMail.getState().refreshCurrent();
@@ -140,6 +191,15 @@ export default function ComposeWindow({ draft }: { draft: Draft }) {
         toast(`Upload failed: ${file.name}`, 'error');
       }
     }
+  };
+
+  const saveAsTemplate = async () => {
+    const name = window.prompt('Template name', draft.subject || 'New template');
+    if (!name?.trim()) return;
+    try {
+      await useTemplates.getState().save({ name: name.trim(), subject: draft.subject, bodyHtml: editor?.getHTML() ?? '', accountId: draft.identity?.accountId ?? null, category: '' });
+      toast(`Saved “${name.trim()}” to Templates`);
+    } catch (e: any) { toast(e?.message ?? 'Could not save the template', 'error'); }
   };
 
   const aiDraft = async () => {
@@ -249,6 +309,35 @@ export default function ComposeWindow({ draft }: { draft: Draft }) {
             input.click();
           })}
           {tb(false, 'Clear formatting', <ClearFormatIcon />, () => editor?.chain().focus().clearNodes().unsetAllMarks().run())}
+          <span className="sep" />
+          <div className="label-menu">
+            <button className={`icon-btn ${tplOpen ? 'active' : ''}`} title="Insert template (or type ;shortcut)"
+              onMouseDown={(e) => e.preventDefault()} onClick={() => setTplOpen((v) => !v)}><TemplateIcon /></button>
+            {tplOpen && (
+              <div className="dropdown tpl-pop">
+                <input className="text-input compact" autoFocus placeholder="Find a template…" value={tplFilter} onChange={(e) => setTplFilter(e.target.value)} />
+                {templates.length === 0 && <div className="menu-empty">No templates yet — make one with “Save as template” or in Templates.</div>}
+                {Object.entries(templates
+                  .filter((t) => `${t.name} ${t.category} ${t.shortcut ?? ''}`.toLowerCase().includes(tplFilter.toLowerCase()))
+                  .reduce<Record<string, ApiTemplate[]>>((acc, t) => { (acc[t.category || 'General'] ??= []).push(t); return acc; }, {}))
+                  .map(([cat, list]) => (
+                    <div key={cat}>
+                      <div className="switch-head">{cat}</div>
+                      {list.map((t) => (
+                        <button key={t.id} className="side-item" onClick={() => { setTplOpen(false); setTplFilter(''); void insertTemplate(t); }}>
+                          <span className="name">{t.name}</span>{t.shortcut && <code className="tpl-key">{t.shortcut}</code>}
+                        </button>
+                      ))}
+                    </div>
+                  ))}
+              </div>
+            )}
+          </div>
+          <button className={`icon-btn track-eye ${draft.track ? 'active' : ''}`} aria-pressed={draft.track}
+            title={draft.track ? 'Open tracking ON — you will see when it is opened (click to turn off)' : 'Open tracking OFF (click to turn on)'}
+            onMouseDown={(e) => e.preventDefault()} onClick={() => update(draft.key, { track: !draft.track })}>
+            <EyeIcon weight={draft.track ? 'fill' : 'regular'} />
+          </button>
         </div>
 
         <div className="editor-scroll">
@@ -291,10 +380,20 @@ export default function ComposeWindow({ draft }: { draft: Draft }) {
             <button className="btn ghost" disabled={aiBusy} onClick={aiDraft}><SparkleIcon /> {aiBusy ? 'Drafting…' : 'AI draft'}</button>
           )}
           <div className="grow" />
-          <label className="track-toggle" title="Insert an invisible tracking pixel to see when the message is opened">
-            <input type="checkbox" checked={draft.track} onChange={(e) => update(draft.key, { track: e.target.checked })} />
-            <EyeIcon /> Track opens
-          </label>
+          {draft.track && <span className="track-state" title="Open tracking is on for this message"><EyeIcon weight="fill" size={14} /> Tracked{draft.perRecipientTracking ? ' per recipient' : ''}</span>}
+          <div className="label-menu">
+            <button className={`icon-btn ${moreOpen ? 'active' : ''}`} title="More options" onClick={() => setMoreOpen((v) => !v)}><KebabIcon /></button>
+            {moreOpen && (
+              <div className="dropdown up">
+                <button className="side-item" onClick={() => { setMoreOpen(false); void saveAsTemplate(); }}><TemplateIcon size={15} /><span className="name">Save as template…</span></button>
+                <label className="side-item checkbox-line" title="Send each recipient their own copy with its own pixel, so the open report shows who opened">
+                  <input type="checkbox" checked={draft.perRecipientTracking} disabled={!draft.track}
+                    onChange={(e) => update(draft.key, { perRecipientTracking: e.target.checked })} />
+                  <span className="name">Track each recipient separately</span>
+                </label>
+              </div>
+            )}
+          </div>
           <button className="icon-btn" title="Discard" onClick={() => close(draft.key)}><TrashIcon /></button>
         </div>
       </div>

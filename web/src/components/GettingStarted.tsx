@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { api } from '../api/client.ts';
 import { CheckIcon, CloseIcon } from '../icons.tsx';
+import { useCompose } from '../state/compose.ts';
 
 interface WizardStatus { accounts: number; rules: number; aiReady: boolean; devices: number }
 
@@ -17,9 +18,11 @@ export default function GettingStarted({ openSettings, openHelp }: {
   const refresh = () => void api.get<WizardStatus>('/api/wizard/status').then(setStatus).catch(() => {});
   useEffect(() => { refresh(); const t = setInterval(refresh, 8000); return () => clearInterval(t); }, []);
 
-  if (dismissed || !status) return null;
+  // the card and the compose dock share the bottom-right corner: step aside while composing
+  const composing = useCompose((st) => st.windows.length > 0);
+  if (dismissed || !status || composing) return null;
   const steps = [
-    { done: status.accounts > 0, label: 'Connect a mail account', hint: 'Gmail/Microsoft via OAuth, or any IMAP server', tab: 'accounts' },
+    { done: status.accounts > 0, label: 'Connect a mailbox', hint: 'Gmail/Microsoft via OAuth, or any IMAP server', tab: 'mailboxes' },
     { done: status.rules > 0, label: 'Import your rules spreadsheet', hint: 'labels + retention + rules in one go (or add rules by hand)', tab: 'automation' },
     { done: status.aiReady, label: 'Enable the AI classifier', hint: 'map the Classify + Embeddings tasks to a provider', tab: 'ai' },
     { done: status.devices > 0, label: 'Connect your phone or mail app', hint: 'app password + the server settings card', tab: 'devices' },

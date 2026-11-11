@@ -85,6 +85,12 @@ async function inQuietHours(userId: number, now: number): Promise<boolean> {
 
 interface Rendered { title: string; body: string; link: string | null; groupKey: string | null; accountId: number | null }
 
+/** `"Priya Shah" <priya@x>` → Priya Shah; a bare address stays as it is. */
+export function displayName(from: string): string {
+  const m = from.match(/^\s*"?([^"<]*?)"?\s*<([^>]+)>\s*$/);
+  return m ? (m[1].trim() || m[2].trim()) : from.trim();
+}
+
 const quote = (s: unknown) => `"${String(s ?? '').slice(0, 120) || '(no subject)'}"`;
 
 export function render(ev: EventRow): Rendered {
@@ -92,7 +98,7 @@ export function render(ev: EventRow): Rendered {
   const accountId = typeof p.accountId === 'number' ? p.accountId : null;
   switch (ev.type) {
     case 'mail.received':
-      return { title: String(p.from || 'New mail'), body: String(p.subject || '(no subject)'), link: p.messageId ? `/mail/msg/m${p.messageId}` : null, groupKey: null, accountId };
+      return { title: displayName(String(p.from ?? '')) || 'New mail', body: String(p.subject || '(no subject)'), link: p.messageId ? `/mail/msg/m${p.messageId}` : null, groupKey: null, accountId };
     case 'disposable.received':
       return { title: `New mail to ${p.address ?? 'a disposable address'}`, body: String(p.subject ?? ''), link: p.messageId ? `/mail/msg/m${p.messageId}` : null, groupKey: null, accountId };
     case 'mail.opened':
@@ -100,7 +106,8 @@ export function render(ev: EventRow): Rendered {
         title: `${p.recipient || 'Your recipient'} opened ${quote(p.subject)}`,
         body: p.proxied ? 'Probably an automatic open (mail privacy proxy)' : (p.client ? `On ${p.client}` : ''),
         link: p.messageId ? `/mail/msg/m${p.messageId}/opens` : null,
-        groupKey: p.messageId ? `opened:msg:${p.messageId}` : null, accountId,
+        // per-recipient sends group per person; a normal send has one token per message
+        groupKey: p.messageId ? `opened:msg:${p.messageId}${p.perRecipient ? `:${p.token}` : ''}` : null, accountId,
       };
     case 'send.failed':
       return { title: `Couldn't send ${quote(p.subject)}`, body: String(p.error ?? ''), link: '/mail/drafts', groupKey: null, accountId };

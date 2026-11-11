@@ -1,44 +1,82 @@
-import { useState } from 'react';
+/**
+ * Sidebar (T1 F-10):
+ *   [Compose]
+ *   Inbox · (Review when there is something to decide) · Starred · Drafts · Scheduled · Sent
+ *   Templates · Spam · Bin · More ▸ (Archive and anything moved there in Settings → Labels)
+ *   ── Labels A–Z (nested, hidden ones left out) [+ New label]
+ *   ── Folders (only when the scope is a single mailbox)
+ */
+import { useMemo, useState } from 'react';
 import type { ComponentType } from 'react';
-import { useMail, type View } from '../state/mail.ts';
+import type { ApiLabel } from '@seamless/shared';
+import { useMail, scopeToSlug } from '../state/mail.ts';
 import { useCompose } from '../state/compose.ts';
-import type { ApiMailbox } from '@seamless/shared';
-import { InboxIcon, DraftsIcon, SentIcon, ScheduledIcon, ArchiveIcon, JunkIcon, TrashIcon, FolderIcon, ComposeIcon, CaretDownIcon, CaretRightIcon, StarIcon, ReviewIcon, CloudDownloadIcon } from '../icons.tsx';
+import { useSession, DEFAULT_SIDEBAR } from '../state/session.ts';
+import { useRouter, navigate, FOLDER_ROLE, FOLDER_TITLE } from '../router.ts';
+import {
+  InboxIcon, DraftsIcon, SentIcon, ScheduledIcon, ArchiveIcon, JunkIcon, TrashIcon, FolderIcon, ComposeIcon,
+  CaretDownIcon, CaretRightIcon, StarIcon, ReviewIcon, CloudDownloadIcon, TemplateIcon, MailLogo, SidebarCollapseIcon,
+} from '../icons.tsx';
 import { IconContext } from '@phosphor-icons/react';
 import { api } from '../api/client.ts';
 import { toast } from '../toast.ts';
 import LabelColorPicker from './LabelColorPicker.tsx';
 
-const STARRED_VIEW: View = { kind: 'search', query: 'is:starred', title: 'Starred' };
-const REVIEW_VIEW: View = { kind: 'review', title: 'Review' };
-// sidebar display order; 'starred'/'review' are synthetic views, the rest are unified mailboxes by role
-const UNIFIED_ORDER = ['inbox', 'starred', 'review', 'scheduled', 'drafts', 'sent', 'archive', 'junk', 'trash'];
-
-const ROLE_ICON: Record<string, ComponentType<{ className?: string }>> = {
-  inbox: InboxIcon, drafts: DraftsIcon, sent: SentIcon, scheduled: ScheduledIcon, archive: ArchiveIcon, junk: JunkIcon, trash: TrashIcon,
+const FOLDER_ICON: Record<string, ComponentType<{ className?: string }>> = {
+  inbox: InboxIcon, starred: StarIcon, drafts: DraftsIcon, scheduled: ScheduledIcon, sent: SentIcon,
+  templates: TemplateIcon, spam: JunkIcon, bin: TrashIcon, archive: ArchiveIcon, review: ReviewIcon,
 };
 
-function BoxGlyph({ mb }: { mb: ApiMailbox }) {
-  const Icon = (mb.role && ROLE_ICON[mb.role]) || FolderIcon;
-  return <Icon className="glyph" />;
+interface LabelNode { label: ApiLabel; children: LabelNode[] }
+
+/** Tree of labels in the chosen order; hidden ones (and "only if unread" with none) dropped. */
+export function labelTree(labels: ApiLabel[], sort: 'az' | 'manual' | 'count', forSidebar: boolean): LabelNode[] {
+  const visible = forSidebar
+    ? labels.filter((l) => l.sidebarVisibility !== 'hidden' && !(l.sidebarVisibility === 'unread' && !(l.unread ?? 0)))
+    : labels;
+  const ids = new Set(visible.map((l) => l.id));
+  const cmp = (a: ApiLabel, b: ApiLabel) =>
+    sort === 'manual' ? (a.sort ?? 0) - (b.sort ?? 0) || a.name.localeCompare(b.name)
+      : sort === 'count' ? (b.total ?? 0) - (a.total ?? 0) || a.name.localeCompare(b.name)
+        : a.name.localeCompare(b.name, undefined, { sensitivity: 'base', numeric: true });
+  const build = (parent: number | null): LabelNode[] => visible
+    .filter((l) => (l.parentId && ids.has(l.parentId) ? l.parentId : null) === parent)
+    .sort(cmp)
+    .map((label) => ({ label, children: build(label.id) }));
+  return build(null);
 }
 
 export default function Sidebar({ open, onNavigate, onAddLabel }: { open: boolean; onNavigate: () => void; onAddLabel: () => void }) {
   const mailboxes = useMail((s) => s.mailboxes);
   const labels = useMail((s) => s.labels);
   const reviewCount = useMail((s) => s.reviewCount);
-  const view = useMail((s) => s.view);
-  const setView = useMail((s) => s.setView);
+  const scope = useMail((s) => s.scope);
+  const overview = useMail((s) => s.overview);
+  const route = useRouter((s) => s.route);
   const openBlank = useCompose((s) => s.openBlank);
-  const [expandedAccounts, setExpandedAccounts] = useState<Set<number>>(new Set());
+  const settings = useSession((s) => s.settings);
+  const saveSettings = useSession((s) => s.saveSettings);
+  const [moreOpen, setMoreOpen] = useState(false);
+  const [collapsedLabels, setCollapsedLabels] = useState<Set<number>>(new Set());
   const [fetching, setFetching] = useState(false);
+
+  const sidebar = settings.sidebar ?? DEFAULT_SIDEBAR;
+  const slug = scopeToSlug(scope, overview);
+  const unifiedByRole = new Map(mailboxes.filter((m) => m.accountId === null).map((m) => [m.role, m]));
+  const singleAccount = scope.startsWith('account:') ? Number(scope.slice(8)) : null;
+  const ownFolders = singleAccount ? mailboxes.filter((m) => m.accountId === singleAccount && !m.role) : [];
+  const tree = useMemo(() => labelTree(labels, settings.labelSort ?? 'az', true), [labels, settings.labelSort]);
+
+  const go = (folder: string, arg?: string) => { navigate({ page: 'mail', scope: slug, folder, arg }); onNavigate(); };
+  const isActive = (folder: string, arg?: string) =>
+    route.page === 'mail' && route.folder === folder && (arg === undefined || route.arg === arg);
 
   const fetchAll = async () => {
     if (fetching) return;
     setFetching(true);
     try {
       const res = await api.post<{ accounts: number }>('/api/sync');
-      toast(res.accounts ? `Checking ${res.accounts} account${res.accounts === 1 ? '' : 's'} for new mail…` : 'No connected accounts to check');
+      toast(res.accounts ? `Checking ${res.accounts} mailbox${res.accounts === 1 ? '' : 'es'} for new mail…` : 'No connected mailboxes to check');
     } catch (e: any) {
       toast(e?.message ?? 'Could not check for mail', 'error');
     } finally {
@@ -46,141 +84,103 @@ export default function Sidebar({ open, onNavigate, onAddLabel }: { open: boolea
     }
   };
 
-  const unified = mailboxes.filter((m) => m.accountId === null);
-  const accounts = new Map<number, ApiMailbox[]>();
-  for (const mb of mailboxes) {
-    if (mb.accountId === null) continue;
-    if (!accounts.has(mb.accountId)) accounts.set(mb.accountId, []);
-    accounts.get(mb.accountId)!.push(mb);
-  }
+  const folderItem = (folder: string, nested = false) => {
+    const Icon = FOLDER_ICON[folder] ?? FolderIcon;
+    const role = FOLDER_ROLE[folder];
+    const mb = role ? unifiedByRole.get(role as any) : undefined;
+    const title = FOLDER_TITLE[folder] ?? folder;
+    let count: React.ReactNode = null;
+    if (folder === 'inbox' && mb && mb.unreadEmails > 0) count = <span className="count">{mb.unreadEmails}</span>;
+    if ((folder === 'drafts' || folder === 'scheduled') && mb && mb.totalEmails > 0) count = <span className="count muted">{mb.totalEmails}</span>;
+    if (folder === 'spam' && mb && mb.unreadEmails > 0) count = <span className="count muted">{mb.unreadEmails}</span>;
+    if (folder === 'review') count = <span className="count">{reviewCount}</span>;
+    return (
+      <button key={folder} className={`side-item ${nested ? 'sub' : ''} ${isActive(folder) ? 'active' : ''}`} onClick={() => go(folder)} title={title}>
+        <Icon className="glyph" />
+        <span className="name">{title}</span>
+        {count}
+      </button>
+    );
+  };
 
-  const unifiedByRole = new Map(unified.map((m) => [m.role, m]));
-
-  const go = (v: View) => { setView(v); onNavigate(); };
-  const isActive = (v: Partial<View>) =>
-    (v.mailboxId && view.kind === 'mailbox' && view.mailboxId === v.mailboxId) ||
-    (v.labelId !== undefined && view.kind === 'label' && view.labelId === v.labelId);
-  const starredActive = view.kind === 'search' && view.query === 'is:starred';
+  const labelNode = (n: LabelNode, depth: number): React.ReactNode => {
+    const l = n.label;
+    const collapsed = collapsedLabels.has(l.id);
+    return (
+      <div key={l.id}>
+        <div className={`side-item label-item ${isActive('label', String(l.id)) ? 'active' : ''}`} style={{ paddingLeft: depth * 14 }}>
+          {n.children.length > 0 ? (
+            <button className="label-caret" aria-label={collapsed ? 'Expand' : 'Collapse'}
+              onClick={() => { const s = new Set(collapsedLabels); if (collapsed) s.delete(l.id); else s.add(l.id); setCollapsedLabels(s); }}>
+              {collapsed ? <CaretRightIcon size={11} /> : <CaretDownIcon size={11} />}
+            </button>
+          ) : <span className="label-caret" />}
+          <LabelColorPicker label={l} dotSize={11} stop />
+          <button className="label-name-btn" onClick={() => go('label', String(l.id))} title={l.name}>
+            <span className="name">{l.name}</span>
+            {(l.unread ?? 0) > 0 && <span className="count muted">{l.unread}</span>}
+          </button>
+        </div>
+        {!collapsed && n.children.map((c) => labelNode(c, depth + 1))}
+      </div>
+    );
+  };
 
   return (
     <IconContext.Provider value={{ weight: 'fill', size: 18 }}>
-    <nav className={`sidebar ${open ? 'open' : ''}`}>
+    <nav className={`sidebar ${open ? 'open' : ''} ${settings.sidebarCollapsed ? 'collapsed' : ''}`} aria-label="Folders">
+      <div className="side-brand mobile-only"><MailLogo size="1.4em" /><span className="app-name">{settings.appName || 'Seamless'}</span></div>
       <div className="compose-actions">
-        <button className={`btn primary fetch-btn ${fetching ? 'busy' : ''}`} title="Check all accounts for new mail"
-          aria-label="Check all accounts for new mail" disabled={fetching} onClick={fetchAll}><CloudDownloadIcon /></button>
-        <button className="btn primary compose-btn" onClick={openBlank}><ComposeIcon /> Compose</button>
+        <button className={`btn primary fetch-btn ${fetching ? 'busy' : ''}`} title="Check all mailboxes for new mail"
+          aria-label="Check all mailboxes for new mail" disabled={fetching} onClick={fetchAll}><CloudDownloadIcon /></button>
+        <button className="btn primary compose-btn" onClick={openBlank} title="Compose (c)"><ComposeIcon /> <span className="compose-label">Compose</span></button>
       </div>
 
       <div className="side-section">
-        {UNIFIED_ORDER.map((role) => {
-          if (role === 'starred') {
-            return (
-              <button key="starred" className={`side-item ${starredActive ? 'active' : ''}`} onClick={() => go(STARRED_VIEW)}>
-                <StarIcon className="glyph" weight="fill" />
-                <span className="name">Starred</span>
-              </button>
-            );
-          }
-          if (role === 'review') {
-            if (reviewCount === 0 && view.kind !== 'review') return null; // appears only when there is something to decide
-            return (
-              <button key="review" className={`side-item ${view.kind === 'review' ? 'active' : ''}`} onClick={() => go(REVIEW_VIEW)}>
-                <ReviewIcon className="glyph" />
-                <span className="name">Review</span>
-                {reviewCount > 0 && <span className="count">{reviewCount}</span>}
-              </button>
-            );
-          }
-          const mb = unifiedByRole.get(role as any);
-          if (!mb) return null;
-          return (
-            <button
-              key={mb.id}
-              className={`side-item ${isActive({ mailboxId: mb.id }) ? 'active' : ''}`}
-              onClick={() => go({ kind: 'mailbox', mailboxId: mb.id, title: mb.name })}
-            >
-              <BoxGlyph mb={mb} />
-              <span className="name">{mb.name}</span>
-              {mb.role === 'inbox' && mb.unreadEmails > 0 && <span className="count">{mb.unreadEmails}</span>}
-              {mb.role === 'drafts' && mb.totalEmails > 0 && <span className="count muted">{mb.totalEmails}</span>}
+        {sidebar.order.map((folder) => (
+          <div key={folder}>
+            {folderItem(folder)}
+            {folder === 'inbox' && (reviewCount > 0 || isActive('review')) && folderItem('review', true)}
+          </div>
+        ))}
+        {sidebar.more.length > 0 && (
+          <>
+            <button className="side-item more-toggle" onClick={() => setMoreOpen((v) => !v)} aria-expanded={moreOpen}>
+              {moreOpen ? <CaretDownIcon className="glyph" size={14} /> : <CaretRightIcon className="glyph" size={14} />}
+              <span className="name">{moreOpen ? 'Less' : 'More'}</span>
             </button>
-          );
-        })}
+            {(moreOpen || sidebar.more.some((f) => isActive(f))) && sidebar.more.map((f) => folderItem(f, true))}
+          </>
+        )}
       </div>
 
-      {labels.length > 0 && (
+      <div className="side-section">
+        <div className="side-header">
+          <span>Labels</span>
+          <button className="icon-btn side-add" title="New label" aria-label="New label" onClick={onAddLabel}>+</button>
+        </div>
+        {tree.map((n) => labelNode(n, 0))}
+        {labels.length === 0 && <button className="side-item side-hint" onClick={onAddLabel}><span className="name">+ New label</span></button>}
+      </div>
+
+      {ownFolders.length > 0 && (
         <div className="side-section">
-          <div className="side-header">
-            <span>Labels</span>
-            <button className="icon-btn side-add" title="Add label" aria-label="Add label" onClick={onAddLabel}>+</button>
-          </div>
-          {labels.map((l) => (
-            <div key={l.id} className={`side-item label-item ${isActive({ labelId: l.id }) ? 'active' : ''}`}>
-              <LabelColorPicker label={l} dotSize={11} stop />
-              <button className="label-name-btn" onClick={() => go({ kind: 'label', labelId: l.id, title: l.name })}>
-                <span className="name">{l.name}</span>
-              </button>
-            </div>
+          <div className="side-header"><span>Folders</span></div>
+          {ownFolders.map((mb) => (
+            <button key={mb.id} className={`side-item ${isActive('folder', mb.id.slice(3)) ? 'active' : ''}`} onClick={() => go('folder', mb.id.slice(3))}>
+              <FolderIcon className="glyph" />
+              <span className="name">{mb.name}</span>
+              {mb.unreadEmails > 0 && <span className="count muted">{mb.unreadEmails}</span>}
+            </button>
           ))}
         </div>
       )}
 
-      {accounts.size > 0 && (
-        <div className="side-section">
-          <div className="side-header">Accounts</div>
-          {[...accounts.entries()].map(([accountId, boxes]) => {
-            const inbox = boxes.find((b) => b.role === 'inbox');
-            const email = boxes[0] ? emailForAccount(boxes[0]) : `#${accountId}`;
-            const expanded = expandedAccounts.has(accountId);
-            return (
-              <div key={accountId}>
-                <button
-                  className="side-item"
-                  onClick={() => {
-                    const next = new Set(expandedAccounts);
-                    if (expanded) next.delete(accountId); else next.add(accountId);
-                    setExpandedAccounts(next);
-                  }}
-                >
-                  <span className="acct-dot" style={{ background: accountColor(accountId) }} />
-                  <span className="name" title={email}>{email}</span>
-                  {inbox && inbox.unreadEmails > 0 && <span className="count muted">{inbox.unreadEmails}</span>}
-                  {expanded ? <CaretDownIcon size={12} color="var(--md-text-faint)" /> : <CaretRightIcon size={12} color="var(--md-text-faint)" />}
-                </button>
-                {expanded && boxes.map((mb) => (
-                  <button
-                    key={mb.id}
-                    className={`side-item sub ${isActive({ mailboxId: mb.id }) ? 'active' : ''}`}
-                    onClick={() => go({ kind: 'mailbox', mailboxId: mb.id, title: `${email} / ${mb.name}` })}
-                  >
-                    <BoxGlyph mb={mb} />
-                    <span className="name">{mb.name}</span>
-                    {mb.unreadEmails > 0 && <span className="count muted">{mb.unreadEmails}</span>}
-                  </button>
-                ))}
-              </div>
-            );
-          })}
-        </div>
-      )}
+      <div className="side-foot desktop-only">
+        <button className="icon-btn" title={settings.sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+          onClick={() => saveSettings({ sidebarCollapsed: !settings.sidebarCollapsed })}><SidebarCollapseIcon size={17} /></button>
+      </div>
     </nav>
     </IconContext.Provider>
   );
-}
-
-// account email/color live on messages; sidebar derives from mailbox rows via the mail store
-function emailForAccount(mb: ApiMailbox): string {
-  const emails = useMail.getState().emails;
-  for (const e of Object.values(emails)) {
-    if (e.accountId === mb.accountId) return e.accountEmail;
-  }
-  return useCompose.getState().identities.find((i) => i.accountId === mb.accountId && !i.isAlias)?.email ?? `Account ${mb.accountId}`;
-}
-
-function accountColor(accountId: number): string {
-  const emails = useMail.getState().emails;
-  for (const e of Object.values(emails)) {
-    if (e.accountId === accountId) return e.accountColor;
-  }
-  return 'var(--md-border-strong)';
 }

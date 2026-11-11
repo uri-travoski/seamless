@@ -26,6 +26,19 @@ export default function FilterSettings() {
   const load = () => void api.get<ApiFilter[]>('/api/filters').then(setFilters).catch(() => {});
   useEffect(load, []);
 
+  // "Create filter from this" (message menu) lands here with the sender + subject filled in
+  useEffect(() => {
+    const raw = sessionStorage.getItem('seamless-filter-prefill');
+    if (!raw) return;
+    sessionStorage.removeItem('seamless-filter-prefill');
+    try {
+      const p = JSON.parse(raw) as { name: string; from: string; subject: string };
+      const conditions: FilterCondition[] = [{ field: 'from', op: 'contains', value: p.from }];
+      if (p.subject) conditions.push({ field: 'subject', op: 'contains', value: p.subject.replace(/^(re|fwd?):\s*/i, '') });
+      setEditing({ ...BLANK, name: p.name, conditions });
+    } catch { /* ignore a bad prefill */ }
+  }, []);
+
   const save = async () => {
     if (!editing?.name.trim()) { toast('Give the filter a name', 'error'); return; }
     if (editing.id) await api.put(`/api/filters/${editing.id}`, editing);

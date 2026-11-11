@@ -56,22 +56,27 @@ export async function recordOpen(token: string, ip: string, ua: string, now = Da
 
   // the sent copy carrying this token (or its group token for per-recipient copies)
   const msgToken = sent?.group_token ?? token;
-  const msg = await one<{ id: number; user_id: number; account_id: number; subject: string; to_json: string }>(`
-    SELECT m.id, m.user_id, m.account_id, m.subject, m.to_json
+  const msg = await one<{ id: number; user_id: number; account_id: number; subject: string; to_json: string; cc_json: string }>(`
+    SELECT m.id, m.user_id, m.account_id, m.subject, m.to_json, m.cc_json
     FROM messages m JOIN mailboxes mb ON mb.id = m.mailbox_id
     WHERE m.tracking_token = ?
     ORDER BY CASE mb.role WHEN 'sent' THEN 0 ELSE 1 END, m.id LIMIT 1`, [msgToken]);
 
   await bumpState();
   if (msg) {
-    let recipient = sent?.recipient ?? '';
-    if (!recipient) {
-      let to: { name?: string; email?: string }[] = [];
-      try { to = JSON.parse(msg.to_json); } catch { /* empty */ }
-      recipient = to[0] ? (to[0].name || to[0].email || '') : '';
+    let people: { name?: string; email?: string }[] = [];
+    try { people = [...JSON.parse(msg.to_json), ...JSON.parse(msg.cc_json)]; } catch { /* empty */ }
+    let recipient: string;
+    if (sent?.recipient) {
+      // per-recipient copy: show the person's name from the headers when we have it
+      const p = people.find((x) => x.email?.toLowerCase() === sent.recipient!.toLowerCase());
+      recipient = p?.name || sent.recipient;
+    } else {
+      recipient = people[0] ? (people[0].name || people[0].email || '') : '';
     }
     await emitEvent(msg.user_id, 'mail.opened', { type: 'message', id: msg.id }, {
       messageId: msg.id, accountId: msg.account_id, subject: msg.subject, recipient, token, ip, client, proxied,
+      perRecipient: !!sent?.recipient,
     });
     broadcast({ type: 'stateChange' }, msg.user_id);
   } else {
@@ -91,8 +96,15 @@ export async function openReport(userId: number, emailId: string): Promise<ApiOp
   const recipientOf = new Map(sends.map((s) => [s.token, s.recipient]));
   const rows = await q<{ token: string; ts: number; ip: string; ua: string; client: string | null; country: string | null; proxied: boolean }>(
     'SELECT token, ts, ip, ua, client, country, proxied FROM tracking_opens WHERE token = ANY(?::text[]) ORDER BY ts DESC LIMIT 1000', [tokens]);
+  // per-recipient copies record the address; show the name from the message headers
+  const people = [...JSON.parse(row.to_json), ...JSON.parse(row.cc_json)] as { name?: string; email?: string }[];
+  const nameOf = (addr: string | null | undefined) => {
+    if (!addr) return null;
+    const p = people.find((x) => x.email?.toLowerCase() === addr.toLowerCase());
+    return p?.name ? `${p.name} <${addr}>` : addr;
+  };
   const opens: ApiOpen[] = rows.map((r) => ({
-    ts: Number(r.ts), recipient: recipientOf.get(r.token) ?? null,
+    ts: Number(r.ts), recipient: nameOf(recipientOf.get(r.token)),
     client: r.client || classifyOpen(r.ua).client, ip: r.ip, country: r.country, proxied: r.proxied,
   }));
   const real = opens.filter((o) => !o.proxied);

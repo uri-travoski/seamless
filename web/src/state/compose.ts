@@ -1,5 +1,6 @@
 import { create } from 'zustand';
-import type { ApiAddress, ApiEmail, ApiEmailBody, ApiIdentity } from '@seamless/shared';
+import type { ApiAddress, ApiEmail, ApiEmailBody, ApiIdentity, ApiTemplate } from '@seamless/shared';
+import { fillTemplate } from './templates.ts';
 import { matchIdentity, fetchIdentities, fetchBody } from '../api/client.ts';
 import { useSession } from './session.ts';
 
@@ -16,6 +17,7 @@ export interface Draft {
   draftId?: string;
   attachments: { id: string; filename: string; size: number }[];
   track: boolean;
+  perRecipientTracking: boolean;
   minimized: boolean;
   maximized: boolean;
 }
@@ -25,6 +27,7 @@ interface ComposeState {
   identities: ApiIdentity[];
   loadIdentities: () => Promise<void>;
   openBlank: () => void;
+  openTemplate: (t: ApiTemplate) => Promise<void>;
   openReply: (email: ApiEmail, mode: 'reply' | 'replyAll' | 'forward') => Promise<void>;
   openDraft: (email: ApiEmail, body: ApiEmailBody) => Promise<void>;
   update: (key: string, patch: Partial<Draft>) => void;
@@ -69,6 +72,25 @@ export const useCompose = create<ComposeState>((set, get) => ({
         identity: identities[0] ?? null,
         to: [], cc: [], bcc: [], subject: '', initialHtml: '<p></p>',
         attachments: [], track: useSession.getState().settings.trackByDefault,
+        perRecipientTracking: useSession.getState().settings.perRecipientTracking,
+        minimized: false, maximized: false,
+      }],
+    });
+  },
+
+  /** Templates view → new message from a template (default From = the template's mailbox). */
+  openTemplate: async (t) => {
+    const identities = get().identities;
+    const identity = (t.accountId ? identities.find((i) => i.accountId === t.accountId && !i.isAlias) : null) ?? identities[0] ?? null;
+    const filled = await fillTemplate(t, { identity, to: [], subject: '' });
+    if (!filled) return;
+    set({
+      windows: [...get().windows, {
+        key: `c${++counter}`,
+        identity,
+        to: [], cc: [], bcc: [], subject: filled.subject, initialHtml: filled.html,
+        attachments: [], track: useSession.getState().settings.trackByDefault,
+        perRecipientTracking: useSession.getState().settings.perRecipientTracking,
         minimized: false, maximized: false,
       }],
     });
@@ -112,6 +134,7 @@ export const useCompose = create<ComposeState>((set, get) => ({
         replyToEmailId: mode === 'forward' ? undefined : email.id,
         attachments: [],
         track: useSession.getState().settings.trackByDefault,
+        perRecipientTracking: useSession.getState().settings.perRecipientTracking,
         minimized: false, maximized: false,
       }],
     });
@@ -130,7 +153,9 @@ export const useCompose = create<ComposeState>((set, get) => ({
         initialHtml: body.html ?? `<p>${esc(body.text ?? '').replace(/\n/g, '<br>')}</p>`,
         draftId: email.id,
         attachments: [],
-        track: useSession.getState().settings.trackByDefault,
+        // the draft remembers its tracking toggle (X-Seamless-Track)
+        track: body.headers.seamlessTrack ?? useSession.getState().settings.trackByDefault,
+        perRecipientTracking: useSession.getState().settings.perRecipientTracking,
         minimized: false, maximized: false,
       }],
     });

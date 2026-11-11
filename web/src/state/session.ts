@@ -18,12 +18,25 @@ export interface ClientSettings {
   shortcuts: boolean;               // Gmail-style keyboard shortcuts
   lastScope: string;                // 'unified' | 'category:<id>' | 'account:<id>'
   noTrackDomains: string[];         // never insert the tracking pixel for these recipient domains
+  perRecipientTracking: boolean;    // default for the compose window's per-recipient toggle
+  sidebar: SidebarConfig;           // order of system folders; the rest live under "More"
+  labelSort: 'az' | 'manual' | 'count';
+  sidebarCollapsed: boolean;
 }
+
+export interface SidebarConfig { order: string[]; more: string[] }
+
+export const SIDEBAR_FOLDERS = ['inbox', 'starred', 'drafts', 'scheduled', 'sent', 'templates', 'spam', 'bin', 'archive'];
+export const DEFAULT_SIDEBAR: SidebarConfig = {
+  order: ['inbox', 'starred', 'drafts', 'scheduled', 'sent', 'templates', 'spam', 'bin'],
+  more: ['archive'],
+};
 
 const DEFAULTS: ClientSettings = {
   fontSize: 15, fontFamily: '', density: 'comfortable', layout: 'split', allowRemoteImages: false,
   trackByDefault: true, theme: DEFAULT_THEME, mode: 'light', accent: '', appName: 'Seamless',
-  shortcuts: true, lastScope: 'unified', noTrackDomains: [],
+  shortcuts: true, lastScope: 'unified', noTrackDomains: [], perRecipientTracking: false,
+  sidebar: DEFAULT_SIDEBAR, labelSort: 'az', sidebarCollapsed: false,
 };
 
 const APPEARANCE_CACHE = 'seamless-appearance';
