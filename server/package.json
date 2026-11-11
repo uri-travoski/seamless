@@ -11,6 +11,7 @@
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.600.0",
+    "@aws-sdk/client-sesv2": "^3.1166.0",
     "@fastify/cookie": "^11.0.0",
     "@fastify/helmet": "^13.2.0",
     "@fastify/multipart": "^9.0.0",

@@ -4,7 +4,7 @@
  * mailboxes between categories).
  */
 import { useEffect, useMemo, useState } from 'react';
-import type { TestStep, ApiCategory } from '@seamless/shared';
+import type { TestStep, ApiCategory, ApiTransport } from '@seamless/shared';
 import { api } from '../../api/client.ts';
 import { toast } from '../../toast.ts';
 import { useMail } from '../../state/mail.ts';
@@ -40,7 +40,7 @@ function detectPreset(email: string): Preset | null {
 // ---- wizard ----
 
 interface Form {
-  id?: number; kind?: string; enabled: boolean;
+  id?: number; kind?: string; enabled: boolean; outboundTransportId?: number | null;
   name: string; email: string; color: string;
   imapHost: string; imapPort: number; imapSecure: boolean; imapUser: string; imapPass: string;
   smtpHost: string; smtpPort: number; smtpSecure: boolean; smtpUser: string; smtpPass: string; smtpSameLogin: boolean;
@@ -87,6 +87,13 @@ function Wizard({ initial, categories, onDone }: { initial: Form; categories: Ap
   const preset = useMemo(() => detectPreset(f.email), [f.email]);
   const set = <K extends keyof Form>(k: K, v: Form[K]) => setF((p) => ({ ...p, [k]: v }));
   const editing = !!f.id;
+  const [transports, setTransports] = useState<ApiTransport[]>([]);
+  useEffect(() => { if (initial.id) void api.get<ApiTransport[]>('/api/transports').then(setTransports).catch(() => {}); }, [initial.id]);
+  const chooseTransport = async (v: string) => {
+    const id = v ? Number(v) : null;
+    try { await api.put(`/api/accounts/${f.id}/transport`, { transportId: id }); set('outboundTransportId', id); }
+    catch { toast('Could not change that', 'error'); }
+  };
 
   const applyPreset = (p: Preset | null) => {
     const local = f.email.trim();
@@ -271,6 +278,15 @@ function Wizard({ initial, categories, onDone }: { initial: Form; categories: Ap
               <textarea className="text-input" rows={4} value={f.signature} placeholder="Sam Smith · Acme Pty Ltd · 0400 000 000" onChange={(e) => set('signature', e.target.value)} /></div>
             <div className="field"><label>Aliases (other addresses that deliver here; replies go out from the one that received)</label>
               <input className="text-input" value={f.aliases} placeholder="info@acme.com, sales@acme.com" onChange={(e) => set('aliases', e.target.value)} /></div>
+            {editing && (
+              <div className="field"><label>Send through</label>
+                <select className="text-input" value={f.outboundTransportId ?? ''} onChange={(e) => void chooseTransport(e.target.value)}>
+                  <option value="">This mailbox’s own SMTP</option>
+                  {transports.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
+                </select>
+                {transports.length === 0 && <p className="dim">Add providers under Settings → Sending.</p>}
+              </div>
+            )}
             <label className="checkbox-line"><input type="checkbox" checked={f.sentCopy} onChange={(e) => set('sentCopy', e.target.checked)} /> Save a copy in this mailbox's Sent folder (turn off for Gmail, which does it itself)</label>
             <label className="checkbox-line"><input type="checkbox" checked={f.aiCategorize} onChange={(e) => set('aiCategorize', e.target.checked)} /> AI-categorise incoming mail into labels (needs Settings → AI)</label>
             <label className="checkbox-line"><input type="checkbox" checked={f.healthIgnored} onChange={(e) => set('healthIgnored', e.target.checked)} /> Ignore this mailbox in health checks (the green status dot and “can’t connect” alerts skip it)</label>
@@ -434,6 +450,7 @@ export default function MailboxSettings() {
       smtpHost: a.smtpHost, smtpPort: a.smtpPort, smtpSecure: a.smtpSecure, smtpUser: a.smtpUser,
       smtpSameLogin: a.smtpUser === a.imapUser, categoryIds: a.categoryIds ?? [], signature: a.signature ?? '',
       aliases: (a.aliases ?? []).join(', '), sentCopy: a.sentCopy, aiCategorize: a.aiCategorize, healthIgnored: !!a.healthIgnored,
+      outboundTransportId: a.outboundTransportId ?? null,
     });
   };
 

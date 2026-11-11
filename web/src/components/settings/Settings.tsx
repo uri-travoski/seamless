@@ -15,6 +15,7 @@ import LogsSettings from './LogsSettings.tsx';
 import HealthSettings from './HealthSettings.tsx';
 import DevicesSettings from './DevicesSettings.tsx';
 import BackupSettings from './BackupSettings.tsx';
+import SendingSettings from './SendingSettings.tsx';
 import ContactsSettings from './ContactsSettings.tsx';
 import TemplatesView from '../TemplatesView.tsx';
 import { useSession } from '../../state/session.ts';
@@ -22,7 +23,7 @@ import { useMail, scopeToSlug } from '../../state/mail.ts';
 import { navigate } from '../../router.ts';
 import {
   SettingsIcon, MailboxIcon, TagIcon, FilterIcon, SparkleIcon, UsersIcon, LogoutIcon, BackIcon, RulesIcon, ImportIcon,
-  LogsIcon, DevicesIcon, ContactsIcon, BackupIcon, PaletteIcon, TemplateIcon, BellIcon, LockIcon, HelpIcon, KeyboardIcon, HealthIcon,
+  LogsIcon, DevicesIcon, ContactsIcon, SentIcon, BackupIcon, PaletteIcon, TemplateIcon, BellIcon, LockIcon, HelpIcon, KeyboardIcon, HealthIcon,
 } from '../../icons.tsx';
 import { useUi } from '../../state/ui.ts';
 
@@ -30,6 +31,7 @@ const TABS: { id: string; name: string; Icon: ComponentType<{ className?: string
   { id: 'general', name: 'General', Icon: SettingsIcon, C: GeneralSettings },
   { id: 'appearance', name: 'Appearance', Icon: PaletteIcon, C: AppearanceSettings },
   { id: 'mailboxes', name: 'Mailboxes', Icon: MailboxIcon, C: MailboxSettings },
+  { id: 'sending', name: 'Sending', Icon: SentIcon, C: SendingSettings },
   { id: 'labels', name: 'Labels', Icon: TagIcon, C: LabelSettings },
   { id: 'templates', name: 'Templates', Icon: TemplateIcon, C: () => <><h2>Templates</h2><TemplatesView embedded /></> },
   { id: 'notifications', name: 'Notifications', Icon: BellIcon, C: NotificationSettings },

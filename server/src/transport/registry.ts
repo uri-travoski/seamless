@@ -4,11 +4,23 @@ import { emitEvent } from '../events/emit.ts';
 import type { AccountRow } from '../imap/sync.ts';
 import { TransportError, type OutboundTransport } from './types.ts';
 import { smtpFromAccount, smtpFromConfig } from './outbound/smtp.ts';
+import { sendgridFromConfig } from './outbound/sendgrid.ts';
+import { brevoFromConfig } from './outbound/brevo.ts';
+import { sesFromConfig } from './outbound/ses.ts';
+import { mailgunFromConfig } from './outbound/mailgun.ts';
+import { postmarkFromConfig } from './outbound/postmark.ts';
 
 type Factory = (config: Record<string, any>) => OutboundTransport;
-const factories = new Map<string, Factory>([['smtp', (c) => smtpFromConfig(c)]]);
+const factories = new Map<string, Factory>([
+  ['smtp', (c) => smtpFromConfig(c)],
+  ['sendgrid', (c) => sendgridFromConfig(c)],
+  ['brevo', (c) => brevoFromConfig(c)],
+  ['ses', (c) => sesFromConfig(c)],
+  ['mailgun', (c) => mailgunFromConfig(c)],
+  ['postmark', (c) => postmarkFromConfig(c)],
+]);
 
-/** Adapters register themselves here (T3.2 adds the API providers). */
+/** Adapters register themselves here (tests use it for fakes). */
 export function registerAdapter(kind: string, f: Factory): void { factories.set(kind, f); }
 export function knownKinds(): string[] { return [...factories.keys()]; }
 
