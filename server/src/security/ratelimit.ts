@@ -51,3 +51,6 @@ export const ingestFailLimiter = new RateLimiter(20, 15 * 60_000);
 
 /** Push-inbound endpoint: 600 accepted posts per minute per token. */
 export const ingestLimiter = new RateLimiter(600, 60_000);
+
+/** REST v1 (T5 F-37): 600 calls per minute per API token, then 429. */
+export const apiLimiter = new RateLimiter(600, 60_000);

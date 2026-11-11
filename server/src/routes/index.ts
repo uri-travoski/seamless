@@ -44,7 +44,9 @@ import { register as invites } from './invites.ts';
 import { register as views } from './views.ts';
 import { register as vips } from './vips.ts';
 import { register as webhooks } from './webhooks.ts';
+import { register as apiv1 } from './apiv1.ts';
 import { sessionToken } from '../auth/sessions.ts';
+import { authenticate, ApiError, onApiCall } from '../api/tokens.ts';
 
 export { sessionUser, type SessionUser } from './util.ts';
 
@@ -53,7 +55,27 @@ export { sessionUser, type SessionUser } from './util.ts';
 const PUBLIC_PATHS = [/^\/t\//, /^\/api\/(login|login\/mfa|setup|me)$/, /^\/api\/import(\?.*)?$/, /^\/api\/setup\/(backups|restore|storage-test)$/, /^\/api\/ingest\/[A-Za-z0-9_-]+(\/disposed)?(\?.*)?$/, /^\/api\/hooks\/blob\/[A-Za-z0-9_.-]+(\?.*)?$/, /^\/(?!api|jmap)/];
 
 export function registerRoutes(app: FastifyInstance): void {
+  // REST v1: bearer tokens only. Cookies are ignored here on purpose (no CSRF surface); the OpenAPI document is public.
   app.addHook('preHandler', async (req, reply) => {
+    if (!/^\/api\/v1(\/|$)/.test(req.url)) return;
+    (req as any).sessionUser = null;
+    if (/^\/api\/v1\/openapi\.json(\?.*)?$/.test(req.url)) return;
+    try {
+      const a = await authenticate(req.headers.authorization);
+      (req as any).apiAuth = a;
+      (req as any).sessionUser = { userId: a.userId, role: a.role, token: '' };
+    } catch (e) {
+      if (e instanceof ApiError) return reply.code(e.status).send({ error: e.message });
+      throw e;
+    }
+  });
+  app.addHook('onResponse', async (req, reply) => {
+    const a = (req as any).apiAuth;
+    if (a) onApiCall(a.tokenId, `${req.method} ${req.routeOptions?.url ?? req.url}`, reply.statusCode);
+  });
+
+  app.addHook('preHandler', async (req, reply) => {
+    if (/^\/api\/v1(\/|$)/.test(req.url)) return;
     const su = await sessionUser(sessionToken(req));
     (req as any).sessionUser = su;
     if (PUBLIC_PATHS.some((re) => re.test(req.url))) return;
@@ -105,4 +127,5 @@ export function registerRoutes(app: FastifyInstance): void {
   views(app);
   vips(app);
   webhooks(app);
+  apiv1(app);
 }

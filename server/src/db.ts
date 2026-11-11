@@ -1141,6 +1141,25 @@ ALTER TABLE webhooks ADD COLUMN connector TEXT;
 ALTER TABLE webhooks ADD COLUMN connector_config_enc TEXT;
 `,
   },
+  {
+    id: 33,
+    sql: `
+-- T5.3 F-37: personal API tokens for REST v1 (only the sha256 of the token is stored)
+CREATE TABLE api_tokens (
+  id SERIAL PRIMARY KEY,
+  user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  name TEXT NOT NULL,
+  token_hash TEXT NOT NULL UNIQUE,
+  prefix TEXT NOT NULL,
+  scopes TEXT[] NOT NULL DEFAULT '{}',
+  last_used_at BIGINT,
+  expires_at BIGINT,
+  created_at BIGINT NOT NULL,
+  revoked_at BIGINT
+);
+CREATE INDEX api_tokens_user ON api_tokens(user_id);
+`,
+  },
 ];
 
 /** Run `fn` in one transaction. Events emitted through the client are only turned into

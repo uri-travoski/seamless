@@ -82,3 +82,29 @@ shows what happened. An email with nothing to send (for example no attachment fo
 Filters (Settings → Filters) can now **send to webhook**, **send to DMS**, **send to BizBooks** or **create task** when
 new mail arrives. These queue a send in the background — they never slow down receiving mail — and run once per
 message even if several filters ask for the same thing. They are not applied when you use "run on existing mail".
+
+## API
+
+Settings → Integrations → **API tokens** lets your own scripts talk to Seamless over a REST API at `/api/v1`.
+
+1. Click **New API token**, name it, tick the scopes it needs and choose when it expires. The token
+   (`sk_sl_…`) is shown **once** — copy it then. Only a hash is kept, so a lost token can't be shown again; revoke it and make a new one.
+2. Send it as `Authorization: Bearer sk_sl_…`. Browser sessions (cookies) are **not** accepted on `/api/v1`.
+3. The full description of every call is at `/api/v1/openapi.json` (OpenAPI 3.1, no login needed).
+
+| Scope | Allows |
+|---|---|
+| `mail:read` | `GET /messages?query=&scope=&limit=&cursor=`, `GET /messages/:id`, `GET /messages/:id/raw` |
+| `labels:write` | `POST /messages/:id/labels` (`{add:[ids], remove:[ids]}`), `POST /messages/:id/archive` |
+| `mail:send` | `POST /send` (`identityId`, `to`, `cc`, `bcc`, `subject`, `html` or `text`). Sends at once — the undo-send delay does not apply — through the identity's own sending service |
+| `events:subscribe` | `GET /events?since=<id>&wait=30` (long-poll, ordered, use the returned `cursor` as the next `since`), `POST /subscriptions`, `DELETE /subscriptions/:id` (webhooks) |
+| `contacts:read` | `GET /contacts` |
+
+A token sees what you see, including shared mailboxes; your role on a shared mailbox still applies (a viewer can read
+but not archive or send). Labels are personal, so they can't be set on shared mail. Each token may make 600 calls a
+minute; after that you get `429`. The list shows when each token was last used.
+
+### Triggers
+
+A "trigger" is a saved view plus a webhook: when you add a webhook, choose **Use a saved view…** under *Only mail
+matching* and the webhook fires only for mail that view matches.

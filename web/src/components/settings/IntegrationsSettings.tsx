@@ -3,6 +3,7 @@ import { Fragment, useCallback, useEffect, useState } from 'react';
 import { api } from '../../api/client.ts';
 import { toast } from '../../toast.ts';
 import { useSession } from '../../state/session.ts';
+import { useViews } from '../../state/views.ts';
 
 interface Hook { id: number; name: string; url: string; eventTypes: string[]; filterQuery: string | null; include: string; active: boolean; lastStatus: string | null; connector: string | null; connectorConfig: { baseUrl: string; projectId: string; hasToken: boolean } | null }
 interface Delivery { id: number; eventType: string | null; status: string; httpStatus: number | null; attempts: number; nextAttemptAt: number | null; lastError: string | null; requestBody: string | null; responseSnippet: string | null; createdAt: number }
@@ -43,6 +44,8 @@ function HookForm({ initial, listing, onSaved, onCancel }: { initial?: Hook; lis
       else onSaved((await api.post<{ secret: string }>('/api/webhooks', body)).secret);
     } catch (e: any) { toast(e?.message ?? 'Could not save', 'error'); }
   };
+  const views = useViews((v) => v.views);
+  useEffect(() => { if (views.length === 0) void useViews.getState().load(); }, [views.length]);
   const toggle = (t: string) => setTypes((cur) => cur.includes(t) ? cur.filter((x) => x !== t) : [...cur, t]);
   return (
     <div className="dns-panel">
@@ -54,7 +57,12 @@ function HookForm({ initial, listing, onSaved, onCancel }: { initial?: Hook; lis
         </div></div>
       <div className="field"><label>Only mail matching (optional)</label>
         <input className="text-input" value={filter} onChange={(e) => setFilter(e.target.value)} placeholder='from:*@client.com.au subject:"timesheet"' />
-        <span className="dim">Uses the search language. Applies to events about a message.</span></div>
+        {views.length > 0 && (
+          <select aria-label="Use a saved view" value="" onChange={(e) => { const v = views.find((x) => String(x.id) === e.target.value); if (v) setFilter(v.query); }}>
+            <option value="">Use a saved view…</option>
+            {views.map((v) => <option key={v.id} value={v.id}>{v.name}</option>)}
+          </select>)}
+        <span className="dim">Uses the search language. Applies to events about a message. Pick a saved view to fire only for mail it matches.</span></div>
       <div className="field"><label>Include</label>
         <select value={include} onChange={(e) => setInclude(e.target.value)}>{listing.includeLevels.map((l) => <option key={l} value={l}>{INCLUDE_HELP[l] ?? l}</option>)}</select></div>
       <label className="checkbox-line"><input type="checkbox" checked={active} onChange={(e) => setActive(e.target.checked)} />Active</label>
@@ -135,6 +143,58 @@ function DeliveryLog({ hookId }: { hookId: number }) {
   );
 }
 
+interface Tok { id: number; name: string; prefix: string; scopes: string[]; lastUsedAt: number | null; expiresAt: number | null; createdAt: number; revoked: boolean }
+
+function ApiTokens() {
+  const [data, setData] = useState<{ items: Tok[]; scopes: string[] } | null>(null);
+  const [creating, setCreating] = useState(false);
+  const [name, setName] = useState('');
+  const [scopes, setScopes] = useState<string[]>(['mail:read']);
+  const [days, setDays] = useState('90');
+  const [token, setToken] = useState<string | null>(null);
+  const load = useCallback(async () => { setData(await api.get('/api/api-tokens')); }, []);
+  useEffect(() => { void load(); }, [load]);
+  const create = async () => {
+    try {
+      const r = await api.post<{ token: string }>('/api/api-tokens', { name, scopes, expiresInDays: days ? Number(days) : null });
+      setToken(r.token); setCreating(false); setName(''); void load();
+    } catch (e: any) { toast(e?.message ?? 'Could not create the token', 'error'); }
+  };
+  if (!data) return null;
+  return (
+    <>
+      <h3>API tokens</h3>
+      <p className="settings-desc">Let your own scripts read mail, send, or follow events through the REST API at <code>/api/v1</code> (<a href="/api/v1/openapi.json" target="_blank" rel="noreferrer">OpenAPI</a>). Each token has only the scopes you give it.</p>
+      {token && (
+        <div className="dns-panel" role="status">
+          <strong>Your new token — shown once. Copy it now.</strong>
+          <p><code>{token}</code></p>
+          <button className="btn" onClick={() => { void navigator.clipboard?.writeText(token).catch(() => {}); toast('Token copied'); }}>Copy</button>{' '}
+          <button className="btn ghost" onClick={() => setToken(null)}>I've saved it</button>
+        </div>)}
+      {data.items.length === 0 && !creating && <p className="dim">No API tokens yet.</p>}
+      {data.items.map((t) => (
+        <div key={t.id} className="dns-panel">
+          <strong>{t.name}</strong> {t.revoked && <span className="dim">(revoked)</span>} <code>{t.prefix}…</code>
+          <div className="dim">{t.scopes.join(', ')}</div>
+          <div className="dim">Last used: {t.lastUsedAt ? when(t.lastUsedAt) : 'never'} · {t.expiresAt ? `expires ${when(t.expiresAt)}` : 'no expiry'}</div>
+          {!t.revoked && <button className="btn-link" onClick={() => { if (confirm(`Revoke “${t.name}”? Anything using it stops working.`)) void api.del(`/api/api-tokens/${t.id}`).then(load); }}>Revoke</button>}
+        </div>))}
+      {creating ? (
+        <div className="dns-panel">
+          <div className="field"><label>Name</label><input className="text-input" value={name} onChange={(e) => setName(e.target.value)} placeholder="Nightly report script" /></div>
+          <div className="field"><label>Scopes</label>
+            <div className="check-grid">
+              {data.scopes.map((sc) => <label key={sc} className="checkbox-line"><input type="checkbox" checked={scopes.includes(sc)} onChange={() => setScopes((cur) => cur.includes(sc) ? cur.filter((x) => x !== sc) : [...cur, sc])} />{sc}</label>)}
+            </div></div>
+          <div className="field"><label>Expires after (days, blank = never)</label><input className="text-input" value={days} onChange={(e) => setDays(e.target.value.replace(/\D/g, ''))} /></div>
+          <button className="btn" onClick={() => void create()}>Create token</button>{' '}<button className="btn ghost" onClick={() => setCreating(false)}>Cancel</button>
+        </div>
+      ) : <button className="btn" onClick={() => setCreating(true)}>New API token</button>}
+    </>
+  );
+}
+
 function Allowlist() {
   const [items, setItems] = useState<{ id: number; value: string }[]>([]);
   const [value, setValue] = useState('');
@@ -212,6 +272,7 @@ export default function IntegrationsSettings() {
         : editing === 'new-app'
           ? <ConnectorForm onCancel={() => setEditing(null)} onSaved={(s) => { setEditing(null); if (s) setSecret(s); void load(); }} />
           : <><button className="btn" onClick={() => setEditing('new')}>Add webhook</button>{' '}<button className="btn" onClick={() => setEditing('new-app')}>Connect an app (DMS, BizBooks, tasks)</button></>}
+      <ApiTokens />
       {isAdmin && <Allowlist />}
     </>
   );
