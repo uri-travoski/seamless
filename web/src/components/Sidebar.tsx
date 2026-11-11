@@ -195,9 +195,9 @@ export default function Sidebar({ open, onNavigate, onAddLabel }: { open: boolea
       <div className="side-foot">
         <button className={`icon-btn ${route.page === 'settings' ? 'active' : ''}`} title="Settings" aria-label="Settings"
           onClick={() => { navigate({ page: 'settings', tab: 'general' }); onNavigate(); }}><SettingsIcon size={17} weight="regular" /></button>
-        <span className="side-size" title={sizeTitle}>{sizeLabel}</span>
         <button className={`icon-btn refresh-btn ${fetching ? 'busy' : ''}`} title="Check all mailboxes for new mail"
           aria-label="Check all mailboxes for new mail" disabled={fetching} onClick={fetchAll}><RedoIcon size={17} weight="bold" /></button>
+        <span className="side-size" title={sizeTitle}>{sizeLabel}</span>
         <button className="icon-btn" title="Log out" aria-label="Log out" onClick={() => void useSession.getState().logout()}><LogoutIcon size={17} weight="regular" /></button>
         <button className="icon-btn desktop-only" title={settings.sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
           aria-label={settings.sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}

@@ -9,7 +9,7 @@ import { readableTextOn } from './LabelColorPicker.tsx';
 import { ContextMenu, type MenuPos } from './EmailMenu.tsx';
 import { IconContext } from '@phosphor-icons/react';
 import {
-  StarIcon, EyeIcon, AttachClipIcon, EnvelopeIcon, EnvelopeOpenIcon, ArchiveIcon, JunkIcon, TrashIcon, RefreshIcon,
+  StarIcon, EyeIcon, AttachClipIcon, EnvelopeIcon, EnvelopeOpenIcon, ArchiveIcon, JunkIcon, TrashIcon,
   TableViewIcon, SplitViewIcon, CompactIcon, ComfortableIcon, CloseIcon, NoteIcon, RestoreMailIcon, ReplyIcon, InboxIcon, SnoozeIcon, ShieldWarnIcon,
 } from '../icons.tsx';
 import { useSession } from '../state/session.ts';
@@ -230,7 +230,6 @@ export default function MessageList() {
   const emails = useMail((s) => s.emails);
   const selectedId = useMail((s) => s.selectedId);
   const loadPage = useMail((s) => s.loadPage);
-  const refreshCurrent = useMail((s) => s.refreshCurrent);
   const checkedCount = useMail((s) => s.checked.size);
   const allMatching = useMail((s) => s.allMatching);
   const setAllChecked = useMail((s) => s.setAllChecked);
@@ -379,7 +378,6 @@ export default function MessageList() {
             onClick={() => saveSettings({ density: settings.density === 'compact' ? 'comfortable' : 'compact' })}>
             {settings.density === 'compact' ? <ComfortableIcon /> : <CompactIcon />}
           </button>
-          <button className="icon-btn" title="Reload this list" onClick={() => void refreshCurrent()}><RefreshIcon /></button>
         </div>
       )}
       {!allMatching && pageAllChecked && total > checkedCount && (

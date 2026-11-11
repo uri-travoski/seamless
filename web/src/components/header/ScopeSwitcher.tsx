@@ -98,7 +98,9 @@ export default function ScopeSwitcher({ dot }: { dot?: React.ReactNode }) {
   const rowEl = (r: Row, i: number) => (
     <button key={r.scope} className={`switch-row ${r.scope === scope ? 'current' : ''} ${i === hi ? 'hi' : ''}`}
       onMouseEnter={() => setHi(i)} onClick={() => pick(r.scope)} role="option" aria-selected={r.scope === scope}>
-      {r.kind === 'mailbox' && <span className="acct-dot" style={{ background: r.color }} />}
+      {r.kind === 'category'
+        ? <span className="switch-icon" style={{ color: r.color }}><CategoryGlyph icon={r.icon ?? 'folder'} size={17} /></span>
+        : <span className="acct-dot" style={{ background: r.color }} />}
       <span className="switch-text">
         <span className="switch-name">{r.name}</span>
         {r.sub && r.sub !== r.name && <span className="switch-sub">{r.sub}</span>}
@@ -111,9 +113,7 @@ export default function ScopeSwitcher({ dot }: { dot?: React.ReactNode }) {
     <div className="scope-switcher" ref={ref}>
       <button className="scope-btn" onClick={() => setOpen((v) => !v)} aria-haspopup="listbox" aria-expanded={open} title="Switch mailbox (Ctrl+K)">
         {dot}
-        <span className="switch-icon" style={{ color: current.color }}>
-          {current.icon ? <CategoryGlyph icon={current.icon} size={17} /> : <span className="acct-dot" style={{ background: current.color }} />}
-        </span>
+        {!current.icon && <span className="acct-dot" style={{ background: current.color }} />}
         <span className="scope-name">{current.name}</span>
         {current.unread > 0 && <span className="switch-count">{current.unread}</span>}
         <CaretDownIcon size={13} />
