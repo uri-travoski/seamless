@@ -37,7 +37,7 @@ export default function AppMenu() {
   return (
     <div className="app-menu" ref={ref}>
       <button className={`icon-btn menu-btn ${open ? 'active' : ''}`} aria-haspopup="menu" aria-expanded={open} aria-label="Menu" title="Menu"
-        onClick={() => setOpen((v) => !v)}><MenuIcon size={15} /></button>
+        onClick={() => setOpen((v) => !v)}><MenuIcon size={20} /></button>
       {open && (
         <div className="dropdown app-menu-pop" role="menu">
           <button className="side-item" role="menuitem" disabled={fetching} onClick={() => void fetchAll()}>
