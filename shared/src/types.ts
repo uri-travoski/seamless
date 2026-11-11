@@ -108,6 +108,7 @@ export interface ApiBackup {
 }
 
 export interface ApiEmail {
+  assignment?: ApiAssignment | null; // T4 F-32: only set when the thread is assigned / has a status
   id: string;              // "m<rowid>"
   threadId: string;
   accountId: number;
@@ -425,7 +426,7 @@ export type EventType =
   | 'backup.failed' | 'backup.ok'
   | 'storage.migration.done' | 'storage.migration.failed'
   | 'export.created' | 'export.imported'
-  | 'disposable.received' | 'disposable.leak' | 'lead.captured' | 'assignment.changed'
+  | 'disposable.received' | 'disposable.leak' | 'lead.captured' | 'assignment.changed' | 'comment.mention'
   | 'security.login' | 'security.2fa_changed';
 
 /** UI filter groups on the notifications page (each maps to one or more event types). */
@@ -440,7 +441,7 @@ export const NOTIFICATION_GROUPS: { id: string; name: string; types: EventType[]
   { id: 'backup', name: 'Backups', types: ['backup.failed', 'backup.ok', 'storage.unreachable', 'storage.migration.done', 'storage.migration.failed', 'export.created', 'export.imported'] },
   { id: 'security', name: 'Security', types: ['security.login', 'security.2fa_changed'] },
   { id: 'leads', name: 'Leads', types: ['lead.captured'] },
-  { id: 'assignments', name: 'Assignments', types: ['assignment.changed'] },
+  { id: 'assignments', name: 'Assignments', types: ['assignment.changed', 'comment.mention'] },
 ];
 
 export interface ApiNotification {
@@ -471,8 +472,13 @@ export interface ApiNotificationPref {
 }
 
 export interface WsMessage {
-  type: 'stateChange' | 'newMail' | 'counts' | 'notifications';
+  type: 'stateChange' | 'newMail' | 'counts' | 'notifications' | 'presence';
   state?: string;
+  // presence (T4 F-32)
+  threadId?: string;
+  action?: 'replying' | 'viewing' | 'left';
+  userId?: number;
+  userName?: string;
   accountId?: number;
   mailboxRole?: MailboxRole;
   from?: string;
@@ -510,3 +516,12 @@ export interface ApiDisposable {
   signupDomain: string | null; leakDomains: string[]; disposedAt: number | null; createdAt: number;
   canUndo: boolean;
 }
+
+// ---- shared inbox workflow (T4 F-32) ----
+export interface ApiAssignment {
+  accountId: number; threadId: string;
+  assigneeId: number | null; assigneeName: string | null;
+  status: 'open' | 'pending' | 'done';
+  dueAt: number | null; updatedAt: number;
+}
+export interface ApiThreadComment { id: number; userId: number; userName: string; body: string; mentions: number[]; createdAt: number }

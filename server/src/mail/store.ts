@@ -112,7 +112,11 @@ export async function rowToApi(r: MsgRow, viewerId: number = r.user_id): Promise
   const bounces = await q<{ recipient: string; status: string; diagnostic: string }>('SELECT recipient, status, diagnostic FROM bounces WHERE message_id = ? AND user_id = ? ORDER BY id', [r.id, r.user_id]);
   const disp = await one<{ id: number; address: string; label: string; status: 'active' | 'paused' | 'disposed' }>(
     'SELECT d.id, d.address, d.label, d.status FROM disposable_addresses d JOIN messages m ON m.disposable_id = d.id WHERE m.id = ?', [r.id]);
+  const asg = await one<any>(`SELECT a.*, u.name AS assignee_name FROM assignments a LEFT JOIN users u ON u.id = a.assignee_id
+    WHERE a.account_id = ? AND a.message_thread_id = ?`, [r.account_id, r.thread_id]);
   return {
+    assignment: asg ? { accountId: asg.account_id, threadId: asg.message_thread_id, assigneeId: asg.assignee_id, assigneeName: asg.assignee_name ?? null,
+      status: asg.status, dueAt: asg.due_at == null ? null : Number(asg.due_at), updatedAt: Number(asg.updated_at) } : null,
     id: `m${r.id}`,
     threadId: r.thread_id,
     accountId: r.account_id,
@@ -262,6 +266,16 @@ export async function queryEmails(userId: number, req: EmailQueryRequest): Promi
         WHERE bz.user_id = ? AND lower(bz.name) = lower(?) AND bi.user_id = bz.user_id
           AND (bi.account_id = m.account_id OR lower(bi.email) = lower(m.delivered_to)))`);
       params.push(userId, p.business);
+    }
+    if (p.assigned === 'me') {
+      where.push('EXISTS (SELECT 1 FROM assignments asg WHERE asg.account_id = m.account_id AND asg.message_thread_id = m.thread_id AND asg.assignee_id = ?)');
+      params.push(userId);
+    }
+    if (p.assigned === 'none') where.push('NOT EXISTS (SELECT 1 FROM assignments asg WHERE asg.account_id = m.account_id AND asg.message_thread_id = m.thread_id AND asg.assignee_id IS NOT NULL)');
+    if (p.status) {
+      // a thread with no assignment row counts as open
+      if (p.status === 'open') where.push("NOT EXISTS (SELECT 1 FROM assignments asg WHERE asg.account_id = m.account_id AND asg.message_thread_id = m.thread_id AND asg.status <> 'open')");
+      else { where.push('EXISTS (SELECT 1 FROM assignments asg WHERE asg.account_id = m.account_id AND asg.message_thread_id = m.thread_id AND asg.status = ?)'); params.push(p.status); }
     }
     if (p.unread !== null) where.push(`m.unread = ${p.unread ? 'true' : 'false'}`);
     if (p.starred) where.push('m.flagged = true');

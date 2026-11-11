@@ -12,6 +12,7 @@ import { ensureBucket } from './s3.ts';
 import { registerRoutes, sessionUser } from './routes/index.ts';
 import { syncManager, type NewMailEvent } from './imap/sync.ts';
 import { addClient, broadcast } from './ws.ts';
+import { handlePresence } from './mail/presence.ts';
 import { initPush } from './push.ts';
 import { categorizeEmail } from './ai/tasks.ts';
 import { startScheduler, onScheduledSend } from './mail/scheduler.ts';
@@ -56,6 +57,9 @@ app.register(async (instance) => {
     const su = await sessionUser(sessionToken(req as any));
     if (!su) { (socket as any).close(); return; }
     addClient(socket as any, su.userId);
+    (socket as any).on('message', (raw: Buffer) => {
+      try { void handlePresence(su.userId, JSON.parse(String(raw))).catch(() => {}); } catch { /* ignore junk */ }
+    });
   });
 });
 

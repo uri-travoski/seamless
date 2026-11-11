@@ -87,5 +87,5 @@ export const FOLDER_ROLE: Record<string, string> = {
 export const ROLE_FOLDER: Record<string, string> = Object.fromEntries(Object.entries(FOLDER_ROLE).map(([k, v]) => [v, k]));
 export const FOLDER_TITLE: Record<string, string> = {
   inbox: 'Inbox', starred: 'Starred', drafts: 'Drafts', scheduled: 'Scheduled', sent: 'Sent', templates: 'Templates',
-  spam: 'Spam', bin: 'Bin', archive: 'Archive', review: 'Review', search: 'Search', snoozed: 'Snoozed', waiting: 'Waiting for reply',
+  spam: 'Spam', bin: 'Bin', archive: 'Archive', review: 'Review', search: 'Search', snoozed: 'Snoozed', waiting: 'Waiting for reply', assigned: 'Assigned to me', unassigned: 'Unassigned',
 };

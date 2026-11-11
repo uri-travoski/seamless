@@ -21,6 +21,7 @@ import {
   KebabIcon, SourceIcon, NoteIcon, CaretDownIcon, RestoreMailIcon, StarIcon, InboxIcon, ChartIcon, ShieldWarnIcon,
 } from '../icons.tsx';
 import { IconContext } from '@phosphor-icons/react';
+import SharedThread from './SharedThread.tsx';
 
 function fmtSize(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;
@@ -634,6 +635,7 @@ export default function ReadingPane() {
             }}
           />
         ))}
+        {!selected.keywords.$draft && <SharedThread email={selected} />}
       </div>
     </section>
   );

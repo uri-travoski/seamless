@@ -33,3 +33,6 @@ Plain words match the subject, body, and participants (full-text). Combine them 
 - `category:work` limits a search to the mailboxes in a category (any category name or key works, e.g. `category:personal is:unread`). Search also follows the scope picked in the top-right switcher.
 - Operators can be combined freely; everything is AND-ed together.
 - Clearing the box (the **x** or Escape) returns you to whatever mailbox you were in.
+
+## Shared inbox operators
+`assigned:me` · `assigned:none` · `status:open|pending|done` — see *Shared mailboxes*.

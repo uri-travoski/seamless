@@ -1,6 +1,6 @@
 /**
  * Search query language:
- *   from:foo to:bar label:Work in:inbox is:unread is:starred has:attachment category:work business:"Name"
+ *   from:foo to:bar label:Work in:inbox is:unread is:starred has:attachment category:work assigned:me|none status:open|pending|done business:"Name"
  *   before:2026-01-31 after:2026-01-01 "quoted phrase" free words
  * Everything unprefixed becomes a Postgres tsquery over subject/body/from/to.
  */
@@ -16,6 +16,8 @@ export interface ParsedSearch {
   hasAttachment: boolean | null;
   disposable: 'any' | number | null; // T3 F-25: is:disposable / disposable:<id>
   business: string | null;    // T4 F-30: business:"Name"
+  assigned: 'me' | 'none' | null;            // T4 F-32: assigned:me / assigned:none
+  status: 'open' | 'pending' | 'done' | null; // T4 F-32: status:open|pending|done
   risk: 'high' | 'medium' | null; // T2 F-20: risk:high / risk:medium
   before: number | null;      // epoch ms
   after: number | null;
@@ -39,7 +41,7 @@ function ftsEscape(term: string): string {
 export function parseSearch(query: string): ParsedSearch {
   const out: ParsedSearch = {
     fts: null, from: null, to: null, label: null, category: null, inRole: null,
-    unread: null, starred: null, hasAttachment: null, disposable: null, business: null, risk: null, before: null, after: null,
+    unread: null, starred: null, hasAttachment: null, disposable: null, business: null, assigned: null, status: null, risk: null, before: null, after: null,
   };
   const ftsTerms: string[] = [];
   // tokens: key:"quoted value" | key:value | "quoted phrase" | word
@@ -71,6 +73,8 @@ export function parseSearch(query: string): ParsedSearch {
           if (val === 'attachment') out.hasAttachment = true;
           continue;
         case 'disposable': if (/^\d+$/.test(val)) out.disposable = Number(val); continue;
+        case 'assigned': { const v = val.toLowerCase(); if (v === 'me' || v === 'none') out.assigned = v; continue; }
+        case 'status': { const v = val.toLowerCase(); if (v === 'open' || v === 'pending' || v === 'done') out.status = v; continue; }
         case 'risk': if (val === 'high' || val === 'medium') out.risk = val; continue;
         case 'before': { const t = Date.parse(val); if (!isNaN(t)) out.before = t; continue; }
         case 'after': { const t = Date.parse(val); if (!isNaN(t)) out.after = t; continue; }

@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import type { ApiEmail } from '@seamless/shared';
+import { AssigneeChip } from './SharedThread.tsx';
 import { useMail, PAGE } from '../state/mail.ts';
 import { actions, runBulk } from '../state/actions.ts';
 import { useCompose } from '../state/compose.ts';
@@ -168,6 +169,7 @@ function Row({ email, selected, onMenu }: { email: ApiEmail; selected: boolean; 
           <div className="line1">
             <span className="from">{who}</span>
             <span className="meta-icons">
+              <AssigneeChip email={email} />
               <BounceChip email={email} />
               <BounceChip email={email} />
         <RiskFlag email={email} />
@@ -219,6 +221,7 @@ function TableRow({ email, selected, onMenu }: { email: ApiEmail; selected: bool
         {email.preview && <span className="tbl-snippet"> — {email.preview}</span>}
       </span>
       <span className="tbl-metas">
+        <AssigneeChip email={email} />
         <RiskFlag email={email} />
         <OpenBadge email={email} />
         {email.hasNote && <NoteIcon size={18} weight="fill" className="note-flag" aria-label="Has a private note" />}

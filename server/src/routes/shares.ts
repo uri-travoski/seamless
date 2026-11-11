@@ -3,6 +3,7 @@ import type { FastifyInstance } from 'fastify';
 import { q, one, run, bumpState } from '../db.ts';
 import { broadcast } from '../ws.ts';
 import { uid, isAdmin } from './util.ts';
+import { clearAssignmentsFor } from '../mail/assignments.ts';
 
 const ROLES = ['viewer', 'responder', 'manager'] as const;
 
@@ -67,6 +68,7 @@ export function register(app: FastifyInstance): void {
     if (!acct) return reply.code(404).send({ error: 'not found' });
     const target = Number((req.params as any).userId);
     await run('DELETE FROM mailbox_shares WHERE account_id = ? AND user_id = ?', [acct.id, target]);
+    await clearAssignmentsFor(acct.id, target);
     await bumpState();
     broadcast({ type: 'stateChange' }, target);
     return { ok: true };

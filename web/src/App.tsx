@@ -25,6 +25,8 @@ const NotificationsPage = lazy(() => import('./components/NotificationsPage.tsx'
 const OpenReport = lazy(() => import('./components/OpenReport.tsx'));
 const TemplatesView = lazy(() => import('./components/TemplatesView.tsx'));
 
+import { useShared, setSocket } from './state/shared.ts';
+
 function useWebSocket(enabled: boolean): boolean {
   const [connected, setConnected] = useState(false);
   useEffect(() => {
@@ -36,10 +38,11 @@ function useWebSocket(enabled: boolean): boolean {
     const connect = () => {
       const proto = location.protocol === 'https:' ? 'wss' : 'ws';
       ws = new WebSocket(`${proto}://${location.host}/api/ws`);
-      ws.onopen = () => { setConnected(true); retry = 1000; };
+      ws.onopen = () => { setConnected(true); retry = 1000; setSocket(ws); };
       ws.onmessage = (ev) => {
         try {
           const msg = JSON.parse(ev.data) as WsMessage;
+          if (msg.type === 'presence') { useShared.getState().onPresence(msg); return; }
           if (msg.type === 'stateChange' || msg.type === 'newMail') {
             void useMail.getState().refreshCurrent();
           }
@@ -47,7 +50,7 @@ function useWebSocket(enabled: boolean): boolean {
         } catch { /* ignore */ }
       };
       ws.onclose = () => {
-        setConnected(false);
+        setConnected(false); setSocket(null);
         if (!closed) {
           setTimeout(connect, retry);
           retry = Math.min(retry * 2, 15000);
@@ -66,6 +69,8 @@ function folderView(route: Extract<Route, { page: 'mail' }>): View {
   const role = FOLDER_ROLE[route.folder];
   if (role) return { kind: 'mailbox', mailboxId: `u:${role}`, title: FOLDER_TITLE[route.folder] };
   if (route.folder === 'starred') return { kind: 'search', query: 'is:starred', title: 'Starred' };
+  if (route.folder === 'assigned') return { kind: 'search', query: 'assigned:me status:open', title: 'Assigned to me' };
+  if (route.folder === 'unassigned') return { kind: 'search', query: 'assigned:none status:open in:inbox', title: 'Unassigned' };
   if (route.folder === 'review') return { kind: 'review', title: 'Review' };
   if (route.folder === 'snoozed') return { kind: 'snoozed', title: 'Snoozed' };
   if (route.folder === 'waiting') return { kind: 'waiting', title: 'Waiting for reply' };

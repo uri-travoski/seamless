@@ -1350,3 +1350,22 @@ kbd { font-family: var(--font-mono); font-size: 11.5px; padding: 1px 6px; border
 mark[data-ai-fill], mark[data-ai-pending], mark[data-unknown-var] { background: var(--md-blue-light); color: inherit; border-radius: 3px; padding: 0 2px; }
 mark[data-ai-pending], mark[data-unknown-var] { outline: 1px dashed var(--md-border-strong); }
 .check { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; }
+
+/* shared inbox (T4 F-32) */
+.shared-thread { margin: 14px 16px 24px; display: flex; flex-direction: column; gap: 10px; }
+.presence-line { font-size: 12.5px; color: var(--md-blue-dark); }
+.presence-line.dim { color: var(--md-text-faint); }
+.assign-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; font-size: 13px; }
+.assign-bar select { margin-left: 4px; padding: 3px 6px; border: 1px solid var(--md-border-strong); border-radius: 6px; background: var(--md-surface); color: var(--md-text); }
+.status-group { display: inline-flex; gap: 4px; }
+.comments-panel { border: 1px dashed var(--md-border-strong); background: var(--md-blue-light); border-radius: 8px; padding: 10px 12px; }
+.comments-head { font-weight: 600; font-size: 13px; margin-bottom: 6px; }
+.comments-head .dim { font-weight: 400; margin-left: 6px; color: var(--md-text-faint); font-size: 12px; }
+.comment { padding: 6px 0; border-top: 1px solid var(--md-border); font-size: 13px; }
+.comment-body { white-space: pre-wrap; margin-top: 2px; }
+.comment-form { display: flex; gap: 8px; margin-top: 8px; align-items: flex-end; }
+.comment-form textarea { flex: 1; min-height: 52px; resize: vertical; padding: 6px 8px; border: 1px solid var(--md-border-strong); border-radius: 6px; background: var(--md-surface); color: var(--md-text); font: inherit; }
+.assignee-chip { display: inline-flex; align-items: center; gap: 4px; }
+.assignee-avatar { display: inline-flex; align-items: center; justify-content: center; width: 20px; height: 20px; border-radius: 50%; background: var(--md-blue); color: var(--md-surface); font-size: 10px; font-weight: 700; }
+.status-pill { font-size: 10.5px; padding: 1px 6px; border-radius: 8px; border: 1px solid var(--md-border-strong); color: var(--md-text-soft); }
+.status-pill.done { background: var(--md-hover); }

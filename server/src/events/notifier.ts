@@ -41,7 +41,8 @@ export const DEFAULT_PREFS: Record<EventType, { inApp: boolean; push: boolean }>
   'disposable.received': { inApp: true, push: false },
   'disposable.leak': { inApp: true, push: true },
   'lead.captured': { inApp: true, push: true },
-  'assignment.changed': { inApp: true, push: false },
+  'assignment.changed': { inApp: true, push: true },
+  'comment.mention': { inApp: true, push: true },
   'security.login': { inApp: false, push: false },     // opt-in: one per sign-in is noisy
   'security.2fa_changed': { inApp: true, push: false },
 };
@@ -142,6 +143,10 @@ export function render(ev: EventRow): Rendered {
       return { title: 'New sign-in', body: [p.ip ? `from ${p.ip}` : '', p.mfa ? `(2FA: ${p.mfa})` : ''].filter(Boolean).join(' '), link: '/settings/security', groupKey: null, accountId: null };
     case 'security.2fa_changed':
       return { title: p.enabled ? 'Two-factor sign-in turned on' : 'Two-factor sign-in turned off', body: '', link: '/settings/security', groupKey: null, accountId: null };
+    case 'assignment.changed':
+      return { title: `${p.by ?? 'Someone'} assigned you a thread`, body: String(p.subject || '(no subject)'), link: p.messageId ? `/mail/msg/m${p.messageId}` : null, groupKey: null, accountId };
+    case 'comment.mention':
+      return { title: `${p.by ?? 'Someone'} mentioned you`, body: `${p.subject ? quote(p.subject) + ': ' : ''}${p.excerpt ?? ''}`, link: p.messageId ? `/mail/msg/m${p.messageId}` : null, groupKey: null, accountId };
     case 'reminder.due':
     case 'followup.due':
     case 'snooze.woke':
