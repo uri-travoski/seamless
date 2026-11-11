@@ -115,6 +115,30 @@ or a plain warning that the bucket is unreachable. Without that check, a restore
 
 If you *do* set `S3_BUCKET` in the environment, it wins. That is how you migrate mail to a new bucket.
 
+## Export and import
+
+A backup is for disaster recovery and needs the same `SEAMLESS_SECRET` to read. An **export** is for moving: one
+file, `.seamless-export`, protected by a password you choose (at least 12 characters), that imports on any Seamless
+server — even one with a different `SEAMLESS_SECRET`. Every stored secret (mailbox passwords, sending-service keys,
+storage credentials) is re-encrypted with your export password inside the file and with the new server's secret on import.
+
+### Make an export
+**Settings → Backup → Export everything…** (admins). Pick a password, optionally tick *Include the mail itself*
+(adds every `.eml`; the file can get big), and the browser downloads it. Keep the password somewhere safe — it
+cannot be recovered. Each export is recorded as a notification event.
+
+### Import on a new server
+On the first-run screen (no users yet) open **Import from export file**, choose the file and enter its password.
+The whole database is restored. If the export included mail, the messages are written to *this* server's mail
+storage; otherwise the server reconnects to the mail bucket named in the export and checks that it can read it.
+A wrong password or a damaged file is reported and nothing is written. A full import is refused once any user exists.
+
+### Import just the settings
+**Settings → Backup → Import settings from an export file** merges the labels, rules, filters, templates, sending
+services, categories and preferences into your account. Anything whose name already exists is skipped, so running
+it twice is safe. No mail or mailboxes are imported. The settings come from the user with your email address in
+the file, or else the first admin.
+
 ## Keeping backups away from the mail
 
 By default, backups sit in the same bucket as the mail. That is convenient, and it is also a single point of failure: one deleted bucket, or one leaked key, takes both.

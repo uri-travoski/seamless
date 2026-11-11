@@ -92,3 +92,35 @@ export async function uploadFile(file: File): Promise<{ id: string; filename: st
   fd.append('file', file);
   return req('/api/upload', { method: 'POST', body: fd });
 }
+
+/** Portable export (F-28): POST the password, get the file back as a download. */
+export async function downloadExport(password: string, includeMail: boolean): Promise<string> {
+  const res = await fetch('/api/export', {
+    method: 'POST', credentials: 'same-origin',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ password, includeMail }),
+  });
+  if (!res.ok) {
+    let msg = res.statusText;
+    try { msg = (await res.json()).error ?? msg; } catch { /* keep statusText */ }
+    throw new ApiError(res.status, msg);
+  }
+  const name = /filename="([^"]+)"/.exec(res.headers.get('content-disposition') ?? '')?.[1] ?? 'seamless.seamless-export';
+  const url = URL.createObjectURL(await res.blob());
+  const a = document.createElement('a');
+  a.href = url; a.download = name; document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 10_000);
+  return name;
+}
+
+/** Import an export file. The password travels in a header, the file as the raw body. */
+export async function uploadImport<T>(file: File, password: string, mode: 'full' | 'settings'): Promise<T> {
+  const res = await fetch(`/api/import?mode=${mode}`, {
+    method: 'POST', credentials: 'same-origin',
+    headers: { 'Content-Type': 'application/octet-stream', 'X-Export-Password': password },
+    body: file,
+  });
+  const body = await res.json().catch(() => ({}));
+  if (!res.ok) throw new ApiError(res.status, body.error ?? res.statusText);
+  return body as T;
+}

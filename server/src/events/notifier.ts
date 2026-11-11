@@ -36,6 +36,8 @@ export const DEFAULT_PREFS: Record<EventType, { inApp: boolean; push: boolean }>
   'backup.ok': { inApp: false, push: false },
   'storage.migration.done': { inApp: true, push: false },
   'storage.migration.failed': { inApp: true, push: false },
+  'export.created': { inApp: true, push: false },
+  'export.imported': { inApp: true, push: false },
   'disposable.received': { inApp: true, push: false },
   'disposable.leak': { inApp: true, push: true },
   'lead.captured': { inApp: true, push: true },
@@ -132,6 +134,10 @@ export function render(ev: EventRow): Rendered {
       return { title: 'Backup failed', body: String(p.error ?? ''), link: '/settings/backup', groupKey: 'backup:failed', accountId: null };
     case 'backup.ok':
       return { title: 'Backup completed', body: p.rows ? `${p.rows} rows saved` : '', link: '/settings/backup', groupKey: 'backup:ok', accountId: null };
+    case 'export.created':
+      return { title: 'Full export created', body: p.includeMail ? `${p.rows} rows and ${p.blobs} messages` : `${p.rows} rows`, link: '/settings/backup', groupKey: null, accountId: null };
+    case 'export.imported':
+      return { title: p.mode === 'settings' ? 'Settings imported from an export' : 'Instance restored from an export', body: p.mode === 'settings' ? `${p.added ?? 0} added, ${p.skipped ?? 0} skipped` : `${p.rows} rows`, link: '/settings/backup', groupKey: null, accountId: null };
     case 'security.login':
       return { title: 'New sign-in', body: [p.ip ? `from ${p.ip}` : '', p.mfa ? `(2FA: ${p.mfa})` : ''].filter(Boolean).join(' '), link: '/settings/security', groupKey: null, accountId: null };
     case 'security.2fa_changed':

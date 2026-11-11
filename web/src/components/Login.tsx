@@ -1,3 +1,4 @@
+import { ImportForm } from './settings/ExportDialog.tsx';
 import { useEffect, useState } from 'react';
 import type { ApiBackup } from '@seamless/shared';
 import { useSession } from '../state/session.ts';
@@ -233,6 +234,16 @@ export default function Login() {
               </div>
             ))}
           </div>
+        )}
+
+        {isSetup && !restored && (
+          <details style={{ marginTop: 18, borderTop: '1px solid var(--md-border)', paddingTop: 14 }}>
+            <summary><strong style={{ fontSize: 13 }}>Import from export file</strong></summary>
+            <p className="hint" style={{ marginTop: 4 }}>
+              Moving from another Seamless server? Choose the <code>.seamless-export</code> file and its password.
+            </p>
+            <ImportForm mode="full" onDone={(s) => { setRestored(s); void useSession.getState().init(); }} />
+          </details>
         )}
 
         {isSetup && askStorage && !backups.length && !restored && (

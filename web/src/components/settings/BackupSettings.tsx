@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import type { ApiBackup, ApiBackupConfig, ApiBackupStatus, BackupFrequency } from '@seamless/shared';
 import { api } from '../../api/client.ts';
 import { toast } from '../../toast.ts';
+import { ExportDialog, ImportForm } from './ExportDialog.tsx';
 
 const FREQUENCIES: { id: BackupFrequency; name: string }[] = [
   { id: 'every_n_hours', name: 'Every few hours…' },
@@ -22,6 +23,8 @@ export default function BackupSettings() {
   const [backups, setBackups] = useState<ApiBackup[]>([]);
   const [storageError, setStorageError] = useState('');
   const [busy, setBusy] = useState('');
+  const [exporting, setExporting] = useState(false);
+  const [importNote, setImportNote] = useState('');
 
   const load = async () => {
     const res = await api.get<{ config: ApiBackupConfig; status: ApiBackupStatus; backups: ApiBackup[]; storageError?: string }>('/api/backup');
@@ -226,6 +229,22 @@ export default function BackupSettings() {
           </tbody>
         </table>
       )}
+
+      <h3>Export and import</h3>
+      <p className="settings-desc">
+        A portable, password-protected copy of everything — it imports on any Seamless server, even one with a different{' '}
+        <code>SEAMLESS_SECRET</code>. Use it to move house; use the backups above for disaster recovery.
+      </p>
+      <div className="field">
+        <button className="btn" onClick={() => setExporting(true)}>Export everything…</button>
+      </div>
+      <details className="field">
+        <summary>Import settings from an export file</summary>
+        <p className="hint">Adds the labels, rules, filters, templates, sending services, categories and preferences from the file to your account. Anything with the same name is skipped. No mail is touched.</p>
+        <ImportForm mode="settings" onDone={(s) => { setImportNote(s); toast(s); }} />
+        {importNote && <div className="dim">{importNote}</div>}
+      </details>
+      {exporting && <ExportDialog onClose={() => setExporting(false)} />}
 
       <h3>Restoring</h3>
       <p className="settings-desc">

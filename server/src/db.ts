@@ -960,12 +960,12 @@ export async function clientQuery<T = any>(client: pg.PoolClient, sql: string, p
   return (await client.query(ph(sql), params as any[])).rows as T[];
 }
 
-export async function migrate(): Promise<void> {
-  await pool.query('CREATE TABLE IF NOT EXISTS schema_migrations (id INTEGER PRIMARY KEY, applied_at BIGINT NOT NULL)');
+export async function migrate(db: pg.Pool = pool): Promise<void> {
+  await db.query('CREATE TABLE IF NOT EXISTS schema_migrations (id INTEGER PRIMARY KEY, applied_at BIGINT NOT NULL)');
   for (const m of MIGRATIONS) {
-    const done = await pool.query('SELECT 1 FROM schema_migrations WHERE id = $1', [m.id]);
+    const done = await db.query('SELECT 1 FROM schema_migrations WHERE id = $1', [m.id]);
     if (done.rowCount) continue;
-    const client = await pool.connect();
+    const client = await db.connect();
     try {
       await client.query('BEGIN');
       await client.query(m.sql);

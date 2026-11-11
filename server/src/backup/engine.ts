@@ -1,4 +1,5 @@
 import { gzipSync, gunzipSync } from 'node:zlib';
+import type pg from 'pg';
 import { pool, q, one, migrate } from '../db.ts';
 import { config } from '../config.ts';
 import { encryptBuffer, decryptBuffer, sha256 } from '../crypto.ts';
@@ -60,10 +61,22 @@ export interface BackupSummary {
   tables: number;
 }
 
-interface Column { name: string; generated: boolean }
+export interface Column { name: string; generated: boolean }
 
-async function tableNames(): Promise<string[]> {
-  const rows = await q<{ table_name: string }>(`
+/** `?`-style query function; defaults to the app pool. The import/tests pass one for another database. */
+export type QueryFn = (sql: string, params?: unknown[]) => Promise<any[]>;
+/** Per-row hook for the dump/replay (the portable export re-encrypts secret columns with it). */
+export type RowTransform = (table: string, names: string[], row: unknown[]) => unknown[];
+
+export function queryFnOf(db: pg.Pool | pg.PoolClient): QueryFn {
+  return async (sql, params = []) => {
+    let i = 0;
+    return (await db.query(sql.replace(/\?/g, () => `$${++i}`), params as any[])).rows;
+  };
+}
+
+export async function tableNames(query: QueryFn = q): Promise<string[]> {
+  const rows: { table_name: string }[] = await query(`
     SELECT table_name FROM information_schema.tables
     WHERE table_schema = 'public' AND table_type = 'BASE TABLE'
     ORDER BY table_name
@@ -73,8 +86,8 @@ async function tableNames(): Promise<string[]> {
 
 /** Generated columns (message_fts.tsv) must be skipped: Postgres rejects an explicit
  *  value for them, and they rebuild themselves from the restored source columns. */
-async function columnsOf(table: string): Promise<Column[]> {
-  const rows = await q<{ column_name: string; is_generated: string }>(`
+export async function columnsOf(table: string, query: QueryFn = q): Promise<Column[]> {
+  const rows: { column_name: string; is_generated: string }[] = await query(`
     SELECT column_name, is_generated FROM information_schema.columns
     WHERE table_schema = 'public' AND table_name = ?
     ORDER BY ordinal_position
@@ -82,7 +95,32 @@ async function columnsOf(table: string): Promise<Column[]> {
   return rows.map((r) => ({ name: r.column_name, generated: r.is_generated === 'ALWAYS' }));
 }
 
-const ident = (name: string) => `"${name.replace(/"/g, '""')}"`;
+export const ident = (name: string) => `"${name.replace(/"/g, '""')}"`;
+
+/** The NDJSON table dump shared by backups and the portable export. */
+export async function dumpDatabase(opts: { query?: QueryFn; transform?: RowTransform } = {}): Promise<{ text: string; counts: Record<string, number>; rows: number }> {
+  const query = opts.query ?? q;
+  const lines: string[] = [];
+  const counts: Record<string, number> = {};
+  let rows = 0;
+  for (const table of await tableNames(query)) {
+    const cols = (await columnsOf(table, query)).filter((c) => !c.generated);
+    if (!cols.length) continue;
+    const names = cols.map((c) => c.name);
+    // header line names the columns, so a restore stays correct even if a later
+    // migration reorders or adds columns to the live schema
+    lines.push(JSON.stringify({ __table: table, cols: names }));
+
+    const data = await query(`SELECT ${names.map(ident).join(', ')} FROM ${ident(table)}`);
+    for (const row of data) {
+      const vals = names.map((n) => row[n] ?? null);
+      lines.push(JSON.stringify(opts.transform ? opts.transform(table, names, vals) : vals));
+    }
+    counts[table] = data.length;
+    rows += data.length;
+  }
+  return { text: lines.join('\n'), counts, rows };
+}
 
 export async function createBackup(opts: { prefix?: string; store?: BlobStore; appVersion?: string; includeEmails?: boolean; mailSource?: (key: string) => Promise<Buffer> } = {}): Promise<BackupManifest> {
   const store = opts.store ?? backupStore;
@@ -101,28 +139,8 @@ export async function createBackup(opts: { prefix?: string; store?: BlobStore; a
     mirrorKeys = res.keys;
   }
 
-  const tables = await tableNames();
-
-  const lines: string[] = [];
-  const counts: Record<string, number> = {};
-  let rows = 0;
-
-  for (const table of tables) {
-    const cols = (await columnsOf(table)).filter((c) => !c.generated);
-    if (!cols.length) continue;
-    const names = cols.map((c) => c.name);
-    // header line names the columns, so a restore stays correct even if a later
-    // migration reorders or adds columns to the live schema
-    lines.push(JSON.stringify({ __table: table, cols: names }));
-
-    const data = await q<Record<string, unknown>>(
-      `SELECT ${names.map(ident).join(', ')} FROM ${ident(table)}`);
-    for (const row of data) lines.push(JSON.stringify(names.map((n) => row[n] ?? null)));
-    counts[table] = data.length;
-    rows += data.length;
-  }
-
-  const plain = Buffer.from(lines.join('\n'), 'utf8');
+  const { text, counts, rows } = await dumpDatabase();
+  const plain = Buffer.from(text, 'utf8');
   const cipher = encryptBuffer(gzipSync(plain, { level: 6 }));
 
   const createdAt = Date.now();
@@ -227,90 +245,7 @@ export async function restoreBackup(dir: string, opts: { store?: BlobStore; mail
   const text = gunzipSync(decryptBuffer(cipher)).toString('utf8');
   const lines = text ? text.split('\n') : [];
 
-  const live = new Set(await tableNames());
-  const skippedColumns: string[] = [];
-  const applied: Record<string, number> = {};
-
-  const client = await pool.connect();
-  try {
-    await client.query('BEGIN');
-    await client.query('SET LOCAL session_replication_role = replica');
-
-    const truncatable = [...live].map(ident).join(', ');
-    if (truncatable) await client.query(`TRUNCATE ${truncatable} RESTART IDENTITY CASCADE`);
-
-    let table = '';
-    let cols: string[] = [];
-    let keep: number[] = [];   // indexes of dump columns that still exist in the live schema
-    let batch: unknown[][] = [];
-
-    const flush = async () => {
-      if (!batch.length || !table) return;
-      const names = keep.map((i) => ident(cols[i])).join(', ');
-      const values: unknown[] = [];
-      const tuples = batch.map((row, r) => {
-        const ps = keep.map((_, c) => `$${r * keep.length + c + 1}`);
-        // node-pg turns a JS array into a Postgres array literal, which a jsonb column rejects:
-        // jsonb values that happen to be arrays (message_risk.reasons) must go in as JSON text
-        for (const i of keep) values.push(Array.isArray(row[i]) ? JSON.stringify(row[i]) : row[i]);
-        return `(${ps.join(', ')})`;
-      });
-      await client.query(`INSERT INTO ${ident(table)} (${names}) VALUES ${tuples.join(', ')}`, values);
-      applied[table] = (applied[table] ?? 0) + batch.length;
-      batch = [];
-    };
-
-    for (const line of lines) {
-      if (!line) continue;
-      if (line.startsWith('{"__table"')) {
-        await flush();
-        const head = JSON.parse(line) as { __table: string; cols: string[] };
-        table = live.has(head.__table) ? head.__table : '';
-        cols = head.cols;
-        keep = [];
-        if (table) {
-          const liveCols = new Set((await columnsOf(table)).filter((c) => !c.generated).map((c) => c.name));
-          cols.forEach((c, i) => {
-            if (liveCols.has(c)) keep.push(i);
-            else skippedColumns.push(`${head.__table}.${c}`);
-          });
-        } else {
-          skippedColumns.push(`${head.__table} (table no longer exists)`);
-        }
-        applied[head.__table] = applied[head.__table] ?? 0;
-        continue;
-      }
-      if (!table || !keep.length) continue;
-      batch.push(JSON.parse(line) as unknown[]);
-      if (batch.length >= INSERT_CHUNK) await flush();
-    }
-    await flush();
-
-    // TRUNCATE ... RESTART IDENTITY rewound every sequence to 1, and the rows went back
-    // in with explicit ids — without this the next insert collides on the PK. Only tables
-    // that actually own an id sequence: link tables (message_labels, email_vectors) have
-    // no id column at all, and naming one in the query is a parse error even when guarded.
-    const withId = await client.query<{ table_name: string }>(`
-      SELECT table_name FROM information_schema.columns
-      WHERE table_schema = 'public' AND column_name = 'id'
-    `);
-    for (const { table_name: t } of withId.rows) {
-      if (!live.has(t)) continue;
-      const seq = (await client.query<{ seq: string | null }>(
-        "SELECT pg_get_serial_sequence($1, 'id') AS seq", [t])).rows[0]?.seq;
-      if (!seq) continue;   // schema_migrations and friends: id is supplied, not generated
-      await client.query(
-        `SELECT setval($1, COALESCE((SELECT MAX(id) FROM ${ident(t)}), 1), (SELECT COUNT(*) FROM ${ident(t)}) > 0)`,
-        [seq]);
-    }
-
-    await client.query('COMMIT');
-  } catch (err) {
-    await client.query('ROLLBACK');
-    throw err;
-  } finally {
-    client.release();
-  }
+  const { applied, skippedColumns } = await replayDump(pool, lines);
 
   const rows = Object.values(applied).reduce((a, b) => a + b, 0);
 
@@ -350,4 +285,95 @@ export async function pruneBackups(keep: number, opts: { prefix?: string; store?
 export async function databaseIsEmpty(): Promise<boolean> {
   const row = await one('SELECT 1 FROM users LIMIT 1');
   return !row;
+}
+
+/** Destructive: truncates every table of `db`, then replays NDJSON dump lines in one transaction.
+ *  `transform` may rewrite each row before insert (the portable import re-encrypts secrets with it). */
+export async function replayDump(db: pg.Pool, lines: string[], opts: { transform?: RowTransform } = {}): Promise<{ applied: Record<string, number>; skippedColumns: string[] }> {
+  const dbq = queryFnOf(db);
+  const live = new Set(await tableNames(dbq));
+  const skippedColumns: string[] = [];
+  const applied: Record<string, number> = {};
+
+  const client = await db.connect();
+  try {
+    await client.query('BEGIN');
+    await client.query('SET LOCAL session_replication_role = replica');
+
+    const truncatable = [...live].map(ident).join(', ');
+    if (truncatable) await client.query(`TRUNCATE ${truncatable} RESTART IDENTITY CASCADE`);
+
+    let table = '';
+    let cols: string[] = [];
+    let keep: number[] = [];   // indexes of dump columns that still exist in the live schema
+    let batch: unknown[][] = [];
+
+    const flush = async () => {
+      if (!batch.length || !table) return;
+      const names = keep.map((i) => ident(cols[i])).join(', ');
+      const values: unknown[] = [];
+      const tuples = batch.map((row, r) => {
+        const ps = keep.map((_, c) => `$${r * keep.length + c + 1}`);
+        // node-pg turns a JS array into a Postgres array literal, which a jsonb column rejects:
+        // jsonb values that happen to be arrays (message_risk.reasons) must go in as JSON text
+        for (const i of keep) values.push(Array.isArray(row[i]) ? JSON.stringify(row[i]) : row[i]);
+        return `(${ps.join(', ')})`;
+      });
+      await client.query(`INSERT INTO ${ident(table)} (${names}) VALUES ${tuples.join(', ')}`, values);
+      applied[table] = (applied[table] ?? 0) + batch.length;
+      batch = [];
+    };
+
+    for (const line of lines) {
+      if (!line) continue;
+      if (line.startsWith('{"__table"')) {
+        await flush();
+        const head = JSON.parse(line) as { __table: string; cols: string[] };
+        table = live.has(head.__table) ? head.__table : '';
+        cols = head.cols;
+        keep = [];
+        if (table) {
+          const liveCols = new Set((await columnsOf(table, dbq)).filter((c) => !c.generated).map((c) => c.name));
+          cols.forEach((c, i) => {
+            if (liveCols.has(c)) keep.push(i);
+            else skippedColumns.push(`${head.__table}.${c}`);
+          });
+        } else {
+          skippedColumns.push(`${head.__table} (table no longer exists)`);
+        }
+        applied[head.__table] = applied[head.__table] ?? 0;
+        continue;
+      }
+      if (!table || !keep.length) continue;
+      { const row = JSON.parse(line) as unknown[]; batch.push(opts.transform ? opts.transform(table, cols, row) : row); }
+      if (batch.length >= INSERT_CHUNK) await flush();
+    }
+    await flush();
+
+    // TRUNCATE ... RESTART IDENTITY rewound every sequence to 1, and the rows went back
+    // in with explicit ids — without this the next insert collides on the PK. Only tables
+    // that actually own an id sequence: link tables (message_labels, email_vectors) have
+    // no id column at all, and naming one in the query is a parse error even when guarded.
+    const withId = await client.query<{ table_name: string }>(`
+      SELECT table_name FROM information_schema.columns
+      WHERE table_schema = 'public' AND column_name = 'id'
+    `);
+    for (const { table_name: t } of withId.rows) {
+      if (!live.has(t)) continue;
+      const seq = (await client.query<{ seq: string | null }>(
+        "SELECT pg_get_serial_sequence($1, 'id') AS seq", [t])).rows[0]?.seq;
+      if (!seq) continue;   // schema_migrations and friends: id is supplied, not generated
+      await client.query(
+        `SELECT setval($1, COALESCE((SELECT MAX(id) FROM ${ident(t)}), 1), (SELECT COUNT(*) FROM ${ident(t)}) > 0)`,
+        [seq]);
+    }
+
+    await client.query('COMMIT');
+  } catch (err) {
+    await client.query('ROLLBACK');
+    throw err;
+  } finally {
+    client.release();
+  }
+  return { applied, skippedColumns };
 }

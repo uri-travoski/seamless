@@ -36,13 +36,14 @@ import { register as ingest } from './ingest.ts';
 import { register as pushInboxes } from './pushInboxes.ts';
 import { register as disposable } from './disposable.ts';
 import { register as storage } from './storage.ts';
+import { register as exportRoutes } from './export.ts';
 import { sessionToken } from '../auth/sessions.ts';
 
 export { sessionUser, type SessionUser } from './util.ts';
 
 // /api/setup/{backups,restore} are public on purpose: after a total loss the database
 // is empty, so there is no account to authenticate with. Both refuse once a user exists.
-const PUBLIC_PATHS = [/^\/t\//, /^\/api\/(login|login\/mfa|setup|me)$/, /^\/api\/setup\/(backups|restore|storage-test)$/, /^\/api\/ingest\/[A-Za-z0-9_-]+(\/disposed)?(\?.*)?$/, /^\/(?!api|jmap)/];
+const PUBLIC_PATHS = [/^\/t\//, /^\/api\/(login|login\/mfa|setup|me)$/, /^\/api\/import(\?.*)?$/, /^\/api\/setup\/(backups|restore|storage-test)$/, /^\/api\/ingest\/[A-Za-z0-9_-]+(\/disposed)?(\?.*)?$/, /^\/(?!api|jmap)/];
 
 export function registerRoutes(app: FastifyInstance): void {
   app.addHook('preHandler', async (req, reply) => {
@@ -89,4 +90,5 @@ export function registerRoutes(app: FastifyInstance): void {
   pushInboxes(app);
   disposable(app);
   storage(app);
+  exportRoutes(app);
 }

@@ -58,3 +58,24 @@ export function randomToken(bytes = 16): string {
 export function sha256(buf: Buffer | string): string {
   return crypto.createHash('sha256').update(buf).digest('hex');
 }
+
+/** Key derivation for an explicit secret (the portable export re-encrypts from the local SEAMLESS_SECRET
+ *  to the export password, and on import from that password to the importing server's secret). */
+export function keyFromSecret(secret: string): Buffer {
+  return crypto.scryptSync(secret, 'seamless-static-salt-v1', 32);
+}
+export const LOCAL_KEY = key;
+
+export function encryptWith(k: Buffer, plain: string): string {
+  const iv = crypto.randomBytes(12);
+  const cipher = crypto.createCipheriv('aes-256-gcm', k, iv);
+  const ct = Buffer.concat([cipher.update(plain, 'utf8'), cipher.final()]);
+  return Buffer.concat([iv, cipher.getAuthTag(), ct]).toString('base64');
+}
+
+export function decryptWith(k: Buffer, enc: string): string {
+  const buf = Buffer.from(enc, 'base64');
+  const decipher = crypto.createDecipheriv('aes-256-gcm', k, buf.subarray(0, 12));
+  decipher.setAuthTag(buf.subarray(12, 28));
+  return Buffer.concat([decipher.update(buf.subarray(28)), decipher.final()]).toString('utf8');
+}
