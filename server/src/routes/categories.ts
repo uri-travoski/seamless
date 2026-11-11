@@ -2,7 +2,9 @@
 import type { FastifyInstance } from 'fastify';
 import { bumpState } from '../db.ts';
 import { broadcast } from '../ws.ts';
+import { one } from '../db.ts';
 import {
+  scopeAccountIds,
   categoryOverview, createCategory, updateCategory, deleteCategory, setCategoryMembers, reorderCategories,
 } from '../mail/categories.ts';
 import { uid } from './util.ts';
@@ -11,6 +13,17 @@ export function register(app: FastifyInstance): void {
   const changed = async (userId: number) => { await bumpState(); broadcast({ type: 'stateChange' }, userId); };
 
   app.get('/api/categories', async (req) => categoryOverview(uid(req)));
+
+  /** Space the current scope uses (sidebar footer): sum of stored .eml sizes. */
+  app.get('/api/storage/usage', async (req) => {
+    const userId = uid(req);
+    const scope = String((req.query as any)?.scope ?? 'unified');
+    const ids = await scopeAccountIds(userId, scope);
+    const row = await one<{ bytes: string | number | null; messages: number }>(
+      `SELECT COALESCE(SUM(size), 0) AS bytes, COUNT(*) AS messages FROM messages
+       WHERE user_id = ? ${ids ? 'AND account_id = ANY(?::int[])' : ''}`, ids ? [userId, ids] : [userId]);
+    return { scope, bytes: Number(row?.bytes ?? 0), messages: row?.messages ?? 0 };
+  });
 
   app.post('/api/categories', async (req, reply) => {
     try {

@@ -21,8 +21,9 @@ import { useMail, scopeToSlug } from '../../state/mail.ts';
 import { navigate } from '../../router.ts';
 import {
   SettingsIcon, MailboxIcon, TagIcon, FilterIcon, SparkleIcon, UsersIcon, LogoutIcon, BackIcon, RulesIcon, ImportIcon,
-  LogsIcon, DevicesIcon, ContactsIcon, BackupIcon, PaletteIcon, TemplateIcon, BellIcon, LockIcon,
+  LogsIcon, DevicesIcon, ContactsIcon, BackupIcon, PaletteIcon, TemplateIcon, BellIcon, LockIcon, HelpIcon, KeyboardIcon,
 } from '../../icons.tsx';
+import { useUi } from '../../state/ui.ts';
 
 const TABS: { id: string; name: string; Icon: ComponentType<{ className?: string }>; C: ComponentType; admin?: boolean }[] = [
   { id: 'general', name: 'General', Icon: SettingsIcon, C: GeneralSettings },
@@ -63,6 +64,8 @@ export default function Settings({ tab }: { tab: string }) {
         ))}
         <div className="settings-nav-foot">
           <button className="side-item" onClick={() => void logout()}><LogoutIcon className="glyph" /><span className="name">Log out</span></button>
+          <button className="icon-btn" title="Help — the user manual" aria-label="Help" onClick={() => useUi.getState().set({ helpOpen: true })}><HelpIcon size={18} /></button>
+          <button className="icon-btn" title="Keyboard shortcuts (?)" aria-label="Keyboard shortcuts" onClick={() => useUi.getState().set({ shortcutsOpen: true })}><KeyboardIcon size={18} /></button>
         </div>
       </nav>
       <div className="settings-content">

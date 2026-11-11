@@ -10,7 +10,8 @@
 ## New mail is not showing up
 
 - Check the connection indicator says **Live**. If it says Offline, the connection is reconnecting.
-- Click the **fetch button** (cloud icon, left of Compose) to check all accounts now.
+- Click **refresh** (circular arrows, bottom of the sidebar) to check all mailboxes now.
+- Check the dot in the top bar: green means the browser is connected live; amber means it is reconnecting.
 - Confirm the account is enabled under Settings > Mailboxes (its card shows a status pill — OK, Syncing, Error or Paused — and the last error).
 
 ## Images are not loading
@@ -43,7 +44,7 @@ Remote images are blocked by default for privacy. Click **Load images** on a mes
 
 ## Push notifications
 
-Enable native push under **Settings > General > Notifications**. It works best when Seamless is installed as an app (PWA).
+Enable native push under **Settings > General > Push notifications**, then choose which kinds push in **Settings > Notifications**. It works best when Seamless is installed as an app (PWA).
 
 ## Still stuck
 

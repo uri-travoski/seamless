@@ -6,7 +6,7 @@
  *   ── Labels A–Z (nested, hidden ones left out) [+ New label]
  *   ── Folders (only when the scope is a single mailbox)
  */
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import type { ComponentType } from 'react';
 import type { ApiLabel } from '@seamless/shared';
 import { useMail, scopeToSlug } from '../state/mail.ts';
@@ -15,7 +15,7 @@ import { useSession, DEFAULT_SIDEBAR } from '../state/session.ts';
 import { useRouter, navigate, FOLDER_ROLE, FOLDER_TITLE } from '../router.ts';
 import {
   InboxIcon, DraftsIcon, SentIcon, ScheduledIcon, ArchiveIcon, JunkIcon, TrashIcon, FolderIcon, ComposeIcon,
-  CaretDownIcon, CaretRightIcon, StarIcon, ReviewIcon, CloudDownloadIcon, TemplateIcon, MailLogo, SidebarCollapseIcon,
+  CaretDownIcon, CaretRightIcon, StarIcon, ReviewIcon, RefreshIcon, TemplateIcon, MailLogo, SidebarCollapseIcon, SettingsIcon,
 } from '../icons.tsx';
 import { IconContext } from '@phosphor-icons/react';
 import { api } from '../api/client.ts';
@@ -126,13 +126,35 @@ export default function Sidebar({ open, onNavigate, onAddLabel }: { open: boolea
     );
   };
 
+  // space used by what the switcher is showing (mailbox / category / everything)
+  const [usage, setUsage] = useState<{ bytes: number; messages: number } | null>(null);
+  useEffect(() => {
+    let alive = true;
+    api.get<{ bytes: number; messages: number }>(`/api/storage/usage?scope=${encodeURIComponent(scope)}`)
+      .then((u) => { if (alive) setUsage(u); }).catch(() => {});
+    return () => { alive = false; };
+  }, [scope, overview]);   // overview refreshes after every sync/state change
+  const sizeLabel = (() => {
+    if (!usage) return '';
+    const size = formatBytes(usage.bytes);
+    if (scope.startsWith('account:')) return `Mailbox size ${size}`;
+    if (scope.startsWith('category:')) {
+      const c = overview?.categories.find((x) => `category:${x.id}` === scope);
+      return `Category (${c?.name ?? '…'}) size ${size}`;
+    }
+    return `All mailboxes size ${size}`;
+  })();
+  const sizeTitle = (() => {
+    if (!usage) return '';
+    const mb = scope.startsWith('account:') ? overview?.mailboxes.find((m) => `account:${m.id}` === scope) : null;
+    return `${mb ? `${mb.name || mb.email}: ` : ''}${usage.messages.toLocaleString()} messages, ${formatBytes(usage.bytes)} stored`;
+  })();
+
   return (
     <IconContext.Provider value={{ weight: 'fill', size: 18 }}>
     <nav className={`sidebar ${open ? 'open' : ''} ${settings.sidebarCollapsed ? 'collapsed' : ''}`} aria-label="Folders">
       <div className="side-brand mobile-only"><MailLogo size="1.4em" /><span className="app-name">{settings.appName || 'Seamless'}</span></div>
       <div className="compose-actions">
-        <button className={`btn primary fetch-btn ${fetching ? 'busy' : ''}`} title="Check all mailboxes for new mail"
-          aria-label="Check all mailboxes for new mail" disabled={fetching} onClick={fetchAll}><CloudDownloadIcon /></button>
         <button className="btn primary compose-btn" onClick={openBlank} title="Compose (c)"><ComposeIcon /> <span className="compose-label">Compose</span></button>
       </div>
 
@@ -176,11 +198,25 @@ export default function Sidebar({ open, onNavigate, onAddLabel }: { open: boolea
         </div>
       )}
 
-      <div className="side-foot desktop-only">
-        <button className="icon-btn" title={settings.sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
-          onClick={() => saveSettings({ sidebarCollapsed: !settings.sidebarCollapsed })}><SidebarCollapseIcon size={17} /></button>
+      <div className="side-foot">
+        <button className={`icon-btn ${route.page === 'settings' ? 'active' : ''}`} title="Settings" aria-label="Settings"
+          onClick={() => { navigate({ page: 'settings', tab: 'general' }); onNavigate(); }}><SettingsIcon size={17} weight="regular" /></button>
+        <span className="side-size" title={sizeTitle}>{sizeLabel}</span>
+        <button className={`icon-btn refresh-btn ${fetching ? 'busy' : ''}`} title="Check all mailboxes for new mail"
+          aria-label="Check all mailboxes for new mail" disabled={fetching} onClick={fetchAll}><RefreshIcon size={17} weight="regular" /></button>
+        <button className="icon-btn desktop-only" title={settings.sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+          aria-label={settings.sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+          onClick={() => saveSettings({ sidebarCollapsed: !settings.sidebarCollapsed })}><SidebarCollapseIcon size={17} weight="regular" /></button>
       </div>
     </nav>
     </IconContext.Provider>
   );
+}
+
+export function formatBytes(n: number): string {
+  if (n < 1024) return `${n} B`;
+  const units = ['KB', 'MB', 'GB', 'TB'];
+  let v = n / 1024, i = 0;
+  while (v >= 1024 && i < units.length - 1) { v /= 1024; i++; }
+  return `${v >= 100 ? Math.round(v) : v.toFixed(1)} ${units[i]}`;
 }

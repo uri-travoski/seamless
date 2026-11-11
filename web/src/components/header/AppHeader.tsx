@@ -1,18 +1,18 @@
 /**
- * App header (T1 F-08 / theme track): brand on the left, search, then help + settings,
+ * App header (T1 F-08 / theme track): brand on the left, search, the live-connection dot,
  * the scope switcher and — in the far top-right corner — the notification bell.
+ * (Settings, refresh and space used live in the sidebar footer; Help and shortcuts in Settings.)
  */
 import { useState } from 'react';
 import { useSession } from '../../state/session.ts';
 import { useMail, scopeToSlug } from '../../state/mail.ts';
 import { useRouter, navigate } from '../../router.ts';
-import { MenuIcon, SearchIcon, CloseIcon, SettingsIcon, HelpIcon, MailLogo, KeyboardIcon } from '../../icons.tsx';
+import { MenuIcon, SearchIcon, CloseIcon, MailLogo } from '../../icons.tsx';
+import { NO_AUTOFILL } from '../../state/ui.ts';
 import ScopeSwitcher from './ScopeSwitcher.tsx';
 import NotificationBell from './NotificationBell.tsx';
 
-export default function AppHeader({ onMenu, onHelp, onShortcuts, connected }: {
-  onMenu: () => void; onHelp: () => void; onShortcuts: () => void; connected: boolean;
-}) {
+export default function AppHeader({ onMenu, connected }: { onMenu: () => void; connected: boolean }) {
   const appName = useSession((s) => s.settings.appName) || 'Seamless';
   const online = useMail((s) => s.online);
   const route = useRouter((s) => s.route);
@@ -39,7 +39,7 @@ export default function AppHeader({ onMenu, onHelp, onShortcuts, connected }: {
       <div className="search">
         <SearchIcon aria-hidden />
         <input
-          id="global-search"
+          id="global-search" type="search" name="seamless-mail-search" {...NO_AUTOFILL}
           placeholder="Search mail  (from: to: label: category: is:unread …)"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
@@ -52,11 +52,9 @@ export default function AppHeader({ onMenu, onHelp, onShortcuts, connected }: {
       </div>
       <div className="spacer" />
       <div className="topbar-actions">
-        <span className={`conn-dot ${connected && online ? '' : 'offline'}`} title={connected && online ? 'Live' : 'Offline / reconnecting'} />
-        <button className="icon-btn desktop-only" title="Keyboard shortcuts (?)" onClick={onShortcuts}><KeyboardIcon /></button>
-        <button className="icon-btn desktop-only" title="Help" onClick={onHelp}><HelpIcon /></button>
-        <button className={`icon-btn ${route.page === 'settings' ? 'active' : ''}`} title="Settings"
-          onClick={() => navigate({ page: 'settings', tab: route.page === 'settings' ? route.tab : 'general' })}><SettingsIcon /></button>
+        <span className={`conn-dot ${connected && online ? '' : 'offline'}`} role="status"
+          title={connected && online ? 'Live: connected to the server — new mail and changes appear instantly' : 'Offline or reconnecting — changes will appear once the connection is back'}
+          aria-label={connected && online ? 'Live connection' : 'Offline, reconnecting'} />
         <ScopeSwitcher />
         <NotificationBell />
       </div>

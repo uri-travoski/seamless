@@ -2,7 +2,7 @@
 
 ## List views
 
-Switch between **Split** and **Table** view with the button above the list (or in **Settings > General**). Split shows the list beside the reading pane; Table is a full-width list where clicking a row opens the message.
+Switch between **Split** and **Table** view with the button above the list (or in **Settings > Appearance**). Split shows the list beside the reading pane; Table is a full-width list where clicking a row opens the message.
 
 ## Reading a row
 

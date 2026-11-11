@@ -91,6 +91,21 @@ describe('F-07 categories + scope', () => {
     expect(await one('SELECT 1 FROM accounts WHERE id = ?', [A])).toBeTruthy();
   });
 
+  it('storage usage follows the scope and stays per user', async () => {
+    const { A, work } = await threeMailboxes();
+    await run('UPDATE messages SET size = 1000');
+    const cookie = await login(app);
+    const all = (await app.inject({ method: 'GET', url: '/api/storage/usage', headers: { cookie } })).json();
+    expect(all).toMatchObject({ bytes: 9000, messages: 9 });
+    const w = (await app.inject({ method: 'GET', url: `/api/storage/usage?scope=category:${work}`, headers: { cookie } })).json();
+    expect(w.bytes).toBe(6000);
+    const a = (await app.inject({ method: 'GET', url: `/api/storage/usage?scope=account:${A}`, headers: { cookie } })).json();
+    expect(a.bytes).toBe(3000);
+    await makeUser('b@local');
+    const b = (await app.inject({ method: 'GET', url: `/api/storage/usage?scope=account:${A}`, headers: { cookie: await login(app, 'b@local') } })).json();
+    expect(b.bytes).toBe(0);
+  });
+
   it('order is configurable and respected', async () => {
     await threeMailboxes();
     const cookie = await login(app);

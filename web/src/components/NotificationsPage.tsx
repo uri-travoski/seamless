@@ -11,6 +11,7 @@ import { useMail } from '../state/mail.ts';
 import { useNotifs } from '../state/notifications.ts';
 import { NotifRow, openNotification } from './header/NotificationBell.tsx';
 import { toast } from '../toast.ts';
+import { NO_AUTOFILL } from '../state/ui.ts';
 import { ChecksIcon, EnvelopeIcon, TrashIcon, SettingsIcon, CaretLeftIcon, CaretRightIcon } from '../icons.tsx';
 
 const DAY = 86_400_000;
@@ -132,7 +133,7 @@ export default function NotificationsPage({ params }: { params: Record<string, s
             <input type="date" className="text-input compact" value={params.to ?? ''} onChange={(e) => set({ to: e.target.value })} aria-label="To" />
           </span>
         )}
-        <input className="text-input compact grow" placeholder="Search notifications" value={text} onChange={(e) => setText(e.target.value)} />
+        <input className="text-input compact grow" type="search" name="seamless-notification-search" {...NO_AUTOFILL} placeholder="Search notifications" value={text} onChange={(e) => setText(e.target.value)} />
       </div>
       <div className="type-chips" role="group" aria-label="Types">
         {NOTIFICATION_GROUPS.map((g) => {

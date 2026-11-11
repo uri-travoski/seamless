@@ -12,6 +12,7 @@ import Image from '@tiptap/extension-image';
 import Placeholder from '@tiptap/extension-placeholder';
 import { renderTemplate, hasRecipientTokens, type ComposePayload, type ApiTemplate } from '@seamless/shared';
 import { useTemplates, fillTemplate } from '../state/templates.ts';
+import { NO_AUTOFILL } from '../state/ui.ts';
 import { useCompose, type Draft } from '../state/compose.ts';
 import AddressField from './AddressField.tsx';
 import { useMail } from '../state/mail.ts';
@@ -315,7 +316,7 @@ export default function ComposeWindow({ draft }: { draft: Draft }) {
               onMouseDown={(e) => e.preventDefault()} onClick={() => setTplOpen((v) => !v)}><TemplateIcon /></button>
             {tplOpen && (
               <div className="dropdown tpl-pop">
-                <input className="text-input compact" autoFocus placeholder="Find a template…" value={tplFilter} onChange={(e) => setTplFilter(e.target.value)} />
+                <input className="text-input compact" type="search" name="seamless-template-filter" {...NO_AUTOFILL} autoFocus placeholder="Find a template…" value={tplFilter} onChange={(e) => setTplFilter(e.target.value)} />
                 {templates.length === 0 && <div className="menu-empty">No templates yet — make one with “Save as template” or in Templates.</div>}
                 {Object.entries(templates
                   .filter((t) => `${t.name} ${t.category} ${t.shortcut ?? ''}`.toLowerCase().includes(tplFilter.toLowerCase()))

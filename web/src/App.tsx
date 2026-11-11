@@ -15,6 +15,7 @@ import ComposeDock from './components/ComposeDock.tsx';
 import GettingStarted from './components/GettingStarted.tsx';
 import AppHeader from './components/header/AppHeader.tsx';
 import ShortcutsHelp from './components/ShortcutsHelp.tsx';
+import { useUi } from './state/ui.ts';
 import { ComposeIcon } from './icons.tsx';
 
 const Settings = lazy(() => import('./components/settings/Settings.tsx'));
@@ -127,8 +128,11 @@ export default function App() {
   const appName = useSession((s) => s.settings.appName) || 'Seamless';
   const mfaEnrollRequired = useSession((s) => s.mfaEnrollRequired);
   const route = useRouter((s) => s.route);
-  const [helpOpen, setHelpOpen] = useState(false);
-  const [shortcutsOpen, setShortcutsOpen] = useState(false);
+  const helpOpen = useUi((s) => s.helpOpen);
+  const shortcutsOpen = useUi((s) => s.shortcutsOpen);
+  const setUi = useUi((s) => s.set);
+  const setHelpOpen = (v: boolean) => setUi({ helpOpen: v });
+  const setShortcutsOpen = (v: boolean) => setUi({ shortcutsOpen: v });
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const selectedId = useMail((s) => s.selectedId);
   const layout = useSession((s) => s.settings.layout);
@@ -158,7 +162,7 @@ export default function App() {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if ((e.target as HTMLElement).closest('input, textarea, select, [contenteditable]')) return;
-      if (e.key === '?' && useSession.getState().settings.shortcuts) { e.preventDefault(); setShortcutsOpen((v) => !v); }
+      if (e.key === '?' && useSession.getState().settings.shortcuts) { e.preventDefault(); useUi.getState().set({ shortcutsOpen: !useUi.getState().shortcutsOpen }); }
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
@@ -178,8 +182,7 @@ export default function App() {
 
   return (
     <div className="app">
-      <AppHeader onMenu={() => setSidebarOpen(!sidebarOpen)} onHelp={() => setHelpOpen(true)}
-        onShortcuts={() => setShortcutsOpen(true)} connected={wsConnected} />
+      <AppHeader onMenu={() => setSidebarOpen(!sidebarOpen)} connected={wsConnected} />
       <div className={`main ${isMail && layout === 'table' ? 'table-mode' : ''} ${isMail && selectedId ? 'reading' : ''} ${isMail ? '' : 'page-mode'}`}>
         <Sidebar open={sidebarOpen} onNavigate={() => setSidebarOpen(false)} onAddLabel={addLabel} />
         {sidebarOpen && <div className="sidebar-scrim mobile-only" onClick={() => setSidebarOpen(false)} />}

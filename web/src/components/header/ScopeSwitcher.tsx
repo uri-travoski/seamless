@@ -7,6 +7,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { useMail, scopeToSlug, scopeName } from '../../state/mail.ts';
 import { useRouter, navigate, type Route } from '../../router.ts';
 import { CaretDownIcon, CategoryGlyph, SettingsIcon } from '../../icons.tsx';
+import { NO_AUTOFILL } from '../../state/ui.ts';
 
 interface Row { kind: 'category' | 'mailbox'; scope: string; name: string; sub?: string; unread: number; icon?: string; color: string }
 
@@ -122,7 +123,8 @@ export default function ScopeSwitcher() {
         <>
           <div className="sheet-scrim" onClick={() => setOpen(false)} />
           <div className="dropdown switcher-pop" role="listbox" onKeyDown={onListKey}>
-            <input ref={inputRef} className="text-input switch-filter" placeholder="Type to filter…" value={filter}
+            <input ref={inputRef} type="search" name="seamless-mailbox-filter" role="searchbox" {...NO_AUTOFILL}
+              className="text-input switch-filter" placeholder="Type to filter…" value={filter}
               onChange={(e) => setFilter(e.target.value)} aria-label="Filter mailboxes" />
             <div className="switch-scroll">
               {cats.length > 0 && <div className="switch-head">Categories</div>}

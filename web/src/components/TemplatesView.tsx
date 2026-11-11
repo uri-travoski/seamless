@@ -11,6 +11,7 @@ import { TEMPLATE_PLACEHOLDERS, type ApiTemplate } from '@seamless/shared';
 import { useTemplates } from '../state/templates.ts';
 import { useCompose } from '../state/compose.ts';
 import { toast } from '../toast.ts';
+import { NO_AUTOFILL } from '../state/ui.ts';
 import { TemplateIcon, PencilIcon, TrashIcon, ComposeIcon, PlusSimpleIcon, BoldIcon, ItalicIcon, UnderlineIcon, BulletListIcon, LinkIcon } from '../icons.tsx';
 
 type Editing = Partial<ApiTemplate> & { name: string; bodyHtml: string };
@@ -115,7 +116,7 @@ export default function TemplatesView({ embedded = false }: { embedded?: boolean
       <datalist id="tpl-cats">{categories.map((c) => <option key={c} value={c} />)}</datalist>
       <div className="tpl-layout">
         <div className="tpl-list">
-          <input className="text-input compact" placeholder="Find a template…" value={filter} onChange={(e) => setFilter(e.target.value)} />
+          <input className="text-input compact" type="search" name="seamless-template-list-filter" {...NO_AUTOFILL} placeholder="Find a template…" value={filter} onChange={(e) => setFilter(e.target.value)} />
           {list.length === 0 && <div className="empty-state"><TemplateIcon size={28} /><p>No templates yet.</p><p className="dim">Write one here, or use “Save as template” in the compose window. Type its <code>;shortcut</code> in a message to drop it in.</p></div>}
           {groups.map(([cat, items]) => (
             <div key={cat}>
