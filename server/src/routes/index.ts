@@ -40,6 +40,7 @@ import { register as exportRoutes } from './export.ts';
 import { register as businesses } from './businesses.ts';
 import { register as shares } from './shares.ts';
 import { register as assignments } from './assignments.ts';
+import { register as invites } from './invites.ts';
 import { sessionToken } from '../auth/sessions.ts';
 
 export { sessionUser, type SessionUser } from './util.ts';
@@ -97,4 +98,5 @@ export function registerRoutes(app: FastifyInstance): void {
   businesses(app);
   shares(app);
   assignments(app);
+  invites(app);
 }

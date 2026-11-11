@@ -177,6 +177,30 @@ export interface ApiEmailBody {
   attachments: ApiAttachmentMeta[];
   headers: { deliveredTo: string | null; messageId: string | null; listUnsubscribe: string | null; seamlessTrack?: boolean | null };
   tracking: TrackingInfo | null;
+  invite?: ApiInvite | null; // T4 F-33: calendar invite carried by this message
+}
+
+export interface ApiInviteAttendee { name: string; email: string; partstat: string; role: string }
+export interface ApiInvite {
+  id: number;
+  uid: string;
+  sequence: number;
+  method: string;
+  summary: string;
+  startsAt: number | null;     // epoch ms (UTC)
+  endsAt: number | null;
+  allDay: boolean;
+  tz: string | null;           // organiser's zone (IANA) when it is not UTC
+  location: string;
+  url: string;
+  videoUrl: string | null;     // Meet / Zoom / Teams link found in url, location or description
+  organizer: { name: string; email: string } | null;
+  attendees: ApiInviteAttendee[];
+  status: 'active' | 'cancelled';
+  myPartstat: string | null;
+  myEmail: string | null;
+  canRsvp: boolean;
+  caldavConnected: boolean;
 }
 
 export interface EmailQueryFilter {

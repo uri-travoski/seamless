@@ -1020,6 +1020,44 @@ CREATE TABLE thread_comments (
 CREATE INDEX thread_comments_thread ON thread_comments(account_id, message_thread_id);
 `,
   },
+  {
+    id: 28,
+    sql: `
+-- T4 F-33: calendar invites (iMIP) + optional CalDAV connection
+CREATE TABLE calendar_invites (
+  id SERIAL PRIMARY KEY,
+  user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  message_id INTEGER REFERENCES messages(id) ON DELETE SET NULL,
+  uid TEXT NOT NULL,
+  sequence INTEGER NOT NULL DEFAULT 0,
+  method TEXT NOT NULL DEFAULT 'REQUEST',
+  summary TEXT NOT NULL DEFAULT '',
+  starts_at BIGINT,
+  ends_at BIGINT,
+  all_day BOOLEAN NOT NULL DEFAULT false,
+  tz TEXT,
+  location TEXT NOT NULL DEFAULT '',
+  url TEXT NOT NULL DEFAULT '',
+  organizer JSONB,
+  attendees JSONB NOT NULL DEFAULT '[]',
+  status TEXT NOT NULL DEFAULT 'active' CHECK (status IN ('active','cancelled')),
+  my_partstat TEXT,
+  raw_ics TEXT NOT NULL,
+  created_at BIGINT NOT NULL,
+  UNIQUE (user_id, uid)
+);
+CREATE INDEX calendar_invites_message ON calendar_invites(message_id);
+CREATE TABLE calendar_connections (
+  id SERIAL PRIMARY KEY,
+  user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  url TEXT NOT NULL,
+  username TEXT NOT NULL,
+  password_enc TEXT NOT NULL,
+  created_at BIGINT NOT NULL,
+  UNIQUE (user_id)
+);
+`,
+  },
 ];
 
 /** Run `fn` in one transaction. Events emitted through the client are only turned into

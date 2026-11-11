@@ -1369,3 +1369,14 @@ mark[data-ai-pending], mark[data-unknown-var] { outline: 1px dashed var(--md-bor
 .assignee-avatar { display: inline-flex; align-items: center; justify-content: center; width: 20px; height: 20px; border-radius: 50%; background: var(--md-blue); color: var(--md-surface); font-size: 10px; font-weight: 700; }
 .status-pill { font-size: 10.5px; padding: 1px 6px; border-radius: 8px; border: 1px solid var(--md-border-strong); color: var(--md-text-soft); }
 .status-pill.done { background: var(--md-hover); }
+
+/* calendar invite card (T4 F-33) */
+.invite-card { margin: 8px 0; padding: 12px 14px; background: var(--md-surface); border: 1px solid var(--md-border); border-left: 3px solid var(--color-accent); border-radius: var(--md-radius-sm); display: flex; flex-direction: column; gap: 4px; }
+.invite-card.cancelled { border-left-color: var(--color-danger); opacity: 0.8; }
+.invite-card.cancelled .invite-title { text-decoration: line-through; }
+.invite-title { font-weight: 600; font-size: 15px; color: var(--md-text); display: flex; align-items: center; gap: 8px; }
+.invite-badge { font-size: 11px; font-weight: 600; color: var(--color-danger); text-decoration: none; display: inline-block; }
+.invite-row { font-size: 13px; color: var(--md-text); }
+.invite-faint { color: var(--md-text-faint); font-size: 12.5px; }
+.invite-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-top: 6px; }
+.invite-note { flex: 1 1 180px; min-width: 120px; padding: 5px 8px; border: 1px solid var(--md-border); border-radius: var(--md-radius-sm); background: var(--md-bg); color: var(--md-text); font-size: 12.5px; }

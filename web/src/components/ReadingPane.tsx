@@ -22,6 +22,7 @@ import {
 } from '../icons.tsx';
 import { IconContext } from '@phosphor-icons/react';
 import SharedThread from './SharedThread.tsx';
+import InviteCard from './InviteCard.tsx';
 
 function fmtSize(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;
@@ -442,6 +443,7 @@ function MessageCard({ email, expanded, onToggle }: { email: ApiEmail; expanded:
               <button className="btn" onClick={loadRemote}>Load images</button>
             </div>
           )}
+          {body?.invite && <InviteCard invite={body.invite} onChange={(invite) => setBody({ ...body, invite })} />}
           <div className="msg-body">
             {!body && <div style={{ color: 'var(--md-text-faint)', fontSize: 13 }}>Loading…</div>}
             {body && (body.html

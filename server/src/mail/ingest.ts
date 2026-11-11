@@ -10,6 +10,7 @@ import { resolvePendingFollowup } from './followups.ts';
 import { assessAndStore } from './risk.ts';
 import { recordBounce } from './dsn.ts';
 import { applyOnIngest } from './disposable.ts';
+import { ingestInvites } from './invites.ts';
 import { evaluateFilters, loadFilters, type FilterableMessage } from './filters.ts';
 
 export function addressList(obj: AddressObject | AddressObject[] | undefined): ApiAddress[] {
@@ -167,6 +168,7 @@ export async function ingestMessage(args: IngestArgs): Promise<IngestResult | nu
     await applyLocalFilterActions(rowId, filterActions);
   }
 
+  await ingestInvites(userId, args.accountId, rowId, parsed);
   await assessAndStore(userId, rowId, parsed, mailbox.role).catch((err) => console.error('[risk] assess failed:', err?.message ?? err));  // never breaks ingest
   if (isInboxLive) await recordBounce(userId, parsed).catch((err) => console.error('[dsn] bounce handling failed:', err?.message ?? err));
   if (mailbox.role === 'sent') await resolvePendingFollowup(userId, rowId, messageId, threadId).catch(() => {});

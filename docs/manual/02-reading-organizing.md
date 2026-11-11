@@ -103,3 +103,14 @@ Press **?** for the full list (turn them off there or in Settings > General): **
 
 ## Shared mailboxes
 Mailboxes shared with you appear under **Shared** in the switcher — see [Shared mailboxes](19-shared-inbox.md).
+
+## Calendar invites
+
+When an email carries a calendar invitation (a `text/calendar` part or `.ics` attachment), a card appears at the top of the message: title, time, location or video link (Google Meet, Zoom and Teams links are detected), organiser and attendees.
+
+- **Times** are shown in your zone (Australia/Perth by default). If the organiser's zone is different, theirs is shown next to it, e.g. an `America/New_York` 9:00 am meeting shows as 9:00 pm Perth time.
+- **Accept / Maybe / Decline** sends a standard reply (an iMIP `METHOD:REPLY`) to the organiser from the address you were invited on, with an optional note. The card then shows what you answered.
+- A later update to the same event (same UID, same or higher sequence) refreshes the card; a cancellation marks it **Cancelled** and turns off the reply buttons.
+- **Download .ics** is always available.
+- **CalDAV (optional):** connect a calendar with `PUT /api/calendar-connection {url, username, password}` (password stored encrypted). The card then offers **Add to calendar**, which saves the event to `<calendar-url>/<uid>.ics`. There is no settings screen for this yet, and conflict checking against your calendar is not built.
+- On a shared mailbox, viewers can see the card but only responders and managers can reply.

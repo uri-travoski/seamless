@@ -7,6 +7,7 @@ import { config } from '../config.ts';
 import { getMsgRow, getNote } from './store.ts';
 import { attachmentMeta } from './ingest.ts';
 import { roleFor } from '../auth/access.ts';
+import { inviteForMessage } from './invites.ts';
 
 async function canReadAccount(userId: number, rowId: number): Promise<boolean> {
   const m = await one<{ account_id: number }>('SELECT account_id FROM messages WHERE id = ?', [rowId]);
@@ -133,5 +134,6 @@ export async function getEmailBody(userId: number, emailId: string, allowRemote:
       seamlessTrack: parsed.headers.has('x-seamless-track') ? String(parsed.headers.get('x-seamless-track')) === '1' : null,
     },
     tracking,
+    invite: await inviteForMessage(userId, row.id, row.account_id),
   };
 }
