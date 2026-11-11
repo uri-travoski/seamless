@@ -106,7 +106,7 @@ export function register(app: FastifyInstance): void {
     let active = true;
     if (i.role === 'mail' && (await mailObjectCount()) > 0) {
       active = false;
-      note = 'Saved but not switched on: you already have mail stored elsewhere. Use “Move to another bucket” on this page to move your mail there.';
+      note = 'Saved but not switched on: you already have mail stored elsewhere. Use “Move to another bucket” (a verified migration) on this page to move your mail there.';
     }
     const id = await insertTarget({ ...i, accessKey: i.accessKey, secretKey: i.secretKey }, active, test);
     const row = (await getTarget(id))!;
