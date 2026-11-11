@@ -1159,3 +1159,19 @@ kbd { font-family: var(--font-mono); font-size: 11.5px; padding: 1px 6px; border
 .risk-flag { display: inline-flex; align-items: center; }
 .plain-table { border-collapse: collapse; font-size: 13px; }
 .plain-table th, .plain-table td { text-align: left; padding: 6px 14px 6px 0; border-bottom: 1px solid var(--md-border); }
+
+/* health (T2 F-21) */
+.health-dot { display: inline-block; width: 11px; height: 11px; border-radius: 50%; vertical-align: middle; background: var(--color-success); }
+.health-dot.warn { background: var(--color-warning); }
+.health-dot.red { background: var(--color-danger); }
+.health-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); gap: 14px; margin-top: 14px; }
+.health-card { border: 1px solid var(--md-border); border-left-width: 4px; border-radius: var(--radius-md); padding: 4px 16px 14px; background: var(--md-surface); }
+.health-card { border-left-color: var(--color-success); }
+.health-card.warn { border-left-color: var(--color-warning); }
+.health-card.red { border-left-color: var(--color-danger); }
+.health-card h3 { display: flex; align-items: center; gap: 8px; margin: 12px 0 8px; }
+.health-row { display: flex; align-items: center; gap: 10px; padding: 7px 0; border-top: 1px solid var(--md-border); }
+.health-row:first-of-type { border-top: none; }
+.health-list { margin: 0 0 8px 18px; padding: 0; }
+.health-note { font-size: 12.5px; color: var(--md-text-soft); word-break: break-word; }
+.health-note.red { color: var(--color-danger); font-weight: 600; }

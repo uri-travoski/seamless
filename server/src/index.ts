@@ -16,6 +16,7 @@ import { initPush } from './push.ts';
 import { categorizeEmail } from './ai/tasks.ts';
 import { startScheduler, onScheduledSend } from './mail/scheduler.ts';
 import { startJobRunner } from './jobs/runner.ts';
+import { startHealthAlerts, shouldAlert } from './health/alerts.ts';
 import { wakeOnReply } from './mail/snooze.ts';
 import { settleOnReply } from './mail/followups.ts';
 import { setScheduleCanceller } from './mail/store.ts';
@@ -98,7 +99,10 @@ syncManager.on('newMail', (ev: NewMailEvent) => {
 });
 
 syncManager.on('syncFailed', (ev: { accountId: number; userId: number; email: string; error: string }) => {
-  void emitEvent(ev.userId, 'sync.failed', { type: 'account', id: ev.accountId }, ev).catch(() => {});
+  // a mailbox that stays broken would otherwise re-alert on every reconnect cycle: once per 6 hours
+  void shouldAlert('sync.failed', ev.accountId, Date.now())
+    .then(async (ok) => { if (ok) await emitEvent(ev.userId, 'sync.failed', { type: 'account', id: ev.accountId }, ev); })
+    .catch(() => {});
 });
 
 // where the mail blobs live: a bucket named in the environment wins, otherwise use the one
@@ -119,6 +123,7 @@ setScheduleCanceller((messageId) => cancelScheduleByMessageId(messageId));
 onScheduledSend(async () => broadcast({ type: 'stateChange', state: await currentState() }));
 startScheduler();
 startJobRunner();
+startHealthAlerts();
 
 // classification + retention workers
 onClassified(async (userId) => broadcast({ type: 'stateChange', state: await currentState() }, userId));

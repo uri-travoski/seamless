@@ -135,6 +135,7 @@ export {
   ClockClockwise as SnoozeIcon,
   Hourglass as WaitingIcon,
   Alarm as AlarmIcon,
+  Heartbeat as HealthIcon,
   CloudArrowUp as CloudIcon,
   Key as KeyIcon,
   Envelope as MailboxIcon,

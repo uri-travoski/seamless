@@ -30,6 +30,7 @@ import { register as prefs } from './prefs.ts';
 import { register as snooze } from './snooze.ts';
 import { register as followups } from './followups.ts';
 import { register as risk } from './risk.ts';
+import { register as health } from './health.ts';
 import { sessionToken } from '../auth/sessions.ts';
 
 export { sessionUser, type SessionUser } from './util.ts';
@@ -77,4 +78,5 @@ export function registerRoutes(app: FastifyInstance): void {
   snooze(app);
   followups(app);
   risk(app);
+  health(app);
 }
