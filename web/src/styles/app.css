@@ -640,9 +640,20 @@ svg { flex: 0 0 auto; vertical-align: middle; }
 .toast.error { background: var(--md-danger); }
 @keyframes toast-in { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
 
-.login-wrap { height: 100%; display: flex; align-items: center; justify-content: center; background: var(--color-login-bg); }
-.login-card { background: var(--md-surface); border-radius: 14px; box-shadow: var(--md-shadow-heavy); padding: 34px 38px; width: 380px; }
-.login-card .brand { display: flex; align-items: center; gap: 10px; font-size: 21px; font-weight: 800; margin-bottom: 18px; }
+.login-wrap { height: 100%; display: flex; align-items: center; justify-content: center; background: #243959; }
+.login-card { background: var(--md-surface); border-radius: 14px; box-shadow: var(--md-shadow-heavy); padding: 34px 38px; width: 380px;
+  zoom: 1.05; /* boxes, buttons and text 5% larger */
+  /* text 20% darker */
+  --md-text: color-mix(in srgb, var(--color-text) 80%, #000);
+  --md-text-soft: color-mix(in srgb, var(--color-text-soft) 80%, #000);
+  color: var(--md-text); }
+.login-card .brand { display: flex; align-items: center; justify-content: center; gap: 10px; color: #243959; font-size: 21px; font-weight: 800; margin-bottom: 18px; }
+.login-card > :not(.brand) { zoom: 1.05; } /* text, form items and buttons a further 5% larger; app icon + name excluded */
+.login-card .field { margin-bottom: 16px; } /* ~5% of the card height between fields and above the button */
+.login-card .text-input { padding-top: 7.85px; padding-bottom: 7.85px; }   /* boxes 5% taller */
+.login-card .btn.primary { padding-top: 9.85px !important; padding-bottom: 9.85px !important; font-size: 13.65px; }  /* button 5% taller, label 5% larger */
+.login-card > p { font-size: 13.65px !important; }   /* "Please Sign In." 5% larger */
+.login-card .brand { margin-bottom: 23px; }   /* +5px under the app name */
 .login-card .brand img { width: 34px; }
 .login-err { color: var(--md-danger); font-size: 13px; margin-top: 8px; min-height: 18px; }
 

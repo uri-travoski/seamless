@@ -132,12 +132,11 @@ export default function Login() {
           </>
         ) : (<>
         <p style={{ color: 'var(--md-text-soft)', fontSize: 13, marginTop: 0 }}>
-          {isSetup ? 'First run — create the admin account for this instance.' : 'Sign in to open your mail.'}
+          {isSetup ? 'First run — create the admin account for this instance.' : 'Please Sign In.'}
         </p>
         <div className="field">
-          <label>Email</label>
           <input
-            className="text-input" type="email" value={email} autoFocus
+            className="text-input" type="email" value={email} autoFocus placeholder="Email" aria-label="Email" 
             onChange={(e) => setEmail(e.target.value)}
             onKeyDown={(e) => e.key === 'Enter' && !isSetup && canSubmit && submit()}
           />
@@ -152,9 +151,8 @@ export default function Login() {
           </div>
         )}
         <div className="field">
-          <label>Password</label>
           <input
-            className="text-input" type="password" value={password}
+            className="text-input" type="password" value={password} placeholder="Password" aria-label="Password" 
             onChange={(e) => setPassword(e.target.value)}
             onKeyDown={(e) => e.key === 'Enter' && !isSetup && canSubmit && submit()}
           />
