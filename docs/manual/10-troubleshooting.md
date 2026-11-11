@@ -10,7 +10,7 @@
 ## New mail is not showing up
 
 - Check the connection indicator says **Live**. If it says Offline, the connection is reconnecting.
-- Click **refresh** (circular arrows, bottom of the sidebar) to check all mailboxes now.
+- Click **refresh** (single circular arrow, like Gmail's, bottom of the sidebar) to check all mailboxes now.
 - Check the dot in the top bar: green means the browser is connected live; amber means it is reconnecting.
 - Confirm the account is enabled under Settings > Mailboxes (its card shows a status pill — OK, Syncing, Error or Paused — and the last error).
 

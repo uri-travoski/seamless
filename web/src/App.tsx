@@ -15,6 +15,7 @@ import ComposeDock from './components/ComposeDock.tsx';
 import GettingStarted from './components/GettingStarted.tsx';
 import AppHeader from './components/header/AppHeader.tsx';
 import ShortcutsHelp from './components/ShortcutsHelp.tsx';
+import { SnoozePopup } from './components/SnoozeMenu.tsx';
 import { useUi } from './state/ui.ts';
 import { ComposeIcon } from './icons.tsx';
 
@@ -200,6 +201,7 @@ export default function App() {
       <ComposeDock />
       <GettingStarted openSettings={(tab) => navigate({ page: 'settings', tab: tab === 'accounts' ? 'mailboxes' : tab })} openHelp={() => setHelpOpen(true)} />
       {helpOpen && <Suspense fallback={null}><HelpModal onClose={() => setHelpOpen(false)} /></Suspense>}
+      <SnoozePopup />
       {shortcutsOpen && <ShortcutsHelp onClose={() => setShortcutsOpen(false)} />}
       <div className="toast-wrap" role="status" aria-live="polite">
         {toasts.map((t) => (

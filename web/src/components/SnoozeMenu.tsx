@@ -67,7 +67,7 @@ export function SnoozePopup() {
   const left = Math.max(8, Math.min(target.x, window.innerWidth - 260));
   const top = Math.max(8, Math.min(target.y, window.innerHeight - 340));
   return (
-    <div ref={ref} className="dropdown snooze-pop" role="menu" style={{ position: 'fixed', left, top }}>
+    <div ref={ref} className="dropdown snooze-pop" role="menu" style={{ position: 'fixed', left, top, right: 'auto', width: 260 }}>
       <SnoozeList onPick={(at) => { close(); void actions.snooze(target.id, at); }} />
     </div>
   );

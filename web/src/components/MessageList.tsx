@@ -14,7 +14,7 @@ import {
 } from '../icons.tsx';
 import { useSession } from '../state/session.ts';
 import { useUi } from '../state/ui.ts';
-import SnoozeButton, { SnoozePopup } from './SnoozeMenu.tsx';
+import SnoozeButton from './SnoozeMenu.tsx';
 import { fmtSnoozeLong } from '../snoozeTimes.ts';
 import { DENSITY } from '../theme/registry.ts';
 
@@ -401,7 +401,6 @@ export default function MessageList() {
         </div>
       </div>
       {menu && <ContextMenu email={menu.email} pos={menu.pos} onClose={() => setMenu(null)} />}
-      <SnoozePopup />
     </section>
   );
 }

@@ -15,7 +15,7 @@ import { useSession, DEFAULT_SIDEBAR, SIDEBAR_FOLDERS } from '../state/session.t
 import { useRouter, navigate, FOLDER_ROLE, FOLDER_TITLE } from '../router.ts';
 import {
   InboxIcon, DraftsIcon, SentIcon, ScheduledIcon, ArchiveIcon, JunkIcon, TrashIcon, FolderIcon, ComposeIcon,
-  CaretDownIcon, CaretRightIcon, StarIcon, ReviewIcon, RefreshIcon, TemplateIcon, MailLogo, SidebarCollapseIcon, SettingsIcon, SnoozeIcon, WaitingIcon,
+  CaretDownIcon, CaretRightIcon, StarIcon, ReviewIcon, RedoIcon, TemplateIcon, MailLogo, SidebarCollapseIcon, SettingsIcon, SnoozeIcon, WaitingIcon,
 } from '../icons.tsx';
 import { IconContext } from '@phosphor-icons/react';
 import { api } from '../api/client.ts';
@@ -137,16 +137,7 @@ export default function Sidebar({ open, onNavigate, onAddLabel }: { open: boolea
       .then((u) => { if (alive) setUsage(u); }).catch(() => {});
     return () => { alive = false; };
   }, [scope, overview]);   // overview refreshes after every sync/state change
-  const sizeLabel = (() => {
-    if (!usage) return '';
-    const size = formatBytes(usage.bytes);
-    if (scope.startsWith('account:')) return `Mailbox size ${size}`;
-    if (scope.startsWith('category:')) {
-      const c = overview?.categories.find((x) => `category:${x.id}` === scope);
-      return `Category (${c?.name ?? '…'}) size ${size}`;
-    }
-    return `All mailboxes size ${size}`;
-  })();
+  const sizeLabel = usage ? formatBytes(usage.bytes).replace(' ', '') : '';
   const sizeTitle = (() => {
     if (!usage) return '';
     const mb = scope.startsWith('account:') ? overview?.mailboxes.find((m) => `account:${m.id}` === scope) : null;
@@ -206,7 +197,7 @@ export default function Sidebar({ open, onNavigate, onAddLabel }: { open: boolea
           onClick={() => { navigate({ page: 'settings', tab: 'general' }); onNavigate(); }}><SettingsIcon size={17} weight="regular" /></button>
         <span className="side-size" title={sizeTitle}>{sizeLabel}</span>
         <button className={`icon-btn refresh-btn ${fetching ? 'busy' : ''}`} title="Check all mailboxes for new mail"
-          aria-label="Check all mailboxes for new mail" disabled={fetching} onClick={fetchAll}><RefreshIcon size={17} weight="regular" /></button>
+          aria-label="Check all mailboxes for new mail" disabled={fetching} onClick={fetchAll}><RedoIcon size={17} weight="bold" /></button>
         <button className="icon-btn desktop-only" title={settings.sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
           aria-label={settings.sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
           onClick={() => saveSettings({ sidebarCollapsed: !settings.sidebarCollapsed })}><SidebarCollapseIcon size={17} weight="regular" /></button>
