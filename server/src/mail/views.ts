@@ -108,6 +108,7 @@ export async function viewCounts(userId: number, now = Date.now()): Promise<Reco
 
 // ---- suggestions (offered once; dismissible) ----
 const SUGGESTIONS: ApiViewSuggestion[] = [
+  { key: 'vips', name: 'VIPs', icon: 'star', query: 'is:vip' },
   { key: 'waiting', name: 'Waiting for reply', icon: 'hourglass', query: 'is:waiting' },
   { key: 'invoices', name: 'Unpaid invoices', icon: 'receipt', query: 'label:Invoices is:unread' },
   { key: 'risk', name: 'High risk', icon: 'warning', query: 'risk:high' },

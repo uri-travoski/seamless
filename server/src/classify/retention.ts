@@ -28,6 +28,8 @@ export async function sweepRetention(now = Date.now()): Promise<{ trashed: numbe
       FROM messages m JOIN mailboxes mb ON mb.id = m.mailbox_id
       WHERE m.user_id = ? AND m.disposition = 'delete' AND m.delete_at IS NOT NULL AND m.delete_at < ?
         AND m.user_touched = false
+        AND NOT EXISTS (SELECT 1 FROM vip_senders v WHERE v.user_id = m.user_id AND (
+          (v.kind = 'address' AND lower(v.value) = lower(m.from_addr)) OR (v.kind = 'domain' AND lower(split_part(m.from_addr, '@', 2)) = lower(v.value))))
         AND NOT (m.delete_if_unread AND m.opened_at IS NOT NULL)  -- "delete only if I never read it"
         AND (mb.role IS NULL OR mb.role IN ('inbox','archive'))
         AND NOT EXISTS (

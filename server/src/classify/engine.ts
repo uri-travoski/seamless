@@ -5,6 +5,7 @@ import { getUserSetting, plog } from './settings.ts';
 import { getTaskProvider } from '../ai/client.ts';
 import { embedText, embeddingInput, embeddingMatch, upsertVector, llmClassify, recordEmbeddingDecision, matchTeachNote } from './ai.ts';
 import { enqueueOp } from '../imap/sync.ts';
+import { isVipMessage } from '../mail/vip.ts';
 
 const TICK_MS = 20_000;
 const BATCH = 200;
@@ -32,6 +33,11 @@ export async function recomputeDisposition(rowId: number): Promise<void> {
 
   if (msg.user_touched) {
     await run("UPDATE messages SET disposition = 'keep', delete_at = NULL, keep_reason = 'user touched' WHERE id = ?", [rowId]);
+    return;
+  }
+  // VIP senders: labels/AI may still label, but nothing may schedule removal from the Inbox
+  if (await isVipMessage(rowId)) {
+    await run("UPDATE messages SET disposition = 'keep', delete_at = NULL, keep_reason = 'VIP sender' WHERE id = ?", [rowId]);
     return;
   }
   const keeper = labels.find((l) => l.protected || l.keep_default);
@@ -78,7 +84,8 @@ async function markRead(row: PendingRow): Promise<void> {
 }
 
 /** Trust order for retention: protected/keep labels > processor note > AI verdict > label countdown. */
-async function applyVerdictRetention(row: PendingRow, v: AiVerdict): Promise<void> {
+export async function applyVerdictRetention(row: PendingRow, v: AiVerdict): Promise<void> {
+  if (await isVipMessage(row.id)) return; // VIP: the verdict may label, never schedule removal
   const cur = await one<{ disposition: string; keep_reason: string | null }>(
     'SELECT disposition, keep_reason FROM messages WHERE id = ?', [row.id]);
   if (!cur) return;
@@ -253,8 +260,9 @@ export async function classifyMessage(row: PendingRow, rules: RuleRow[]): Promis
   // ---- disposition: labels, then AI verdict, then processor-note retention (strongest) ----
   await recomputeDisposition(row.id);
   if (verdict && !needsReview) await applyVerdictRetention(row, verdict);
+  const vip = await isVipMessage(row.id);
   for (const n of notes) {
-    if (n.retention_days) {
+    if (n.retention_days && !vip) {
       await run("UPDATE messages SET disposition = 'delete', delete_at = ?, keep_reason = ?, delete_if_unread = ? WHERE id = ? AND user_touched = false",
         [row.date + n.retention_days * 86_400_000, `note: ${n.scope_value}`, n.delete_if_unread, row.id]);
     }

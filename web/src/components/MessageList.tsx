@@ -79,6 +79,10 @@ function BounceChip({ email }: { email: ApiEmail }) {
 }
 
 /** Shield on rows with a phishing / lookalike warning. */
+function VipBadge({ email }: { email: ApiEmail }) {
+  return email.vip ? <StarIcon size={14} weight="fill" className="vip-badge" aria-label="VIP sender" /> : null;
+}
+
 function RiskFlag({ email }: { email: ApiEmail }) {
   if (!email.risk) return null;
   return (
@@ -169,6 +173,7 @@ function Row({ email, selected, onMenu }: { email: ApiEmail; selected: boolean; 
           <div className="line1">
             <span className="from">{who}</span>
             <span className="meta-icons">
+              <VipBadge email={email} />
               <AssigneeChip email={email} />
               <BounceChip email={email} />
               <BounceChip email={email} />
@@ -221,6 +226,7 @@ function TableRow({ email, selected, onMenu }: { email: ApiEmail; selected: bool
         {email.preview && <span className="tbl-snippet"> — {email.preview}</span>}
       </span>
       <span className="tbl-metas">
+        <VipBadge email={email} />
         <AssigneeChip email={email} />
         <RiskFlag email={email} />
         <OpenBadge email={email} />

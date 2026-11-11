@@ -21,6 +21,49 @@ const TYPE_NAMES: Partial<Record<EventType, string>> = {
   'security.login': 'New sign-in', 'security.2fa_changed': 'Two-factor changed', 'lead.captured': 'New lead', 'view.match': 'Smart view match', 'assignment.changed': 'Assigned to you', 'comment.mention': 'Mentioned in a comment',
 };
 
+interface Vip { id: number; kind: 'address' | 'domain'; value: string }
+
+/** T4 F-35: VIP senders — never auto-archived/deleted, always notify. */
+function VipList() {
+  const [items, setItems] = useState<Vip[]>([]);
+  const [bypass, setBypass] = useState(true);
+  const [kind, setKind] = useState<'address' | 'domain'>('address');
+  const [value, setValue] = useState('');
+  const load = () => api.get<{ items: Vip[]; bypassQuiet: boolean }>('/api/vips').then((r) => { setItems(r.items); setBypass(r.bypassQuiet); }).catch(() => {});
+  useEffect(() => { void load(); }, []);
+  const add = async () => {
+    if (!value.trim()) return;
+    try { await api.post('/api/vips', { kind, value }); setValue(''); await load(); }
+    catch (err: any) { toast(err?.message ?? 'Could not add', 'error'); }
+  };
+  return (
+    <>
+      <h3>VIPs</h3>
+      <p className="settings-desc">Mail from a VIP is never archived, moved or deleted automatically, and always notifies you.</p>
+      <label className="checkbox-line">
+        <input type="checkbox" checked={bypass} onChange={(e) => { setBypass(e.target.checked); void api.put('/api/vips/settings', { bypassQuiet: e.target.checked }); }} />
+        VIP mail ignores quiet hours
+      </label>
+      <div className="row-gap">
+        <select className="text-input compact" value={kind} onChange={(e) => setKind(e.target.value as any)} aria-label="VIP type">
+          <option value="address">Address</option><option value="domain">Domain</option>
+        </select>
+        <input className="text-input" value={value} placeholder={kind === 'domain' ? 'example.com' : 'name@example.com'} aria-label="VIP sender"
+          onChange={(e) => setValue(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') void add(); }} />
+        <button className="btn" onClick={() => void add()}>Add VIP</button>
+      </div>
+      {items.length === 0 ? <p className="dim">No VIPs yet. Right-click a message and choose “Mark sender as VIP”.</p> : (
+        <ul className="plain-list">
+          {items.map((v) => (
+            <li key={v.id}><span className="name">★ {v.kind === 'domain' ? '@' : ''}{v.value}</span>{' '}
+              <button className="btn-link" onClick={() => void api.del(`/api/vips/${v.id}`).then(load)}>Remove</button></li>
+          ))}
+        </ul>
+      )}
+    </>
+  );
+}
+
 export default function NotificationSettings() {
   const overview = useMail((s) => s.overview);
   const [p, setP] = useState<Prefs | null>(null);
@@ -84,6 +127,8 @@ export default function NotificationSettings() {
         <input type="time" className="text-input compact inline" value={p.quiet.to} onChange={(e) => void persist({ ...p, quiet: { ...p.quiet, to: e.target.value } })} />
         <span className="dim">({p.quiet.tz.replace('_', ' ')} time)</span>
       </label>
+
+      <VipList />
 
       <h3>Sound</h3>
       <label className="checkbox-line">

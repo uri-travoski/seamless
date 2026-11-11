@@ -95,6 +95,26 @@ export const actions = {
     } catch (err: any) { toast(err?.message ?? 'Could not block', 'error'); }
   },
 
+  /** T4 F-35: mark / unmark the sender as a VIP (never auto-removed from the Inbox, always notifies). */
+  toggleVip: async (id: string) => {
+    const e = email(id);
+    const addr = e?.from[0]?.email?.toLowerCase();
+    if (!e || !addr) return;
+    try {
+      if (e.vip) {
+        const list = await api.get<{ items: { id: number; kind: string; value: string }[] }>('/api/vips');
+        const dom = addr.split('@')[1];
+        const hits = list.items.filter((v) => (v.kind === 'address' && v.value === addr) || (v.kind === 'domain' && v.value === dom));
+        for (const v of hits) await api.del(`/api/vips/${v.id}`);
+        toast(`${addr} is no longer a VIP`);
+      } else {
+        await api.post('/api/vips', { kind: 'address', value: addr });
+        toast(`${addr} is now a VIP`);
+      }
+      await mail().refreshCurrent();
+    } catch (err: any) { toast(err?.message ?? 'Could not update VIPs', 'error'); }
+  },
+
   /** Opens Settings → Filters with from / subject / list-id filled in. */
   createFilter: (id: string) => {
     const e = email(id);

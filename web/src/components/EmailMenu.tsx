@@ -85,6 +85,7 @@ export function EmailMenuItems({ email, close }: { email: ApiEmail; close: () =>
       {inSpam ? item('Not spam', InboxIcon, () => actions.notSpam(email.id)) : item('Report spam', JunkIcon, () => actions.spam(email.id))}
       {inBin && item('Restore to Inbox', InboxIcon, () => actions.restore(email.id))}
       {item(inBin || inSpam ? 'Delete forever' : 'Delete', TrashIcon, () => actions.trash(email.id), 'danger-item')}
+      {item(email.vip ? 'Remove sender from VIPs' : 'Mark sender as VIP', StarIcon, () => void actions.toggleVip(email.id))}
       {item('Block sender', BlockIcon, () => void actions.blockSender(email.id))}
       {item('Create filter from this…', FilterIcon, () => actions.createFilter(email.id))}
       <div className="menu-sep" />

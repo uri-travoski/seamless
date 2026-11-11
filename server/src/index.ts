@@ -21,6 +21,7 @@ import { startHealthAlerts, shouldAlert } from './health/alerts.ts';
 import { wakeOnReply } from './mail/snooze.ts';
 import { settleOnReply } from './mail/followups.ts';
 import { notifyViewMatches } from './mail/views.ts';
+import { isVipMessage } from './mail/vip.ts';
 import { setScheduleCanceller } from './mail/store.ts';
 import { cancelScheduleByMessageId } from './mail/send.ts';
 import { startClassifier, kickClassifier, onClassified } from './classify/engine.ts';
@@ -103,8 +104,8 @@ syncManager.on('newMail', (ev: NewMailEvent) => {
         { messageId: ev.rowId, accountId: ev.accountId, from: ev.from, subject: ev.subject, address: d.address, label: d.label });
       return true;
     }).catch(() => false)
-    .then(async (handled) => { if (handled) return; const risk = await one<{ level: string }>('SELECT level FROM message_risk WHERE message_id = ?', [ev.rowId]).catch(() => undefined); return emitEvent(ev.userId, 'mail.received', { type: 'message', id: ev.rowId },
-      { messageId: ev.rowId, accountId: ev.accountId, from: ev.from, subject: ev.subject, ...(risk?.level === 'high' ? { risk: 'high' } : {}) }); })
+    .then(async (handled) => { if (handled) return; const risk = await one<{ level: string }>('SELECT level FROM message_risk WHERE message_id = ?', [ev.rowId]).catch(() => undefined); const vip = await isVipMessage(ev.rowId).catch(() => false); return emitEvent(ev.userId, 'mail.received', { type: 'message', id: ev.rowId },
+      { messageId: ev.rowId, accountId: ev.accountId, from: ev.from, subject: ev.subject, ...(risk?.level === 'high' ? { risk: 'high' } : {}), ...(vip ? { vip: true } : {}) }); })
     .catch((err) => console.error('[events] mail.received failed:', err?.message ?? err));
   if (ev.aiCategorize) {
     categorizeEmail(ev.userId, ev.rowId)

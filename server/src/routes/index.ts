@@ -42,6 +42,7 @@ import { register as shares } from './shares.ts';
 import { register as assignments } from './assignments.ts';
 import { register as invites } from './invites.ts';
 import { register as views } from './views.ts';
+import { register as vips } from './vips.ts';
 import { sessionToken } from '../auth/sessions.ts';
 
 export { sessionUser, type SessionUser } from './util.ts';
@@ -101,4 +102,5 @@ export function registerRoutes(app: FastifyInstance): void {
   assignments(app);
   invites(app);
   views(app);
+  vips(app);
 }

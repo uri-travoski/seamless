@@ -496,6 +496,7 @@ svg { flex: 0 0 auto; vertical-align: middle; }
 /* private note: yellow sticky, separated from the body */
 .note-btn.has-note { color: var(--color-star); }
 .note-flag { color: var(--color-star); flex: 0 0 auto; }
+.vip-badge { color: var(--color-star); flex: 0 0 auto; }
 .note-box {
   margin: 8px 14px 4px; background: var(--color-note-bg); border: 1px solid var(--color-note-border);
   border-radius: var(--md-radius-sm); padding: 8px 12px; box-shadow: 0 1px 2px rgba(120,100,20,0.10);

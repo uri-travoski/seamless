@@ -24,3 +24,13 @@ Choose 25, 50 or 100 per page. Tick notifications to mark them read, unread, or 
 - **Sound** — a short chime when something new arrives.
 
 Push needs to be enabled once per device in **Settings > General**. "New sign-in" notifications are off by default; turn them on here if you want one every time someone signs in.
+
+## VIPs
+
+A VIP is an address (`boss@example.com`) or a whole domain (`bigclient.com`) you never want to miss.
+
+- **Mark one:** right-click a message (or the ⋯ menu) → **Mark sender as VIP**, or add it under **Settings > Notifications > VIPs**. VIP mail shows a ★ badge in the list.
+- **Never auto-removed:** the AI and your rules can still label VIP mail, but nothing archives, moves or deletes it automatically, and the retention sweep skips it. Marking a sender VIP also cancels any pending deletion on their existing mail.
+- **Always notifies:** VIP mail raises a bell notification and a push even if "New mail" is switched off. By default it also ignores quiet hours; untick **VIP mail ignores quiet hours** to hold its push like everything else. A muted mailbox stays muted.
+- Search with `is:vip`; a **VIPs** smart view is offered in the sidebar suggestions.
+

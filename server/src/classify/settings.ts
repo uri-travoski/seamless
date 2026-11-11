@@ -7,6 +7,7 @@ export const SETTING_DEFAULTS: Record<string, string> = {
   ai_conf_threshold: '0.7',
   undo_send_seconds: '10',      // T2 F-17: hold a sent message this long so it can be undone
   snooze_wake_on_reply: 'true', // T2 F-18
+  vip_bypass_quiet: 'true',     // T4 F-35: VIP mail notifies even in quiet hours
   log_retention_days: '90',     // auto-clear processing logs
 };
 

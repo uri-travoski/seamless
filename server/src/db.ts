@@ -1080,6 +1080,20 @@ CREATE TABLE saved_views (
 CREATE INDEX saved_views_user ON saved_views(user_id, sort_order);
 `,
   },
+  {
+    id: 30,
+    sql: `
+-- T4 F-35: VIP senders (the mute half of F-35 was dropped by the user)
+CREATE TABLE vip_senders (
+  id SERIAL PRIMARY KEY,
+  user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  kind TEXT NOT NULL CHECK (kind IN ('address','domain')),
+  value TEXT NOT NULL,
+  created_at BIGINT NOT NULL,
+  UNIQUE (user_id, kind, value)
+);
+`,
+  },
 ];
 
 /** Run `fn` in one transaction. Events emitted through the client are only turned into

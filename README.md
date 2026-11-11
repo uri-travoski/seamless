@@ -5,6 +5,7 @@ Self-hosted, AI-native webmail. Multi-user, unified inbox across many IMAP accou
 ## Features
 
 - **Mailbox categories + switcher** — group mailboxes into Work / Personal / Disposable (or your own) and switch Unified ⇄ category ⇄ single mailbox from the top-right; every list, count and search follows the scope.
+- **VIP senders** — mark an address or domain as VIP: ★ badge, never auto-archived/deleted by rules, AI or retention, always notifies (even in quiet hours), `is:vip` search.
 - **Notifications centre** — bell with the latest six, a filterable paginated page, per-type in-app / push settings, mailbox mutes, quiet hours. Built on an internal event bus.
 - **Undo send** — Send holds the message for a few seconds (you choose: off, 5, 10, 20 or 30) with a countdown and Undo; it is sent exactly once even if the server restarts.
 - **Snooze** — hide a conversation until later today / tomorrow / next week / a date you pick (Perth time); it returns unread at the top, or sooner if someone replies. A Snoozed view lists what's waiting.

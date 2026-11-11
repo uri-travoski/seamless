@@ -21,6 +21,7 @@ Plain words match the subject, body, and participants (full-text). Combine them 
 - `replied:yes` / `replied:no` — has been answered: marked as answered, or someone else wrote later in the same conversation.
 - `older_than:7d` / `newer_than:2w` — by age. Units: `h` hours, `d` days, `w` weeks, `m` months (30 days), `y` years (365 days), e.g. `older_than:3m`.
 - `size>5mb` / `size<100kb` — by message size (`b`, `kb`, `mb`, `gb`).
+- `is:vip` — mail from one of your VIP senders (see "VIPs" in Notifications).
 - `is:waiting` — sent mail with a live "remind me if no reply" follow-up (see "Follow-ups").
 - `is:snoozed` — mail that is snoozed right now.
 - `before:2026-07-01` and `after:2026-06-01` — date range (YYYY-MM-DD).

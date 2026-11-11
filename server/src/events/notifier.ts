@@ -7,6 +7,7 @@ import type { EventType, ApiNotificationPref } from '@seamless/shared';
 import { q, one, run } from '../db.ts';
 import { broadcast } from '../ws.ts';
 import { notifyUser } from '../push.ts';
+import { bypassQuiet } from '../mail/vip.ts';
 
 export interface EventRow {
   id: number;
@@ -105,7 +106,7 @@ export function render(ev: EventRow): Rendered {
   const accountId = typeof p.accountId === 'number' ? p.accountId : null;
   switch (ev.type) {
     case 'mail.received':
-      return { title: p.risk === 'high' ? `Possible phishing: ${displayName(String(p.from ?? '')) || 'unknown sender'}` : displayName(String(p.from ?? '')) || 'New mail', body: String(p.subject || '(no subject)'), link: p.messageId ? `/mail/msg/m${p.messageId}` : null, groupKey: null, accountId };
+      return { title: p.vip ? `★ ${displayName(String(p.from ?? '')) || 'VIP'}` : p.risk === 'high' ? `Possible phishing: ${displayName(String(p.from ?? '')) || 'unknown sender'}` : displayName(String(p.from ?? '')) || 'New mail', body: String(p.subject || '(no subject)'), link: p.messageId ? `/mail/msg/m${p.messageId}` : null, groupKey: null, accountId };
     case 'disposable.received':
       return { title: `New mail to ${p.address ?? 'a disposable address'}`, body: String(p.subject ?? ''), link: p.messageId ? `/mail/msg/m${p.messageId}` : null, groupKey: null, accountId };
     case 'disposable.leak':
@@ -160,7 +161,9 @@ export function render(ev: EventRow): Rendered {
 }
 
 export async function notifyFromEvent(ev: EventRow): Promise<number | null> {
-  const pref = await prefFor(ev.user_id, ev.type);
+  let pref = await prefFor(ev.user_id, ev.type);
+  const vip = ev.type === 'mail.received' && ev.payload?.vip === true;
+  if (vip) pref = { inApp: true, push: true }; // VIP mail always notifies
   if (!pref.inApp && !pref.push) return null;
   const r = render(ev);
   if (r.accountId !== null) {
@@ -182,7 +185,7 @@ export async function notifyFromEvent(ev: EventRow): Promise<number | null> {
     id = row?.id ?? null;
     broadcast({ type: 'notifications' }, ev.user_id);
   }
-  if (pref.push && !(await inQuietHours(ev.user_id, Date.now()))) {
+  if (pref.push && ((vip && (await bypassQuiet(ev.user_id))) || !(await inQuietHours(ev.user_id, Date.now())))) {
     void notifyUser(ev.user_id, r.title, r.body, r.groupKey ?? `${ev.type}-${ev.id}`).catch(() => {});
   }
   return id;

@@ -3,6 +3,7 @@ import { q, one, run, bumpState, currentState } from '../db.ts';
 import { parseSearch } from './searchparse.ts';
 import { enqueueOp } from '../imap/sync.ts';
 import { deleteMessageRow } from './ingest.ts';
+import { VIP_SQL, isVipSender } from './vip.ts';
 import { scopeAccountIds, categoryIdByName } from './categories.ts';
 import { accessibleAccountIds, roleFor, canSendRole, Forbidden, type AccessRole } from '../auth/access.ts';
 
@@ -117,6 +118,7 @@ export async function rowToApi(r: MsgRow, viewerId: number = r.user_id): Promise
   return {
     assignment: asg ? { accountId: asg.account_id, threadId: asg.message_thread_id, assigneeId: asg.assignee_id, assigneeName: asg.assignee_name ?? null,
       status: asg.status, dueAt: asg.due_at == null ? null : Number(asg.due_at), updatedAt: Number(asg.updated_at) } : null,
+    vip: await isVipSender(viewerId, r.from_addr),
     id: `m${r.id}`,
     threadId: r.thread_id,
     accountId: r.account_id,
@@ -303,6 +305,7 @@ export async function queryEmails(userId: number, req: EmailQueryRequest): Promi
     if (p.sizeMax !== null) { where.push('m.size < ?'); params.push(p.sizeMax); }
     if (p.waiting) { where.push(`EXISTS (SELECT 1 FROM followups fu WHERE fu.message_id = m.id AND fu.user_id = ? AND fu.status IN ('waiting','due'))`); params.push(userId); }
     if (p.snoozed) { where.push('m.snoozed_until > ?'); params.push(Date.now()); }
+    if (p.vip) { where.push(VIP_SQL); params.push(userId); }
     if (p.before !== null) { where.push('m.date < ?'); params.push(p.before); }
     if (p.after !== null) { where.push('m.date >= ?'); params.push(p.after); }
     // search excludes trash/junk unless explicitly requested

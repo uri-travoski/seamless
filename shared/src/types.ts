@@ -108,6 +108,7 @@ export interface ApiBackup {
 }
 
 export interface ApiEmail {
+  vip?: boolean; // T4 F-35: sender is one of the viewer's VIPs
   assignment?: ApiAssignment | null; // T4 F-32: only set when the thread is assigned / has a status
   id: string;              // "m<rowid>"
   threadId: string;
