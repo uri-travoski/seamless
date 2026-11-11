@@ -15,6 +15,11 @@ import { notifyFromEvent, type EventRow } from './notifier.ts';
 
 export interface EventSubject { type: string; id: string | number }
 
+/** Subscribers (T5 webhook dispatcher) run after the event is committed, once per event. Errors are swallowed. */
+type EventSubscriber = (ev: EventRow) => Promise<void>;
+const subscribers = new Set<EventSubscriber>();
+export function subscribeEvents(fn: EventSubscriber): () => void { subscribers.add(fn); return () => { subscribers.delete(fn); }; }
+
 export async function emitEvent(
   userId: number,
   type: EventType,
@@ -31,7 +36,10 @@ export async function emitEvent(
     id: Number(rows[0].id), user_id: userId, type, subject_type: subject?.type ?? null,
     subject_id: subject ? String(subject.id) : null, payload, created_at: now,
   };
-  const run = () => notifyFromEvent(ev).catch((err) => console.error('[events] notify failed:', err?.message ?? err));
+  const run = async () => {
+    await notifyFromEvent(ev).catch((err) => console.error('[events] notify failed:', err?.message ?? err));
+    for (const fn of subscribers) await fn(ev).catch((err) => console.error('[events] subscriber failed:', err?.message ?? err));
+  };
   if (client) onCommit(client, async () => { await run(); });
   else await run();
   return ev.id;

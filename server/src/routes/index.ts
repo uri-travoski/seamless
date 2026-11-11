@@ -43,13 +43,14 @@ import { register as assignments } from './assignments.ts';
 import { register as invites } from './invites.ts';
 import { register as views } from './views.ts';
 import { register as vips } from './vips.ts';
+import { register as webhooks } from './webhooks.ts';
 import { sessionToken } from '../auth/sessions.ts';
 
 export { sessionUser, type SessionUser } from './util.ts';
 
 // /api/setup/{backups,restore} are public on purpose: after a total loss the database
 // is empty, so there is no account to authenticate with. Both refuse once a user exists.
-const PUBLIC_PATHS = [/^\/t\//, /^\/api\/(login|login\/mfa|setup|me)$/, /^\/api\/import(\?.*)?$/, /^\/api\/setup\/(backups|restore|storage-test)$/, /^\/api\/ingest\/[A-Za-z0-9_-]+(\/disposed)?(\?.*)?$/, /^\/(?!api|jmap)/];
+const PUBLIC_PATHS = [/^\/t\//, /^\/api\/(login|login\/mfa|setup|me)$/, /^\/api\/import(\?.*)?$/, /^\/api\/setup\/(backups|restore|storage-test)$/, /^\/api\/ingest\/[A-Za-z0-9_-]+(\/disposed)?(\?.*)?$/, /^\/api\/hooks\/blob\/[A-Za-z0-9_.-]+(\?.*)?$/, /^\/(?!api|jmap)/];
 
 export function registerRoutes(app: FastifyInstance): void {
   app.addHook('preHandler', async (req, reply) => {
@@ -103,4 +104,5 @@ export function registerRoutes(app: FastifyInstance): void {
   invites(app);
   views(app);
   vips(app);
+  webhooks(app);
 }

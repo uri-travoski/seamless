@@ -1094,6 +1094,45 @@ CREATE TABLE vip_senders (
 );
 `,
   },
+  {
+    id: 31,
+    sql: `
+-- T5 F-36: outgoing webhooks
+CREATE TABLE webhooks (
+  id SERIAL PRIMARY KEY,
+  user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  name TEXT NOT NULL,
+  url TEXT NOT NULL,
+  secret_enc TEXT NOT NULL,
+  event_types TEXT[] NOT NULL,
+  filter_query TEXT,
+  include TEXT NOT NULL DEFAULT 'metadata' CHECK (include IN ('metadata','body','attachments','raw')),
+  active BOOLEAN NOT NULL DEFAULT true,
+  created_at BIGINT NOT NULL
+);
+CREATE INDEX webhooks_user ON webhooks(user_id);
+CREATE TABLE webhook_deliveries (
+  id BIGSERIAL PRIMARY KEY,
+  webhook_id INTEGER NOT NULL REFERENCES webhooks(id) ON DELETE CASCADE,
+  event_id BIGINT NOT NULL REFERENCES events(id) ON DELETE CASCADE,
+  status TEXT NOT NULL,
+  http_status INTEGER,
+  attempts INTEGER NOT NULL DEFAULT 0,
+  next_attempt_at BIGINT,
+  last_error TEXT,
+  request_body TEXT,
+  response_snippet TEXT,
+  created_at BIGINT NOT NULL
+);
+CREATE INDEX webhook_deliveries_hook ON webhook_deliveries(webhook_id, id DESC);
+CREATE TABLE webhook_allowlist (
+  id SERIAL PRIMARY KEY,
+  cidr_or_host TEXT NOT NULL UNIQUE,
+  created_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
+  created_at BIGINT NOT NULL
+);
+`,
+  },
 ];
 
 /** Run `fn` in one transaction. Events emitted through the client are only turned into

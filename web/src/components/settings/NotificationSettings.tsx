@@ -18,7 +18,7 @@ const TYPE_NAMES: Partial<Record<EventType, string>> = {
   'reminder.due': 'Reminders', 'followup.due': 'Follow-ups due', 'snooze.woke': 'Snoozed mail is back',
   'send.failed': 'A message couldn’t be sent', 'mail.bounced': 'Bounces', 'sync.failed': 'A mailbox can’t sync', 'oauth.expiring': 'Sign-in expiring',
   'job.failed': 'A background task failed', 'storage.unreachable': 'Mail storage unreachable', 'backup.failed': 'Backup failed', 'backup.ok': 'Backup completed', 'storage.migration.done': 'Storage move finished', 'storage.migration.failed': 'Storage move failed',
-  'security.login': 'New sign-in', 'security.2fa_changed': 'Two-factor changed', 'lead.captured': 'New lead', 'view.match': 'Smart view match', 'assignment.changed': 'Assigned to you', 'comment.mention': 'Mentioned in a comment',
+  'security.login': 'New sign-in', 'security.2fa_changed': 'Two-factor changed', 'lead.captured': 'New lead', 'view.match': 'Smart view match', 'assignment.changed': 'Assigned to you', 'comment.mention': 'Mentioned in a comment', 'webhook.failed': 'A webhook gave up',
 };
 
 interface Vip { id: number; kind: 'address' | 'domain'; value: string }

@@ -16,6 +16,8 @@ async function canReadAccount(userId: number, rowId: number): Promise<boolean> {
 
 // small LRU for parsed messages (body views + attachment downloads)
 const cache = new Map<number, ParsedMail>();
+/** Tests restart row ids between cases, so they must drop parsed mail. */
+export function clearParsedCache(): void { cache.clear(); }
 const CACHE_MAX = 40;
 
 /** Parse a message's raw source from S3. Pass userId to enforce ownership (routes); omit for server-internal use. */

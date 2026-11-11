@@ -47,6 +47,7 @@ export const DEFAULT_PREFS: Record<EventType, { inApp: boolean; push: boolean }>
   'comment.mention': { inApp: true, push: true },
   'security.login': { inApp: false, push: false },     // opt-in: one per sign-in is noisy
   'security.2fa_changed': { inApp: true, push: false },
+  'webhook.failed': { inApp: true, push: false },
 };
 
 export const ALL_EVENT_TYPES = Object.keys(DEFAULT_PREFS) as EventType[];
@@ -151,6 +152,8 @@ export function render(ev: EventRow): Rendered {
       return { title: `New in ${quote(p.viewName)}`, body: [p.from ? displayName(String(p.from)) : '', p.subject || '(no subject)'].filter(Boolean).join(': '), link: p.messageId ? `/mail/msg/m${p.messageId}` : null, groupKey: null, accountId };
     case 'comment.mention':
       return { title: `${p.by ?? 'Someone'} mentioned you`, body: `${p.subject ? quote(p.subject) + ': ' : ''}${p.excerpt ?? ''}`, link: p.messageId ? `/mail/msg/m${p.messageId}` : null, groupKey: null, accountId };
+    case 'webhook.failed':
+      return { title: `Webhook "${String(p.name ?? 'webhook').slice(0, 60)}" is failing`, body: `Gave up delivering ${p.eventType ?? 'an event'}: ${String(p.error ?? '').slice(0, 200)}`, link: '/settings/integrations', groupKey: `webhook:${p.webhookId}`, accountId: null };
     case 'reminder.due':
     case 'followup.due':
     case 'snooze.woke':

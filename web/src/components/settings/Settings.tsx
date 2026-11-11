@@ -20,6 +20,7 @@ import SendingSettings from './SendingSettings.tsx';
 import DisposableSettings from './DisposableSettings.tsx';
 import BusinessSettings from './BusinessSettings.tsx';
 import ContactsSettings from './ContactsSettings.tsx';
+import IntegrationsSettings from './IntegrationsSettings.tsx';
 import TemplatesView from '../TemplatesView.tsx';
 import { useSession } from '../../state/session.ts';
 import { useMail, scopeToSlug } from '../../state/mail.ts';
@@ -45,6 +46,7 @@ const TABS: { id: string; name: string; Icon: ComponentType<{ className?: string
   { id: 'automation', name: 'Import & Retention', Icon: ImportIcon, C: AutomationSettings },
   { id: 'filters', name: 'Filters', Icon: FilterIcon, C: FilterSettings },
   { id: 'ai', name: 'AI', Icon: SparkleIcon, C: AiSettings },
+  { id: 'integrations', name: 'Integrations', Icon: CloudIcon, C: IntegrationsSettings },
   { id: 'contacts', name: 'Contacts', Icon: ContactsIcon, C: ContactsSettings },
   { id: 'devices', name: 'Devices', Icon: DevicesIcon, C: DevicesSettings },
   { id: 'health', name: 'Health', Icon: HealthIcon, C: HealthSettings },
