@@ -71,6 +71,12 @@ function OpenBadge({ email }: { email: ApiEmail }) {
   return null;
 }
 
+/** Red chip on a sent message whose delivery failed (T3 F-22). */
+function BounceChip({ email }: { email: ApiEmail }) {
+  if (!email.bounced?.length) return null;
+  return <span className="bounce-chip" title={email.bounced.map((b) => `${b.recipient}: ${b.diagnostic || b.status}`).join('\n')}>Bounced</span>;
+}
+
 /** Shield on rows with a phishing / lookalike warning. */
 function RiskFlag({ email }: { email: ApiEmail }) {
   if (!email.risk) return null;
@@ -162,7 +168,9 @@ function Row({ email, selected, onMenu }: { email: ApiEmail; selected: boolean; 
           <div className="line1">
             <span className="from">{who}</span>
             <span className="meta-icons">
-              <RiskFlag email={email} />
+              <BounceChip email={email} />
+              <BounceChip email={email} />
+        <RiskFlag email={email} />
               <OpenBadge email={email} />
               {email.hasNote && <NoteIcon size={18} weight="fill" className="note-flag" aria-label="Has a private note" />}
               {email.hasAttachment && <AttachClipIcon size={14} aria-label="Has attachment" />}

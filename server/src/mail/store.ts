@@ -104,6 +104,7 @@ export async function rowToApi(r: MsgRow): Promise<ApiEmail> {
   const risk = await one<{ level: string; reasons: any }>('SELECT level, reasons FROM message_risk WHERE message_id = ?', [r.id]);
   const fu = await one<{ id: number; due_at: number; status: string }>(
     `SELECT id, due_at, status FROM followups WHERE message_id = ? AND user_id = ? AND status IN ('waiting','due') ORDER BY id DESC LIMIT 1`, [r.id, r.user_id]);
+  const bounces = await q<{ recipient: string; status: string; diagnostic: string }>('SELECT recipient, status, diagnostic FROM bounces WHERE message_id = ? AND user_id = ? ORDER BY id', [r.id, r.user_id]);
   return {
     id: `m${r.id}`,
     threadId: r.thread_id,
@@ -141,6 +142,7 @@ export async function rowToApi(r: MsgRow): Promise<ApiEmail> {
     risk: risk && risk.level !== 'none' ? { level: risk.level as 'medium' | 'high', reasons: risk.reasons } : null,
     followupId: fu?.id ?? null,
     followupDueAt: fu ? new Date(Number(fu.due_at)).toISOString() : null,
+    bounced: bounces.length ? bounces : null,
     followupStatus: fu ? (fu.status as 'waiting' | 'due') : null,
     snoozedUntil: r.snoozed_until && r.snoozed_until > Date.now() ? new Date(Number(r.snoozed_until)).toISOString() : null,
   };

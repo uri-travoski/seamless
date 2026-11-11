@@ -36,6 +36,29 @@ By default a mailbox sends through its own SMTP server. Under **Settings > Sendi
 - Cloudflare Email Sending is not offered as an API provider yet; use its SMTP details with the *SMTP relay* type.
 - The daily limit field is stored for later; it is not enforced yet.
 
+## Bounces
+
+When a message you sent can't be delivered, the receiving server mails back a *delivery failure report*. Seamless recognises these (standard reports as well as the Postfix and Gmail styles), matches them to the message in your Sent folder, and:
+
+- shows a red **Bounced** chip on that message in the list,
+- shows a **Not delivered** banner in the reading pane with the address and the server's reason (for example "550 5.1.1 User unknown"),
+- sends you a notification (turn it on or off under Settings > Notifications > Bounces).
+
+Only permanent failures count; "delayed" notices are ignored. The report itself stays in your Inbox as normal mail.
+
+## DNS records for your domain
+
+Under **Settings > Sending**, each provider has a **Check DNS** button. Enter the domain you send from and Seamless looks up:
+
+| Record | Why it matters | Counts as a problem? |
+|---|---|---|
+| **SPF** (TXT on the domain) | Must be a single record that includes your provider (`sendgrid.net`, `spf.brevo.com`, `amazonses.com`, `mailgun.org`, `spf.mtasv.net`) | Yes |
+| **DKIM** (CNAME or TXT at `selector._domainkey`) | Signs your mail; copy the exact records from your provider's domain page | Yes |
+| **DMARC** (TXT at `_dmarc`) | Tells receivers what to do with mail that fails the checks; `p=none` is a fine start | Yes |
+| **MX**, **MTA-STS**, **TLS-RPT** | Shown for information only | No |
+
+Each row shows what was found and what was expected. DNS changes can take a while to spread; check again later if a record you just added isn't seen.
+
 ## Managing accounts
 
 Edit an account any time, disable it to pause syncing, or remove it. Removing an account stops its sync and deletes its rows from Seamless (your mail stays on the origin server).

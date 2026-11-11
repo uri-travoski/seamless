@@ -26,6 +26,47 @@ const KINDS: { kind: TransportKind; name: string; help: string; fields: FieldDef
   ] },
 ];
 
+interface DnsRecord { id: string; name: string; type: string; expected: string; found: string[]; ok: boolean; informational: boolean; hint?: string }
+const DNS_LABEL: Record<string, string> = { spf: 'SPF', dkim: 'DKIM', dmarc: 'DMARC', mx: 'MX', 'mta-sts': 'MTA-STS', 'tls-rpt': 'TLS-RPT' };
+
+/** "Check DNS" for one provider: SPF/DKIM/DMARC pass or fail, MX/MTA-STS/TLS-RPT for information. */
+function DnsCheck({ transportId }: { transportId: number }) {
+  const [open, setOpen] = useState(false);
+  const [domain, setDomain] = useState('');
+  const [selectors, setSelectors] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [records, setRecords] = useState<DnsRecord[] | null>(null);
+  const run = async () => {
+    setBusy(true);
+    try {
+      const qs = new URLSearchParams({ domain: domain.trim(), transportId: String(transportId) });
+      if (selectors.trim()) qs.set('selectors', selectors.trim());
+      setRecords((await api.get<{ records: DnsRecord[] }>(`/api/dns-check?${qs}`)).records);
+    } catch (e: any) { toast(e?.message ?? 'Could not check DNS', 'error'); }
+    setBusy(false);
+  };
+  if (!open) return <button className="btn" onClick={() => setOpen(true)}>Check DNS</button>;
+  return (
+    <div className="dns-panel" style={{ flexBasis: '100%' }}>
+      <div className="field"><label>Your sending domain</label>
+        <input className="text-input" value={domain} placeholder="example.com" onChange={(e) => setDomain(e.target.value)} /></div>
+      <div className="field"><label>DKIM selectors (optional, comma separated)</label>
+        <input className="text-input" value={selectors} placeholder="provider default" onChange={(e) => setSelectors(e.target.value)} /></div>
+      <button className="btn primary" disabled={busy || !domain.trim()} onClick={() => void run()}>{busy ? 'Checking…' : 'Check'}</button>{' '}
+      <button className="btn ghost" onClick={() => setOpen(false)}>Close</button>
+      {records && records.map((r, i) => (
+        <div key={i} className={`dns-row ${r.informational ? 'info' : r.ok ? 'ok' : 'bad'}`}>
+          <span>{r.ok ? '✓' : r.informational ? '–' : '✗'}</span>
+          <strong>{DNS_LABEL[r.id] ?? r.id}{r.informational ? ' (info)' : ''}</strong>
+          <span><code>{r.name}</code> {r.type}
+            {r.found.length > 0 ? <div className="dim">Found: <code>{r.found.join(' | ')}</code></div> : <div className="dim">Not found</div>}
+            {!r.ok && !r.informational && <div className="dim">Expected: <code>{r.expected}</code>{r.hint ? ` — ${r.hint}` : ''}</div>}</span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 interface Draft { id?: number; kind: TransportKind; name: string; config: Record<string, any>; fallbackId: number | null; dailyLimit: string; hadSecret: boolean }
 
 export default function SendingSettings() {
@@ -123,6 +164,7 @@ export default function SendingSettings() {
                 )}
               </div>
               <div className="mbx-actions">
+                <DnsCheck transportId={t.id} />
                 <button className="btn" disabled={res === 'busy'} onClick={() => void test(t.id)}>{res === 'busy' ? 'Testing…' : 'Test'}</button>
                 <button className="btn" onClick={() => setDraft({ id: t.id, kind: t.kind, name: t.name, config: { ...t.config }, fallbackId: t.fallbackId, dailyLimit: t.dailyLimit ? String(t.dailyLimit) : '', hadSecret: t.hasApiKey })}>Edit</button>
                 <button className="btn ghost" onClick={() => void remove(t)}>Delete</button>

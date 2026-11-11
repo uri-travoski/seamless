@@ -6,6 +6,7 @@ import { encrypt, decrypt } from '../crypto.ts';
 import { broadcast } from '../ws.ts';
 import { uid } from './util.ts';
 import { buildTransport, knownKinds } from '../transport/registry.ts';
+import { checkDomain, DEFAULT_SELECTORS } from '../transport/dns.ts';
 
 const SECRET_RE = /pass|key|secret|token/i;
 
@@ -82,6 +83,23 @@ export function register(app: FastifyInstance): void {
     } catch (err: any) {
       return { ok: false, steps: [{ name: 'Set up', ok: false, detail: err?.message ?? String(err) }] };
     }
+  });
+
+  // DNS records for a sending domain (SPF/DKIM/DMARC checked, MX/MTA-STS/TLS-RPT informational)
+  app.get('/api/dns-check', async (req, reply) => {
+    const userId = uid(req);
+    const qs = req.query as { domain?: string; transportId?: string; selectors?: string };
+    const domain = String(qs.domain ?? '').trim().toLowerCase();
+    if (!/^(?=.{1,253}$)([a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}$/.test(domain)) return reply.code(400).send({ error: 'enter a domain like example.com' });
+    let kind: string | null = null;
+    if (qs.transportId) {
+      const t = await mine(userId, Number(qs.transportId));
+      if (!t) return reply.code(404).send({ error: 'not found' });
+      kind = t.kind;
+    }
+    const given = String(qs.selectors ?? '').split(',').map((s) => s.trim()).filter((s) => /^[a-z0-9._-]{1,63}$/i.test(s));
+    const selectors = given.length ? given : (kind ? DEFAULT_SELECTORS[kind] ?? [] : []);
+    return { domain, records: await checkDomain(domain, { transportKind: kind, dkimSelectors: selectors }) };
   });
 
   app.put('/api/accounts/:id/transport', async (req, reply) => {

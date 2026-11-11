@@ -113,6 +113,8 @@ export function render(ev: EventRow): Rendered {
       };
     case 'send.failed':
       return { title: `Couldn't send ${quote(p.subject)}`, body: String(p.error ?? ''), link: '/mail/drafts', groupKey: null, accountId };
+    case 'mail.bounced':
+      return { title: `Bounced: ${p.recipient ?? 'a recipient'}`, body: `${quote(p.subject)}${p.error ? ` — ${p.error}` : ''}`, link: p.messageId ? `/mail/msg/m${p.messageId}` : null, groupKey: null, accountId };
     case 'send.sent':
       return { title: `Sent ${quote(p.subject)}`, body: '', link: p.messageId ? `/mail/msg/m${p.messageId}` : null, groupKey: null, accountId };
     case 'sync.failed':

@@ -76,6 +76,17 @@ function HtmlBody({ html, fontSize, fontFamily, blockLinks = false }: { html: st
   return <iframe ref={ref} sandbox={blockLinks ? 'allow-same-origin' : 'allow-same-origin allow-popups'} srcDoc={doc} style={{ height }} title="Message" />;
 }
 
+/** Delivery failed for one or more recipients of this sent message (T3 F-22). */
+function BounceBanner({ email }: { email: ApiEmail }) {
+  if (!email.bounced?.length) return null;
+  return (
+    <div className="bounce-banner" role="alert">
+      <strong>Not delivered</strong>
+      <ul>{email.bounced.map((b) => <li key={b.recipient}><b>{b.recipient}</b>{b.status ? ` (${b.status})` : ''}{b.diagnostic ? ` — ${b.diagnostic}` : ''}</li>)}</ul>
+    </div>
+  );
+}
+
 /** Phishing / lookalike warning (T2 F-20). High risk also switches the links off until you say so. */
 function RiskBanner({ email, linksOn, onEnableLinks }: { email: ApiEmail; linksOn: boolean; onEnableLinks: () => void }) {
   const r = email.risk;
@@ -365,6 +376,7 @@ function MessageCard({ email, expanded, onToggle }: { email: ApiEmail; expanded:
               <tr><th>Size:</th><td>{fmtSize(email.size)}</td></tr>
             </tbody></table>
           )}
+          <BounceBanner email={email} />
           <RiskBanner email={email} linksOn={linksOn} onEnableLinks={() => setLinksOn(true)} />
           {email.needsReview && <ReviewBanner email={email} />}
           {noteOpen && (

@@ -747,6 +747,23 @@ ALTER TABLE accounts ADD COLUMN outbound_transport_id INTEGER REFERENCES transpo
 ALTER TABLE accounts ADD COLUMN inbound_kind TEXT NOT NULL DEFAULT 'imap' CHECK (inbound_kind IN ('imap','pop3','push','none'));
 `,
   },
+  {
+    id: 17,
+    sql: `
+-- T3 F-22: bounces (failed-delivery reports linked to the sent message)
+CREATE TABLE bounces (
+  id SERIAL PRIMARY KEY,
+  user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  message_id INTEGER NOT NULL REFERENCES messages(id) ON DELETE CASCADE,
+  recipient TEXT NOT NULL,
+  status TEXT NOT NULL DEFAULT '',
+  diagnostic TEXT NOT NULL DEFAULT '',
+  created_at BIGINT NOT NULL,
+  UNIQUE (message_id, recipient)
+);
+CREATE INDEX bounces_user ON bounces(user_id);
+`,
+  },
 ];
 
 /** Run `fn` in one transaction. Events emitted through the client are only turned into

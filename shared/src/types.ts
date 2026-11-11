@@ -136,6 +136,7 @@ export interface ApiEmail {
   followupId: number | null;   // T2 F-19: a live reminder on this sent message
   followupDueAt: string | null;
   followupStatus: 'waiting' | 'due' | null;
+  bounced: { recipient: string; status: string; diagnostic: string }[] | null; // T3 F-22: delivery failed for these
 }
 
 export interface ApiAttachmentMeta {

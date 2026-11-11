@@ -1328,3 +1328,15 @@ kbd { font-family: var(--font-mono); font-size: 11.5px; padding: 1px 6px; border
 :root[data-theme="seamless"] .quick-pill.on, :root[data-theme="simply"] .quick-pill.on {
   background: #fff; color: #0f172a; font-weight: 700; box-shadow: 0 1px 3px rgba(15, 23, 42, 0.18), 0 0 0 1px #c3cedd;
 }
+
+/* bounces + DNS check (T3 F-22) */
+.bounce-chip { display: inline-flex; align-items: center; padding: 0 7px; height: 18px; border-radius: 9px; font-size: 11px; font-weight: 700; background: var(--color-danger); color: #fff; flex: 0 0 auto; }
+.bounce-banner { margin: 8px 0 12px; padding: 10px 14px; border-radius: var(--radius-md); border: 1px solid var(--color-danger); background: var(--color-danger-soft); font-size: 13px; }
+.bounce-banner strong { color: var(--color-danger); }
+.bounce-banner ul { margin: 6px 0 0 18px; padding: 0; }
+.dns-panel { margin-top: 10px; border-top: 1px solid var(--color-border); padding-top: 10px; }
+.dns-row { display: grid; grid-template-columns: 20px 90px 1fr; gap: 8px; font-size: 12.5px; padding: 4px 6px; border-radius: var(--radius-sm); }
+.dns-row.ok { background: var(--color-success-soft); }
+.dns-row.bad { background: var(--color-danger-soft); }
+.dns-row.info { background: var(--color-surface); }
+.dns-row code { word-break: break-all; }
