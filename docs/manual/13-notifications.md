@@ -9,7 +9,7 @@ The bell in the top-right corner shows how many notifications are unread and, wh
 **See all notifications** opens the full list, with filters that stay in the address bar (so you can bookmark a view):
 
 - **All / Unread / Read**
-- **Type** — New mail, Opened, Reminders, Follow-ups, Snooze, Send failures, Sync errors, Backups, Security, Leads, Assignments
+- **Type** — New mail, Opened, Reminders, Follow-ups, Snooze, Send failures, Sync errors, Backups, Security, Leads, Smart views, Assignments
 - **Mailbox or category**
 - **Date** — today, last 7 or 30 days, or a custom range
 - **Search** in the title and text

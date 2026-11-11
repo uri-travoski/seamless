@@ -1058,6 +1058,28 @@ CREATE TABLE calendar_connections (
 );
 `,
   },
+  {
+    id: 29,
+    sql: `
+-- T4 F-34: saved searches / smart views
+CREATE TABLE saved_views (
+  id SERIAL PRIMARY KEY,
+  user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  name TEXT NOT NULL,
+  icon TEXT NOT NULL DEFAULT 'magnifying-glass',
+  color TEXT,
+  query TEXT NOT NULL,
+  scope TEXT NOT NULL DEFAULT 'unified',
+  sort TEXT NOT NULL DEFAULT 'date_desc',
+  pinned BOOLEAN NOT NULL DEFAULT true,
+  show_count BOOLEAN NOT NULL DEFAULT true,
+  sort_order INTEGER NOT NULL DEFAULT 0,
+  notify BOOLEAN NOT NULL DEFAULT false,
+  last_notified_message_id INTEGER
+);
+CREATE INDEX saved_views_user ON saved_views(user_id, sort_order);
+`,
+  },
 ];
 
 /** Run `fn` in one transaction. Events emitted through the client are only turned into

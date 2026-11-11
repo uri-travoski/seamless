@@ -9,6 +9,8 @@ import { useRouter, navigate, FOLDER_ROLE, FOLDER_TITLE, ROLE_FOLDER, type Route
 import { getEmailsByIds } from './api/client.ts';
 import Login from './components/Login.tsx';
 import Sidebar from './components/Sidebar.tsx';
+import SaveViewDialog from './components/SaveViewDialog.tsx';
+import { useViews } from './state/views.ts';
 import MessageList from './components/MessageList.tsx';
 import ReadingPane from './components/ReadingPane.tsx';
 import ComposeDock from './components/ComposeDock.tsx';
@@ -45,6 +47,7 @@ function useWebSocket(enabled: boolean): boolean {
           if (msg.type === 'presence') { useShared.getState().onPresence(msg); return; }
           if (msg.type === 'stateChange' || msg.type === 'newMail') {
             void useMail.getState().refreshCurrent();
+            void useViews.getState().loadCounts();
           }
           if (msg.type === 'notifications' || msg.type === 'newMail') void useNotifs.getState().refresh();
         } catch { /* ignore */ }
@@ -190,6 +193,7 @@ export default function App() {
 
   return (
     <div className="app">
+      <SaveViewDialog />
       <AppHeader onMenu={() => setSidebarOpen(!sidebarOpen)} connected={wsConnected} />
       <div className={`main ${isMail && layout === 'table' ? 'table-mode' : ''} ${isMail && selectedId ? 'reading' : ''} ${isMail ? '' : 'page-mode'}`}>
         <Sidebar open={sidebarOpen} onNavigate={() => setSidebarOpen(false)} onAddLabel={addLabel} />

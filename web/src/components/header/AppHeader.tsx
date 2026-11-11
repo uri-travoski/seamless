@@ -13,6 +13,8 @@ import ScopeSwitcher from './ScopeSwitcher.tsx';
 import NotificationBell from './NotificationBell.tsx';
 import AppMenu from './AppMenu.tsx';
 import { api } from '../../api/client.ts';
+import { useViews } from '../../state/views.ts';
+import { BookmarkSimple } from '@phosphor-icons/react';
 
 export default function AppHeader({ onMenu, connected }: { onMenu: () => void; connected: boolean }) {
   const appName = useSession((s) => s.settings.appName) || 'Seamless';
@@ -63,6 +65,7 @@ export default function AppHeader({ onMenu, connected }: { onMenu: () => void; c
           }}
         />
         {!search && <kbd className="search-kbd" aria-hidden>/</kbd>}
+        {search.trim() && <button className="icon-btn" onClick={() => useViews.getState().openSave(search.trim(), useMail.getState().scope)} aria-label="Save this search" title="Save this search as a smart view"><BookmarkSimple /></button>}
         {search && <button className="icon-btn" onClick={clear} aria-label="Clear search"><CloseIcon /></button>}
       </div>
       <div className="spacer" />

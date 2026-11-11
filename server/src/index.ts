@@ -20,6 +20,7 @@ import { startJobRunner } from './jobs/runner.ts';
 import { startHealthAlerts, shouldAlert } from './health/alerts.ts';
 import { wakeOnReply } from './mail/snooze.ts';
 import { settleOnReply } from './mail/followups.ts';
+import { notifyViewMatches } from './mail/views.ts';
 import { setScheduleCanceller } from './mail/store.ts';
 import { cancelScheduleByMessageId } from './mail/send.ts';
 import { startClassifier, kickClassifier, onClassified } from './classify/engine.ts';
@@ -91,6 +92,7 @@ syncManager.on('newMail', (ev: NewMailEvent) => {
   void settleOnReply(ev.userId, ev.rowId).catch((err) => console.error('[followups] settle failed:', err?.message ?? err));
   void wakeOnReply(ev.userId, ev.rowId).catch((err) => console.error('[snooze] wake on reply failed:', err?.message ?? err));
   broadcast({ type: 'newMail', accountId: ev.accountId, from: ev.from, subject: ev.subject, mailboxRole: 'inbox' }, ev.userId);
+  void notifyViewMatches(ev.userId, ev.rowId).catch((err) => console.error('[views] notify failed:', err?.message ?? err));
   kickClassifier();
   // in-app notification + push (per the user's notification prefs) via the event bus
   void one<{ did: number | null; address: string | null; label: string | null; notify: boolean | null }>(

@@ -214,6 +214,7 @@ export interface EmailQueryFilter {
   hasKeyword?: string;
   notKeyword?: string;
   needsReview?: boolean;     // the review lane: low-confidence / ai-routed mail
+  messageId?: number;        // T4 F-34: restrict to one message row (notify-on-match test)
 }
 
 export interface EmailQueryRequest {
@@ -450,7 +451,7 @@ export type EventType =
   | 'backup.failed' | 'backup.ok'
   | 'storage.migration.done' | 'storage.migration.failed'
   | 'export.created' | 'export.imported'
-  | 'disposable.received' | 'disposable.leak' | 'lead.captured' | 'assignment.changed' | 'comment.mention'
+  | 'disposable.received' | 'disposable.leak' | 'lead.captured' | 'view.match' | 'assignment.changed' | 'comment.mention'
   | 'security.login' | 'security.2fa_changed';
 
 /** UI filter groups on the notifications page (each maps to one or more event types). */
@@ -465,6 +466,7 @@ export const NOTIFICATION_GROUPS: { id: string; name: string; types: EventType[]
   { id: 'backup', name: 'Backups', types: ['backup.failed', 'backup.ok', 'storage.unreachable', 'storage.migration.done', 'storage.migration.failed', 'export.created', 'export.imported'] },
   { id: 'security', name: 'Security', types: ['security.login', 'security.2fa_changed'] },
   { id: 'leads', name: 'Leads', types: ['lead.captured'] },
+  { id: 'views', name: 'Smart views', types: ['view.match'] },
   { id: 'assignments', name: 'Assignments', types: ['assignment.changed', 'comment.mention'] },
 ];
 
@@ -549,3 +551,10 @@ export interface ApiAssignment {
   dueAt: number | null; updatedAt: number;
 }
 export interface ApiThreadComment { id: number; userId: number; userName: string; body: string; mentions: number[]; createdAt: number }
+
+// ---- saved searches / smart views (T4 F-34) ----
+export interface ApiSavedView {
+  id: number; name: string; icon: string; color: string | null; query: string; scope: string; sort: string;
+  pinned: boolean; showCount: boolean; sortOrder: number; notify: boolean;
+}
+export interface ApiViewSuggestion { key: string; name: string; icon: string; query: string }

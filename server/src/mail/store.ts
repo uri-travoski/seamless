@@ -233,6 +233,7 @@ export async function queryEmails(userId: number, req: EmailQueryRequest): Promi
   if (f.hasKeyword === '$seen') where.push('m.unread = false');
   if (f.notKeyword === '$seen') where.push('m.unread = true');
   if (f.hasKeyword === '$flagged') where.push('m.flagged = true');
+  if (f.messageId) { where.push('m.id = ?'); params.push(f.messageId); }
   if (f.needsReview) where.push("m.classify_state = 'needs_review'");
   if (f.waiting) where.push(`EXISTS (SELECT 1 FROM followups fu WHERE fu.message_id = m.id AND fu.user_id = ? AND fu.status IN ('waiting','due'))`); 
   if (f.waiting) params.push(userId);
@@ -285,6 +286,23 @@ export async function queryEmails(userId: number, req: EmailQueryRequest): Promi
       else { where.push('m.disposable_id = ?'); params.push(p.disposable); }
     }
     if (p.risk) { where.push('EXISTS (SELECT 1 FROM message_risk r WHERE r.message_id = m.id AND r.level = ?)'); params.push(p.risk); }
+    if (p.opened !== null) {
+      // tracked sent mail: a real (non-proxy) open on the message token or any per-recipient token of it
+      const opens = `EXISTS (SELECT 1 FROM tracking_opens o WHERE o.proxied = false AND (o.token = m.tracking_token
+        OR o.token IN (SELECT ts2.token FROM tracked_sends ts2 WHERE ts2.group_token = m.tracking_token)))`;
+      where.push(`m.tracking_token IS NOT NULL AND ${p.opened ? '' : 'NOT '}${opens}`);
+    }
+    if (p.replied !== null) {
+      const rep = `(m.answered = true OR EXISTS (SELECT 1 FROM messages r WHERE r.account_id = m.account_id AND r.thread_id = m.thread_id
+        AND r.date > m.date AND lower(r.from_addr) <> lower(m.from_addr)))`;
+      where.push(p.replied ? rep : `NOT ${rep}`);
+    }
+    if (p.olderThanMs !== null) { where.push('m.date < ?'); params.push(Date.now() - p.olderThanMs); }
+    if (p.newerThanMs !== null) { where.push('m.date >= ?'); params.push(Date.now() - p.newerThanMs); }
+    if (p.sizeMin !== null) { where.push('m.size > ?'); params.push(p.sizeMin); }
+    if (p.sizeMax !== null) { where.push('m.size < ?'); params.push(p.sizeMax); }
+    if (p.waiting) { where.push(`EXISTS (SELECT 1 FROM followups fu WHERE fu.message_id = m.id AND fu.user_id = ? AND fu.status IN ('waiting','due'))`); params.push(userId); }
+    if (p.snoozed) { where.push('m.snoozed_until > ?'); params.push(Date.now()); }
     if (p.before !== null) { where.push('m.date < ?'); params.push(p.before); }
     if (p.after !== null) { where.push('m.date >= ?'); params.push(p.after); }
     // search excludes trash/junk unless explicitly requested

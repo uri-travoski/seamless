@@ -17,6 +17,12 @@ Plain words match the subject, body, and participants (full-text). Combine them 
 - `has:attachment` — only messages with attachments.
 - `business:"Office Cleaners R Us"` — mail for one of your businesses: messages in a mailbox that has an address in that business, or delivered to one of the business's addresses (see "Businesses").
 - `risk:high` or `risk:medium` — messages with a phishing warning (see "Phishing and lookalike warnings").
+- `opened:yes` / `opened:no` — mail you sent with tracking turned on, that was (or wasn't) opened by a real person. Automatic opens by mail-privacy proxies don't count. Untracked mail matches neither.
+- `replied:yes` / `replied:no` — has been answered: marked as answered, or someone else wrote later in the same conversation.
+- `older_than:7d` / `newer_than:2w` — by age. Units: `h` hours, `d` days, `w` weeks, `m` months (30 days), `y` years (365 days), e.g. `older_than:3m`.
+- `size>5mb` / `size<100kb` — by message size (`b`, `kb`, `mb`, `gb`).
+- `is:waiting` — sent mail with a live "remind me if no reply" follow-up (see "Follow-ups").
+- `is:snoozed` — mail that is snoozed right now.
 - `before:2026-07-01` and `after:2026-06-01` — date range (YYYY-MM-DD).
 - `"exact phrase"` — match the words together, in order.
 
@@ -33,6 +39,16 @@ Plain words match the subject, body, and participants (full-text). Combine them 
 - `category:work` limits a search to the mailboxes in a category (any category name or key works, e.g. `category:personal is:unread`). Search also follows the scope picked in the top-right switcher.
 - Operators can be combined freely; everything is AND-ed together.
 - Clearing the box (the **x** or Escape) returns you to whatever mailbox you were in.
+
+## Smart views
+
+A **smart view** is a saved search that lives in the sidebar under **Smart views**, with a live count of the messages that match.
+
+- **Save a search:** type it in the search box and click the bookmark button next to the **x**. Give it a name, an icon and a colour, and choose whether it is shown in the sidebar, shows a count, and **notifies you** when new mail matches.
+- **Edit or delete:** hover a view in the sidebar and click the pencil.
+- **Counts** refresh when mail changes (at most every 30 seconds per account) and always equal the number of messages the view lists.
+- **Notify on match:** a view with notifications on creates a "Smart view match" notification (Settings → Notifications) once per new message, only for mail that arrives after you turned it on.
+- **Suggestions:** the sidebar offers, once, ready-made views — *Waiting for reply*, *Unpaid invoices*, *High risk*, *Attachments over 5 MB* and *Disposable address mail*. Add the ones you want; **Dismiss** hides the card for good.
 
 ## Shared inbox operators
 `assigned:me` · `assigned:none` · `status:open|pending|done` — see *Shared mailboxes*.
