@@ -114,3 +114,33 @@ When an email carries a calendar invitation (a `text/calendar` part or `.ics` at
 - **Download .ics** is always available.
 - **CalDAV (optional):** connect a calendar with `PUT /api/calendar-connection {url, username, password}` (password stored encrypted). The card then offers **Add to calendar**, which saves the event to `<calendar-url>/<uid>.ics`. There is no settings screen for this yet, and conflict checking against your calendar is not built.
 - On a shared mailbox, viewers can see the card but only responders and managers can reply.
+
+## Newsletters
+
+Seamless recognises newsletters and bulk mail from their headers (`List-Unsubscribe`, `List-Id`, `Precedence: bulk/list`, and the markers
+mailing services add, such as Mailchimp, SendGrid and Mailgun).
+
+**The first time** a sender's newsletter reaches you, a slim bar appears above the message with three choices:
+
+- **Keep in Inbox** – nothing changes; the bar stays out of your way afterwards.
+- **Read later** – this issue and every future one from that sender skip the Inbox and wait in the **Read later** folder
+  (sidebar → *More*). The list shows each item's estimated reading time (words ÷ 230 per minute). Read later items don't
+  count towards the Inbox's unread number.
+- **Unsubscribe** – see below.
+
+Mail from a **VIP** sender and mail you have **snoozed** is never moved by this feature.
+
+**Unsubscribe.** If the newsletter supports one-click unsubscribe (RFC 8058), Seamless sends the request for you from the server
+(private and local addresses are refused, like webhooks). Otherwise, if it has a `mailto:` address, Seamless sends an empty
+"unsubscribe" mail from the address the newsletter was delivered to. If it only has a web link, the link opens in a new tab for you
+to finish. Afterwards a filter called *Unsubscribed: sender* moves that sender's future mail to the Bin (or Archive – your choice)
+and the sender is remembered as *Unsubscribed*. Delete the filter to undo it.
+
+**Settings** (Settings → Import & Retention → Newsletters):
+
+- *Archive a Read later item once I have read it* (off by default).
+- *Delete Read later items after N days unless starred* – on by default, 30 days. It moves items to the Bin, follows the
+  retention **dry-run** switch, and skips starred, VIP and snoozed mail.
+- Where an unsubscribed sender's mail goes (Bin or Archive), and the list of senders you have decided on.
+
+There is no newsletter digest email.

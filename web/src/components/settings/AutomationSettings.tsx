@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { api } from '../../api/client.ts';
 import { toast } from '../../toast.ts';
+import NewsletterSettings from './NewsletterSettings.tsx';
 
 interface ImportPreview {
   labels: { name: string; create: boolean }[];
@@ -123,6 +124,7 @@ export default function AutomationSettings() {
           </div>
         </>
       )}
+      <NewsletterSettings />
     </div>
   );
 }

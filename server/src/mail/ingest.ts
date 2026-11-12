@@ -12,6 +12,7 @@ import { recordBounce } from './dsn.ts';
 import { applyOnIngest } from './disposable.ts';
 import { ingestInvites } from './invites.ts';
 import { queueAttachmentIndex } from './attachmentText.ts';
+import { detectNewsletter, rawHeaders, readMinutes, applyOnIngest as newsletterOnIngest } from './newsletters.ts';
 import { evaluateFilters, loadFilters, type FilterableMessage } from './filters.ts';
 
 export function addressList(obj: AddressObject | AddressObject[] | undefined): ApiAddress[] {
@@ -170,6 +171,10 @@ export async function ingestMessage(args: IngestArgs): Promise<IngestResult | nu
     await queueIntegrationActions(userId, rowId, filterActions).catch((err) => console.error('[connectors] rule action failed:', err?.message ?? err));  // never blocks ingest
   }
 
+  if (mailbox.role === 'inbox') {   // T6.3: newsletter detection; chosen senders skip the Inbox view (never VIP / snoozed mail)
+    const det = detectNewsletter(rawHeaders(args.raw), from.email);
+    await newsletterOnIngest(userId, rowId, det, readMinutes(bodyText), { live: isInboxLive }).catch((err) => console.error('[newsletters] ingest hook failed:', err?.message ?? err));
+  }
   if (isInboxLive) await import('../leads/leads.ts').then((m) => m.captureLead(userId, rowId, parsed)).catch((err) => console.error('[leads] capture failed:', err?.message ?? err));   // lazy import: leads → store → sync → ingest would be a cycle; never blocks ingest
   if (atts.some((a) => !a.inline)) await queueAttachmentIndex(userId, rowId).catch((err) => console.error('[attachments] queue failed:', err?.message ?? err));   // text extraction runs as a job; never blocks ingest
   await ingestInvites(userId, args.accountId, rowId, parsed);

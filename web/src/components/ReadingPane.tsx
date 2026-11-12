@@ -11,6 +11,7 @@ import type { TrackingInfo } from '@seamless/shared';
 import { cache } from '../api/cache.ts';
 import { toast } from '../toast.ts';
 import SnoozeButton from './SnoozeMenu.tsx';
+import { NewsletterPrompt } from './NewsletterPrompt.tsx';
 import { FollowupBanner } from './FollowupMenu.tsx';
 import LabelPicker from './LabelPicker.tsx';
 import { readableTextOn } from './LabelColorPicker.tsx';
@@ -397,6 +398,7 @@ function MessageCard({ email, expanded, onToggle }: { email: ApiEmail; expanded:
           )}
           <BounceBanner email={email} />
           <DisposableChip email={email} />
+          <NewsletterPrompt email={email} />
           <RiskBanner email={email} linksOn={linksOn} onEnableLinks={() => setLinksOn(true)} />
           {email.needsReview && <ReviewBanner email={email} />}
           {noteOpen && (

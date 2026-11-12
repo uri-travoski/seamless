@@ -135,6 +135,7 @@ export {
   Users as PeopleIcon,
   ShieldWarning as ShieldWarnIcon,
   ClockClockwise as SnoozeIcon,
+  BookOpenText as ReadLaterIcon,
   Hourglass as WaitingIcon,
   Alarm as AlarmIcon,
   Heartbeat as HealthIcon,

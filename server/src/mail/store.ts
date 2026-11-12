@@ -3,6 +3,7 @@ import { q, one, run, bumpState, currentState } from '../db.ts';
 import { parseSearch } from './searchparse.ts';
 import { enqueueOp } from '../imap/sync.ts';
 import { deleteMessageRow } from './ingest.ts';
+import { newsletterInfo } from './newsletters.ts';
 import { VIP_SQL, isVipSender } from './vip.ts';
 import { scopeAccountIds, categoryIdByName } from './categories.ts';
 import { accessibleAccountIds, roleFor, canSendRole, Forbidden, type AccessRole } from '../auth/access.ts';
@@ -21,7 +22,7 @@ export async function listMailboxes(userId: number, scope?: string): Promise<Api
   const roleOf = new Map(access.map((a) => [a.id, a.role]));
   const counts = await q<{ mailbox_id: number; total: number; unread: number }>(`
     SELECT m.mailbox_id, COUNT(*) AS total,
-           COUNT(*) FILTER (WHERE m.unread AND (m.snoozed_until IS NULL OR m.snoozed_until <= ?)) AS unread
+           COUNT(*) FILTER (WHERE m.unread AND NOT m.read_later AND (m.snoozed_until IS NULL OR m.snoozed_until <= ?)) AS unread
     FROM messages m WHERE m.account_id = ANY(?::int[]) GROUP BY m.mailbox_id
   `, [Date.now(), accIds]);
   const byId = new Map(counts.map((c) => [c.mailbox_id, c]));
@@ -69,6 +70,8 @@ export interface MsgRow {
   message_id: string | null; references_ids: string;
   disposition: string; delete_at: number | null; classify_state: string;
   snoozed_until: number | null; sort_date: number | null;
+  is_newsletter: boolean; newsletter_sender: string | null; list_unsubscribe: string | null; list_unsubscribe_post: string | null;
+  read_later: boolean; read_later_at: number | null; read_minutes: number | null;
 }
 
 const BASE_SELECT = `
@@ -158,6 +161,9 @@ export async function rowToApi(r: MsgRow, viewerId: number = r.user_id): Promise
     bounced: bounces.length ? bounces : null,
     disposable: disp ? { id: disp.id, address: disp.address, label: disp.label, status: disp.status } : null,
     followupStatus: fu ? (fu.status as 'waiting' | 'due') : null,
+    newsletter: await newsletterInfo(viewerId, r),
+    readLater: r.read_later,
+    readMinutes: r.is_newsletter ? r.read_minutes : null,
     snoozedUntil: r.snoozed_until && r.snoozed_until > Date.now() ? new Date(Number(r.snoozed_until)).toISOString() : null,
   };
 }
@@ -239,11 +245,14 @@ export async function queryEmails(userId: number, req: EmailQueryRequest): Promi
   if (f.needsReview) where.push("m.classify_state = 'needs_review'");
   if (f.waiting) where.push(`EXISTS (SELECT 1 FROM followups fu WHERE fu.message_id = m.id AND fu.user_id = ? AND fu.status IN ('waiting','due'))`); 
   if (f.waiting) params.push(userId);
-  if (f.snoozed) {
+  if (f.readLater) {
+    where.push("m.read_later = true AND (mb.role IS NULL OR mb.role NOT IN ('trash','junk'))");
+  } else if (f.snoozed) {
     where.push('m.snoozed_until > ?'); params.push(Date.now());
   } else if (f.inMailbox) {
-    // snoozed mail is out of the Inbox until it wakes
+    // snoozed mail is out of the Inbox until it wakes; Read later mail only shows in Read later (T6.3)
     where.push("NOT (mb.role = 'inbox' AND COALESCE(m.snoozed_until, 0) > ?)"); params.push(Date.now());
+    where.push("NOT (mb.role = 'inbox' AND m.read_later)");
   }
 
   if (f.text) {
@@ -326,7 +335,7 @@ export async function queryEmails(userId: number, req: EmailQueryRequest): Promi
   const ftsQ = f.text ? parseSearch(f.text).fts : null;
   const bodyFirst = ftsQ ? "(CASE WHEN m.id IN (SELECT message_id FROM message_fts WHERE tsv @@ to_tsquery('simple', ?)) THEN 0 ELSE 1 END)," : '';
   const rows = await q<MsgRow>(
-    `${BASE_SELECT} ${whereSql} ORDER BY ${bodyFirst} ${f.snoozed ? 'm.snoozed_until ASC' : 'COALESCE(m.sort_date, m.date) DESC'}, m.id DESC LIMIT ? OFFSET ?`,
+    `${BASE_SELECT} ${whereSql} ORDER BY ${bodyFirst} ${f.snoozed ? 'm.snoozed_until ASC' : f.readLater ? 'm.read_later_at DESC' : 'COALESCE(m.sort_date, m.date) DESC'}, m.id DESC LIMIT ? OFFSET ?`,
     [...params, ...(ftsQ ? [ftsQ] : []), req.limit, req.position]);
   const attachmentMatches = rows.length ? await attachmentMatchSnippets(f.text, rows.map((r) => r.id)) : undefined;
 
@@ -386,6 +395,7 @@ export async function setKeywords(userId: number, emailId: string, patch: Record
   }
   if (patch.$seen === true) {
     await run('UPDATE messages SET opened_at = COALESCE(opened_at, ?) WHERE id = ?', [Date.now(), row.id]);
+    if (row.read_later && row.user_id === userId) await import('./newsletters.ts').then((m) => m.archiveAfterRead(userId, row.id)).catch(() => {});
   }
   if (patch.$seen === false) {
     // manual mark-unread = "hands off": retention must never touch this message again

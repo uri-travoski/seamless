@@ -15,7 +15,7 @@ import { useSession, DEFAULT_SIDEBAR, SIDEBAR_FOLDERS } from '../state/session.t
 import { useRouter, navigate, FOLDER_ROLE, FOLDER_TITLE } from '../router.ts';
 import {
   InboxIcon, DraftsIcon, SentIcon, ScheduledIcon, ArchiveIcon, JunkIcon, TrashIcon, FolderIcon, ComposeIcon,
-  CaretDownIcon, CaretRightIcon, StarIcon, ReviewIcon, TemplateIcon, MailLogo, SidebarCollapseIcon, SettingsIcon, SnoozeIcon, WaitingIcon,
+  CaretDownIcon, CaretRightIcon, StarIcon, ReviewIcon, TemplateIcon, MailLogo, SidebarCollapseIcon, SettingsIcon, SnoozeIcon, ReadLaterIcon, WaitingIcon,
 } from '../icons.tsx';
 import { IconContext } from '@phosphor-icons/react';
 import { api } from '../api/client.ts';
@@ -29,7 +29,7 @@ import LabelColorPicker from './LabelColorPicker.tsx';
 const FOLDER_ICON: Record<string, ComponentType<{ className?: string }>> = {
   inbox: InboxIcon, starred: StarIcon, drafts: DraftsIcon, scheduled: ScheduledIcon, sent: SentIcon,
   templates: TemplateIcon, spam: JunkIcon, bin: TrashIcon, archive: ArchiveIcon, review: ReviewIcon,
-  snoozed: SnoozeIcon, waiting: WaitingIcon,
+  snoozed: SnoozeIcon, readlater: ReadLaterIcon, waiting: WaitingIcon,
 };
 
 interface LabelNode { label: ApiLabel; children: LabelNode[] }

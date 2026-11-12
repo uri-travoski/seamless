@@ -77,6 +77,7 @@ function folderView(route: Extract<Route, { page: 'mail' }>): View {
   if (route.folder === 'unassigned') return { kind: 'search', query: 'assigned:none status:open in:inbox', title: 'Unassigned' };
   if (route.folder === 'review') return { kind: 'review', title: 'Review' };
   if (route.folder === 'snoozed') return { kind: 'snoozed', title: 'Snoozed' };
+  if (route.folder === 'readlater') return { kind: 'readlater', title: 'Read later' };
   if (route.folder === 'waiting') return { kind: 'waiting', title: 'Waiting for reply' };
   if (route.folder === 'label') {
     const id = Number(route.arg);

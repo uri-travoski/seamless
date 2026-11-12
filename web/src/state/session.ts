@@ -26,10 +26,10 @@ export interface ClientSettings {
 
 export interface SidebarConfig { order: string[]; more: string[] }
 
-export const SIDEBAR_FOLDERS = ['inbox', 'starred', 'drafts', 'scheduled', 'sent', 'templates', 'spam', 'bin', 'archive', 'snoozed', 'waiting'];
+export const SIDEBAR_FOLDERS = ['inbox', 'starred', 'drafts', 'scheduled', 'sent', 'templates', 'spam', 'bin', 'archive', 'snoozed', 'readlater', 'waiting'];
 export const DEFAULT_SIDEBAR: SidebarConfig = {
   order: ['inbox', 'starred', 'drafts', 'scheduled', 'sent', 'templates', 'spam', 'bin'],
-  more: ['snoozed', 'waiting', 'archive'],
+  more: ['snoozed', 'readlater', 'waiting', 'archive'],
 };
 
 const DEFAULTS: ClientSettings = {

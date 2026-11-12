@@ -1213,6 +1213,28 @@ CREATE INDEX attachment_text_tsv ON attachment_text USING GIN (tsv);
 CREATE INDEX attachment_text_user ON attachment_text(user_id);
 `,
   },
+  {
+    id: 36,
+    sql: `
+-- T6.3 F-40: newsletter detection, per-sender choice, Read later
+ALTER TABLE messages ADD COLUMN is_newsletter BOOLEAN NOT NULL DEFAULT false;
+ALTER TABLE messages ADD COLUMN newsletter_sender TEXT;
+ALTER TABLE messages ADD COLUMN list_unsubscribe TEXT;
+ALTER TABLE messages ADD COLUMN list_unsubscribe_post TEXT;
+ALTER TABLE messages ADD COLUMN read_later BOOLEAN NOT NULL DEFAULT false;
+ALTER TABLE messages ADD COLUMN read_later_at BIGINT;
+ALTER TABLE messages ADD COLUMN read_minutes INTEGER;
+CREATE INDEX messages_read_later ON messages(user_id, read_later) WHERE read_later;
+CREATE TABLE newsletter_senders (
+  id SERIAL PRIMARY KEY,
+  user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  sender TEXT NOT NULL,
+  choice TEXT NOT NULL CHECK (choice IN ('inbox','read_later','unsubscribed')),
+  created_at BIGINT NOT NULL,
+  UNIQUE (user_id, sender)
+);
+`,
+  },
 ];
 
 /** Run `fn` in one transaction. Events emitted through the client are only turned into

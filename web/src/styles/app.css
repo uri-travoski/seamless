@@ -1423,3 +1423,8 @@ mark[data-ai-pending], mark[data-unknown-var] { outline: 1px dashed var(--md-bor
 .att-match { font-size: 12px; color: var(--md-text-faint); margin-top: 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .att-match strong { color: var(--md-blue-dark); font-weight: 600; }
 .att-match mark { background: var(--md-blue-light); color: inherit; border-radius: 2px; }
+.newsletter-bar { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin: 8px 0 12px; padding: 6px 12px; border-radius: var(--radius-md); background: var(--color-accent-soft); border: 1px solid var(--md-border); font-size: 13px; }
+.newsletter-bar.done { color: var(--md-text-soft); }
+.newsletter-bar .nl-text { flex: 1 1 200px; }
+.newsletter-bar .nl-actions { display: flex; gap: 6px; }
+.read-time { white-space: nowrap; color: var(--md-text-soft); }

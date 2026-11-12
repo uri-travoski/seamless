@@ -32,6 +32,7 @@ function fmtDate(iso: string): string {
 
 /** Received date — or, in the Snoozed view, when the message comes back. */
 function dateCell(email: ApiEmail): React.ReactNode {
+  if (email.readLater && email.readMinutes) return <span className="read-time" title="Estimated reading time">{email.readMinutes} min read · {fmtDate(email.receivedAt)}</span>;
   if (!email.snoozedUntil) return fmtDate(email.receivedAt);
   return <span className="snooze-wake" title="Comes back to your Inbox then"><SnoozeIcon size={13} /> {fmtSnoozeLong(new Date(email.snoozedUntil).getTime())}</span>;
 }

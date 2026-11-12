@@ -138,6 +138,9 @@ export interface ApiEmail {
   disposition: 'keep' | 'delete';
   deleteAt: string | null; // when the retention sweep will trash it (countdown badge)
   needsReview: boolean;
+  newsletter?: { sender: string; choice: 'inbox' | 'read_later' | 'unsubscribed' | null; unsubscribe: 'one-click' | 'mailto' | 'link' | null } | null; // T6.3: set when the message looks like a newsletter
+  readLater?: boolean;          // T6.3: in the Read later folder
+  readMinutes?: number | null;  // T6.3: estimated reading time (words / 230 wpm), newsletters only
   snoozedUntil: string | null; // ISO while snoozed (hidden from the Inbox until then)
   risk: { level: 'medium' | 'high'; reasons: { code: string; severity: 'medium' | 'high'; text: string }[] } | null; // T2 F-20
   followupId: number | null;   // T2 F-19: a live reminder on this sent message
@@ -207,6 +210,7 @@ export interface ApiInvite {
 }
 
 export interface EmailQueryFilter {
+  readLater?: boolean;       // T6.3: only mail in the Read later folder, newest first
   snoozed?: boolean;         // T2: only mail currently snoozed, soonest first
   waiting?: boolean;         // T2: sent mail with a live follow-up reminder
   scope?: ScopeId;           // T1: unified | category:<id> | account:<id> (default unified)

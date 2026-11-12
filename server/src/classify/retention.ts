@@ -1,6 +1,7 @@
 import { q, one, run, bumpState } from '../db.ts';
 import { moveEmail, destroyEmail } from '../mail/store.ts';
 import { getUserSetting, plog, pruneLogs } from './settings.ts';
+import { retentionCandidates } from '../mail/newsletters.ts';
 
 const TICK_MS = 60 * 60 * 1000; // hourly
 
@@ -52,6 +53,21 @@ export async function sweepRetention(now = Date.now()): Promise<{ trashed: numbe
       }
     }
 
+    // Read later (T6.3): "delete after N days unless starred" — a default rule the user can change; VIP / snoozed never move
+    const stale = await retentionCandidates(u.id, now);
+    for (const c of stale) {
+      if (dryRun) {
+        stats.dryRun++;
+        await plog(u.id, 'retention', `DRY RUN: would trash Read later "${c.subject}" from ${c.from_addr}`, { emailId: c.id });
+      } else {
+        await run('UPDATE messages SET read_later = false WHERE id = ?', [c.id]);
+        await moveEmail(u.id, `m${c.id}`, 'u:trash');
+        await run('UPDATE messages SET trashed_at = ? WHERE id = ?', [now, c.id]);
+        stats.trashed++;
+        await plog(u.id, 'retention', `trashed Read later "${c.subject}" from ${c.from_addr}`, { emailId: c.id });
+      }
+    }
+
     // purge: only messages the sweep itself moved to trash, after the grace window
     const purgeable = await q<{ id: number; subject: string }>(`
       SELECT m.id, m.subject FROM messages m JOIN mailboxes mb ON mb.id = m.mailbox_id
@@ -69,7 +85,7 @@ export async function sweepRetention(now = Date.now()): Promise<{ trashed: numbe
       }
     }
 
-    if (candidates.length || purgeable.length) broadcastChange(u.id);
+    if (candidates.length || purgeable.length || stale.length) broadcastChange(u.id);
   }
 
   await pruneLogs();
