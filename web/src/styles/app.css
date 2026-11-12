@@ -146,7 +146,7 @@ svg { flex: 0 0 auto; vertical-align: middle; }
 }
 .sidebar .compose-actions { display: flex; gap: 6px; margin: 0 6px 14px; }
 .sidebar .compose-btn {
-  flex: 1; padding: 9px 0; font-size: 14px; justify-content: center; border-radius: 5px;
+  flex: 1; padding: 9px 0; font-size: 14px; justify-content: center; border-radius: 7px;
   background: var(--color-header-bg); border-color: var(--color-header-bg); color: var(--color-header-text);
 }
 .sidebar .compose-btn:hover { background: color-mix(in srgb, var(--color-header-bg) 86%, #fff); border-color: color-mix(in srgb, var(--color-header-bg) 86%, #fff); }
@@ -1541,3 +1541,9 @@ mark[data-ai-pending], mark[data-unknown-var] { outline: 1px dashed var(--md-bor
   .archive-list tr { display: block; padding: 8px 0; border-bottom: 1px solid var(--md-border); }
   .archive-list td { display: block; padding: 2px 0; }
 }
+
+/* Compose button: 7px radius everywhere; Rolltop gets terracotta with white text/icon */
+.sidebar .compose-btn { border-radius: 7px; }
+[data-theme="rolltop"] .sidebar .compose-btn { background: #C46B44; border-color: #C46B44; color: #fff; }
+[data-theme="rolltop"] .sidebar .compose-btn svg { color: #fff; }
+[data-theme="rolltop"] .sidebar .compose-btn:hover { background: color-mix(in srgb, #C46B44 88%, #000); border-color: color-mix(in srgb, #C46B44 88%, #000); }
