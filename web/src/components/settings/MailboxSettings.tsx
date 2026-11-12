@@ -204,7 +204,6 @@ function Wizard({ initial, categories, onDone }: { initial: Form; categories: Ap
             <div className="seg" role="group" aria-label="How mail arrives">
               <button className={`seg-btn ${f.inboundKind === 'imap' ? 'on' : ''}`} disabled={editing} onClick={() => set('inboundKind', 'imap')}>IMAP</button>
               <button className={`seg-btn ${f.inboundKind === 'pop3' ? 'on' : ''}`} disabled={editing || isOauth} onClick={() => setF((x) => ({ ...x, inboundKind: 'pop3', pop3User: x.pop3User || x.email.trim() }))}>POP3</button>
-              <button className="seg-btn" disabled title="Delivered to Seamless (Cloudflare / own domain) arrives in tier 3">Pushed · coming in T3</button>
             </div>
             {f.inboundKind === 'pop3' ? (
               <>
@@ -252,7 +251,6 @@ function Wizard({ initial, categories, onDone }: { initial: Form; categories: Ap
           <>
             <div className="seg" role="group" aria-label="How mail leaves">
               <button className="seg-btn on">SMTP server</button>
-              <button className="seg-btn" disabled title="SendGrid, Brevo, SES, Mailgun, Postmark, Cloudflare arrive in tier 3">Sending service · coming in T3</button>
             </div>
             {!isOauth && (
               <>

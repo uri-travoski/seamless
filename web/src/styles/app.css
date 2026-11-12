@@ -1443,3 +1443,5 @@ mark[data-ai-pending], mark[data-unknown-var] { outline: 1px dashed var(--md-bor
 .pgp-toggle:disabled { opacity: 0.4; cursor: not-allowed; }
 .settings-section .field-row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin: 8px 0; }
 .settings-section textarea.text-input { width: 100%; font-family: monospace; font-size: 12px; }
+.settings-help-btn { float: right; margin: -2px 0 0 8px; }
+.help-content ol { padding-left: 22px; }

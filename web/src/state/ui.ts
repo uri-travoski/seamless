@@ -3,6 +3,8 @@ import { create } from 'zustand';
 /** App-level dialogs that can be opened from anywhere (settings nav, keyboard). */
 interface UiState {
   helpOpen: boolean;
+  /** Manual page id to show when Help opens (e.g. '03-searching'); null = the index. */
+  helpPage: string | null;
   shortcutsOpen: boolean;
   /** Snooze picker anchored at a screen point for one message (row clock icon, keyboard b). */
   snoozeFor: { id: string; x: number; y: number } | null;
@@ -10,6 +12,7 @@ interface UiState {
 }
 export const useUi = create<UiState>((set) => ({
   helpOpen: false,
+  helpPage: null,
   shortcutsOpen: false,
   snoozeFor: null,
   set: (p) => set(p),

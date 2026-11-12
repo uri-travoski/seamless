@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { api } from '../api/client.ts';
 import { BackIcon } from '../icons.tsx';
+import { useUi } from '../state/ui.ts';
 
 /** Tiny markdown subset renderer: headings, bold, code, links, lists, paragraphs. */
 function mdToHtml(md: string): string {
@@ -13,14 +14,21 @@ function mdToHtml(md: string): string {
     .replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank" rel="noopener noreferrer">$1</a>');
   const lines = md.split(/\r?\n/);
   const out: string[] = [];
-  let inList = false; let para: string[] = [];
+  let inList: '' | 'ul' | 'ol' = ''; let para: string[] = [];
   const flushPara = () => { if (para.length) { out.push(`<p>${inline(para.join(' '))}</p>`); para = []; } };
-  const flushList = () => { if (inList) { out.push('</ul>'); inList = false; } };
+  const flushList = () => { if (inList) { out.push(`</${inList}>`); inList = ''; } };
   for (const line of lines) {
     const h = line.match(/^(#{1,3})\s+(.*)$/);
     if (h) { flushPara(); flushList(); out.push(`<h${h[1].length + 1}>${inline(h[2])}</h${h[1].length + 1}>`); continue; }
-    const li = line.match(/^\s*[-*]\s+(.*)$/) ?? line.match(/^\s*\d+\.\s+(.*)$/);
-    if (li) { flushPara(); if (!inList) { out.push('<ul>'); inList = true; } out.push(`<li>${inline(li[1])}</li>`); continue; }
+    const ul = line.match(/^\s*[-*]\s+(.*)$/);
+    const ol = line.match(/^\s*\d+\.\s+(.*)$/);
+    const li = ul ?? ol;
+    if (li) {
+      const kind = ul ? 'ul' : 'ol';
+      flushPara();
+      if (inList !== kind) { flushList(); out.push(`<${kind}>`); inList = kind; }
+      out.push(`<li>${inline(li[1])}</li>`); continue;
+    }
     if (line.trim() === '') { flushPara(); flushList(); continue; }
     para.push(line.trim());
   }
@@ -36,7 +44,9 @@ export default function HelpModal({ onClose }: { onClose: () => void }) {
   useEffect(() => {
     void api.get<{ id: string; title: string }[]>('/api/help').then((p) => {
       setPages(p);
-      if (p[0]) setPage(p[0].id);
+      const want = useUi.getState().helpPage;
+      useUi.getState().set({ helpPage: null });
+      setPage(p.find((x) => x.id === want)?.id ?? p[0]?.id ?? '');
     });
   }, []);
 
@@ -62,7 +72,13 @@ export default function HelpModal({ onClose }: { onClose: () => void }) {
             </button>
           </div>
         </div>
-        <div className="settings-content help-content" dangerouslySetInnerHTML={{ __html: html }} />
+        <div className="settings-content help-content" dangerouslySetInnerHTML={{ __html: html }}
+          onClick={(e) => {
+            // links between manual pages (e.g. 05-accounts-providers.md) stay inside Help
+            const a = (e.target as HTMLElement).closest('a');
+            const m = a?.getAttribute('href')?.match(/^(?:\.\/)?([a-z0-9-]+)\.md(?:#.*)?$/i);
+            if (m && pages.some((p) => p.id === m[1])) { e.preventDefault(); setPage(m[1]); }
+          }} />
       </div>
     </div>
   );

@@ -45,13 +45,46 @@ Plain words match the subject, body, and participants (full-text). Combine them 
 
 ## Smart views
 
-A **smart view** is a saved search that lives in the sidebar under **Smart views**, with a live count of the messages that match.
+A **smart view** is nothing more than a **saved search** that lives in the sidebar under **Smart views**, with a live
+count of the messages that match. It never moves, deletes or changes mail. The AI never "runs" a view either: the AI only
+*labels* mail (see [AI, rules & retention](06-ai-automation.md)), and a view that mentions a label simply searches for
+that label.
 
-- **Save a search:** type it in the search box and click the bookmark button next to the **x**. Give it a name, an icon and a colour, and choose whether it is shown in the sidebar, shows a count, and **notifies you** when new mail matches.
-- **Edit or delete:** hover a view in the sidebar and click the pencil.
-- **Counts** refresh when mail changes (at most every 30 seconds per account) and always equal the number of messages the view lists.
-- **Notify on match:** a view with notifications on creates a "Smart view match" notification (Settings → Notifications) once per new message, only for mail that arrives after you turned it on.
-- **Suggestions:** the sidebar offers, once, ready-made views — *Waiting for reply*, *Unpaid invoices*, *High risk*, *Attachments over 5 MB* and *Disposable address mail*. Add the ones you want; **Dismiss** hides the card for good.
+### The suggested views
+
+The first time you have none, the sidebar offers a card of **Suggested views**. Press **+ Add** next to the ones you want;
+**Dismiss** hides the card for good. Each is exactly this search:
+
+| View | Search it saves | How it is decided |
+|---|---|---|
+| **VIPs** | `is:vip` | Rule: the sender is on **your** VIP list (an address or a whole domain — **Settings → Notifications → VIPs**). No AI. |
+| **Waiting for reply** | `is:waiting` | Rule: a sent message that still has a follow-up reminder open (waiting or due). No AI. See *Follow-up reminders*. |
+| **Unpaid invoices** | `label:Invoices is:unread` | **AI/rules label + unread.** Needs a label called **Invoices** (create it in **Settings → Labels**); rules or the AI apply it to invoice mail. "Unpaid" here only means *unread* — Seamless doesn't know if you paid. With no Invoices label the view is empty. |
+| **High risk** | `risk:high` | Rule: the phishing checks flagged the message as high risk ([Phishing](14-phishing.md)). No AI. |
+| **Attachments over 5 MB** | `has:attachment size>5mb` | Rule: the message has an attachment and is larger than 5 MB. No AI. |
+| **Disposable address mail** | `is:disposable` | Rule: the message was delivered to one of your disposable addresses ([Disposable addresses](16-disposable.md)). No AI. |
+
+### Make your own
+
+1. Type a search in the box at the top (try `from:bank is:unread has:attachment`).
+2. Click the **bookmark** button next to the **x**.
+3. In **Save this search** give it a **Name**, an **Icon** and optionally a **Colour**.
+4. Tick **Show in the sidebar**, **Show how many messages match** and/or **Notify me when new mail matches**.
+5. Press **Save view**.
+
+### Change or remove one
+
+1. Hover the view in the sidebar and click the **pencil**.
+2. Edit the name, the **Search** text, icon, colour or the tick-boxes, then **Save** — or press **Delete** to remove the
+   view (your mail is untouched).
+
+### Good to know
+
+- **Counts** refresh when mail changes (at most every 30 seconds) and always equal the number of messages the view lists.
+- **Notify on match:** a view with notifications on creates a "Smart view match" notification (Settings → Notifications)
+  once per new message, only for mail that arrives after you turned it on.
+- Because a view is just a search, anything in the *What you can search* list above works, including `category:`,
+  `business:`, `assigned:` and `attachment:`.
 
 ## Shared inbox operators
 `assigned:me` · `assigned:none` · `status:open|pending|done` — see *Shared mailboxes*.

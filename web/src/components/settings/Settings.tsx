@@ -62,6 +62,17 @@ const TABS: { id: string; name: string; Icon: ComponentType<{ className?: string
   { id: 'users', name: 'Users', Icon: UsersIcon, C: UserSettings, admin: true },
 ];
 
+/** Manual page that explains each Settings tab (opened by the ? beside the tab title). */
+export const TAB_HELP: Record<string, string> = {
+  general: '01-getting-started', appearance: '01-getting-started', mailboxes: '05-accounts-providers',
+  businesses: '18-businesses', disposable: '16-disposable', sending: '25-sending-receiving', labels: '02-reading-organizing',
+  templates: '04-composing', notifications: '13-notifications', security: '12-security', encryption: '23-encryption',
+  rules: '06-ai-automation', automation: '27-trash-retention', filters: '26-stopping-unwanted-senders', ai: '06-ai-automation',
+  integrations: '20-integrations', leads: '21-leads', contacts: '08-devices-contacts', devices: '08-devices-contacts',
+  health: '15-health', logs: '10-troubleshooting', audit: '22-audit-log', storage: '17-storage', backup: '11-backup-restore',
+  users: '01-getting-started',
+};
+
 export default function Settings({ tab }: { tab: string }) {
   const logout = useSession((s) => s.logout);
   const isAdmin = useSession((s) => s.user?.role === 'admin');
@@ -87,6 +98,8 @@ export default function Settings({ tab }: { tab: string }) {
         </div>
       </nav>
       <div className="settings-content">
+        <button className="icon-btn settings-help-btn" title={`Help for ${current.name}`} aria-label={`Help for ${current.name}`}
+          onClick={() => useUi.getState().set({ helpPage: TAB_HELP[current.id] ?? null, helpOpen: true })}><HelpIcon size={18} /></button>
         <current.C />
       </div>
     </section>

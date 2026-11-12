@@ -48,3 +48,6 @@ Two layouts are available (switch in **Settings > Appearance**, or with the layo
 - **Composing & sending** — the editor, attachments, send later, open tracking.
 - **AI, rules & retention** and **Teach the AI** — how mail is filed and cleaned up automatically.
 - **Devices & contacts** — connect your phone or desktop mail app.
+- **[Manual index](00-index.md)** — every page grouped by task. In Settings, the **?** at the top right of each tab opens
+  the page that explains it.
+- **[Sending & receiving mail](25-sending-receiving.md)** and **[Stopping unwanted senders](26-stopping-unwanted-senders.md)**.

@@ -5,6 +5,26 @@ Seamless can turn the notification emails your websites send (a quote form, a co
 
 Open **Leads** in the sidebar (under Labels). Set it up in **Settings → Leads**.
 
+## Set up your first lead source
+
+1. **Settings → Leads.** If you have no sources yet you will see **Add lead source**; otherwise use the same button at the
+   bottom of the list.
+2. **Name:** something you will recognise, e.g. *Office Cleaners website*.
+3. **Which mail is a lead? (search):** the search that matches your website's notification emails. Open one of those
+   emails first and note who it comes from and what the subject says, e.g.
+   `from:wordpress@officecleaners.com.au subject:"New quote request"`.
+4. **Business:** pick the business the website belongs to (or leave **None**). Create businesses under **Settings →
+   Businesses**.
+5. Press **Test against recent mail**. Seamless lists the latest messages the search matches and shows what it would read
+   from each: name, email, phone, suburb, service. Nothing is saved yet.
+   - Nothing listed? The search is too narrow — loosen the subject or check the sender.
+   - Columns blank or wrong? The form email is unusual; add or set up an AI provider (**Settings → AI**) and test again.
+6. When the test looks right, leave **Enabled** ticked and press **Add source**.
+7. Submit a test enquiry on your website. Within a minute a **New lead** notification appears and the lead is in
+   **Leads** in the sidebar.
+
+Only mail that arrives *after* the source exists is captured. To change the search later, press **Edit** beside the source.
+
 ## Lead sources
 
 A lead source says *which mail is a lead*. It is an ordinary search, the same language as the search box:
