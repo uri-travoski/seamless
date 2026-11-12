@@ -132,3 +132,8 @@ npm test    # vitest against Postgres (creates/rebuilds the seamless_test databa
 See `.env.example`. Key vars: `SEAMLESS_SECRET` (required), `PORT` (4900), `DATABASE_URL`, `DATA_DIR`, `PUBLIC_URL`, `S3_*` (mail blobs).
 
 Backups reuse the `S3_*` bucket unless you separate them — recommended, so one deleted bucket or leaked key cannot take both: `S3_BACKUP_BUCKET`, plus optional `S3_BACKUP_ENDPOINT` / `_REGION` / `_ACCESS_KEY` / `_SECRET_KEY` / `_FORCE_PATH_STYLE` (each falls back to its `S3_*` twin), and `BACKUP_PREFIX` (default `seamless/`).
+
+## License
+
+Seamless is free software under the **GNU Affero General Public License v3.0** (see [LICENSE](LICENSE)). You may use, change and
+self-host it freely. If you run a modified version as a network service, you must offer your changes to its users under the same licence.
