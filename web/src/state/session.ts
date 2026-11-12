@@ -26,11 +26,28 @@ export interface ClientSettings {
 
 export interface SidebarConfig { order: string[]; more: string[] }
 
-export const SIDEBAR_FOLDERS = ['inbox', 'starred', 'drafts', 'scheduled', 'sent', 'templates', 'spam', 'bin', 'archive', 'snoozed', 'readlater', 'waiting'];
+export const SIDEBAR_FOLDERS = ['inbox', 'starred', 'drafts', 'scheduled', 'snoozed', 'sent', 'templates', 'spam', 'archive', 'bin'];
 export const DEFAULT_SIDEBAR: SidebarConfig = {
-  order: ['inbox', 'starred', 'drafts', 'scheduled', 'sent', 'templates', 'spam', 'bin'],
-  more: ['snoozed', 'readlater', 'waiting', 'archive'],
+  order: ['inbox', 'starred', 'drafts', 'scheduled', 'snoozed', 'sent', 'templates', 'spam', 'archive', 'bin'],
+  more: [],
 };
+
+/** Old saved layouts: drop Read later / Waiting for reply (Waiting is a smart view now), and bring Snoozed (under
+ *  Scheduled) and Archive (above Bin) out of "More" into their places. Everything else keeps the user's order. */
+export function normaliseSidebar(saved: SidebarConfig | undefined): SidebarConfig {
+  const s = saved ?? DEFAULT_SIDEBAR;
+  const gone = new Set(['readlater', 'waiting']);
+  const order = s.order.filter((f) => !gone.has(f));
+  const more = s.more.filter((f) => !gone.has(f));
+  const bring = (f: string, place: (o: string[]) => number) => {
+    const m = more.indexOf(f);
+    if (m >= 0) more.splice(m, 1);
+    if (!order.includes(f)) order.splice(place(order), 0, f);
+  };
+  bring('snoozed', (o) => { const i = o.indexOf('scheduled'); return i >= 0 ? i + 1 : o.length; });
+  bring('archive', (o) => { const i = o.indexOf('bin'); return i >= 0 ? i : o.length; });
+  return { order, more };
+}
 
 const DEFAULTS: ClientSettings = {
   fontSize: 16, fontFamily: 'Inter', density: 'comfortable', layout: 'split', allowRemoteImages: false,

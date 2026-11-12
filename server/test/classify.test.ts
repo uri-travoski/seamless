@@ -156,7 +156,7 @@ describe('classification pipeline + retention', () => {
     expect(stats.trashed).toBe(0); // never re-trashed
   });
 
-  it('purges swept trash after the grace window, leaves user-trashed mail alone', async () => {
+  it('purges swept trash after the grace window', async () => {
     const swept = await ingest(acct, inbox, rawEmail({ from: 'deals@ozbargain.com.au', to: 'alice@demo.test', subject: 'Purge me', date: 'Mon, 01 Jun 2026 10:00:00 +0000' }));
     await processPending();
     await setUserSetting(userId, 'dry_run', 'false');
@@ -166,6 +166,23 @@ describe('classification pipeline + retention', () => {
     const stats = await sweepRetention(Date.parse('2026-08-11'));
     expect(stats.purged).toBe(1);
     expect(await one('SELECT 1 FROM messages WHERE id = ?', [swept!.rowId])).toBeUndefined();
+  });
+
+  it('purges mail you deleted by hand too, including mail that arrived in Trash from another app', async () => {
+    await setUserSetting(userId, 'dry_run', 'false');
+    const mine = await ingest(acct, inbox, rawEmail({ from: 'friend@example.com', to: 'alice@demo.test', subject: 'Deleted by me', date: 'Mon, 01 Jun 2026 10:00:00 +0000' }));
+    await moveEmail(userId, `m${mine!.rowId}`, `mb:${trash}`);          // user deletes it in Seamless
+    const synced = await ingest(acct, trash, rawEmail({ from: 'friend@example.com', to: 'alice@demo.test', subject: 'Deleted elsewhere', date: 'Mon, 01 Jun 2026 10:00:00 +0000' }));
+    await run('UPDATE messages SET trashed_at = NULL WHERE id = ?', [synced!.rowId]);   // no clock yet
+    await run('UPDATE messages SET trashed_at = ? WHERE id = ?', [Date.parse('2026-07-01'), mine!.rowId]);
+    expect((await sweepRetention(Date.parse('2026-07-10'))).purged).toBe(0);          // inside the grace window
+    expect(await one('SELECT 1 FROM messages WHERE id = ?', [mine!.rowId])).toBeDefined();
+    const stats = await sweepRetention(Date.parse('2026-07-02') + 31 * 86_400_000);
+    expect(stats.purged).toBeGreaterThanOrEqual(1);
+    expect(await one('SELECT 1 FROM messages WHERE id = ?', [mine!.rowId])).toBeUndefined();
+    const later = await sweepRetention(Date.parse('2026-07-10') + 31 * 86_400_000);  // the synced one's clock started at the first sweep
+    expect(await one('SELECT 1 FROM messages WHERE id = ?', [synced!.rowId])).toBeUndefined();
+    expect(later.purged + stats.purged).toBeGreaterThanOrEqual(2);
   });
 
   it('label retention edit recomputes dispositions', async () => {

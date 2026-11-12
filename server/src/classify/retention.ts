@@ -13,7 +13,7 @@ interface Candidate { id: number; user_id: number; subject: string; from_addr: s
 /**
  * The retention sweep (DESIGN.md §4). Never touches: protected labels, user_touched,
  * trash/junk/sent/drafts/scheduled. Dry-run (default ON) only logs what it would do.
- * Deleting = recoverable Trash; purge only expunges what the sweep itself trashed,
+ * Deleting = recoverable Trash; purge empties everything in Trash (swept or hand-deleted)
  * after the trash grace window.
  */
 export async function sweepRetention(now = Date.now()): Promise<{ trashed: number; purged: number; dryRun: number }> {
@@ -68,7 +68,13 @@ export async function sweepRetention(now = Date.now()): Promise<{ trashed: numbe
       }
     }
 
-    // purge: only messages the sweep itself moved to trash, after the grace window
+    // purge: everything in Trash after the grace window — mail the sweep trashed AND mail you deleted by hand.
+    // Mail that landed in Trash some other way (deleted in a phone app and synced in) has no purge clock yet:
+    // start it now, so it goes after the same number of days.
+    if (!dryRun) {
+      await run(`UPDATE messages SET trashed_at = ? WHERE user_id = ? AND trashed_at IS NULL
+                 AND mailbox_id IN (SELECT id FROM mailboxes WHERE role = 'trash')`, [now, u.id]);
+    }
     const purgeable = await q<{ id: number; subject: string }>(`
       SELECT m.id, m.subject FROM messages m JOIN mailboxes mb ON mb.id = m.mailbox_id
       WHERE m.user_id = ? AND mb.role = 'trash' AND m.trashed_at IS NOT NULL AND m.trashed_at < ?

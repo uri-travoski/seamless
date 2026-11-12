@@ -98,13 +98,13 @@ describe('F-04 event bus', () => {
 });
 
 describe('F-04 notifications API', () => {
-  it('summary returns the unread badge and the latest six', async () => {
-    for (let i = 0; i < 8; i++) await emitEvent(TEST_USER, 'mail.received', null, { from: `S${i}`, subject: `s${i}` });
+  it('summary returns the unread badge and the latest twenty', async () => {
+    for (let i = 0; i < 25; i++) await emitEvent(TEST_USER, 'mail.received', null, { from: `S${i}`, subject: `s${i}` });
     const cookie = await login(app);
     const s = (await app.inject({ method: 'GET', url: '/api/notifications/summary', headers: { cookie } })).json();
-    expect(s.unread).toBe(8);
-    expect(s.latest).toHaveLength(6);
-    expect(s.latest[0].title).toBe('S7');
+    expect(s.unread).toBe(25);
+    expect(s.latest).toHaveLength(20);
+    expect(s.latest[0].title).toBe('S24');
   });
 
   it('130 notifications: page 3 at 50/page holds items 101–130, total 130', async () => {

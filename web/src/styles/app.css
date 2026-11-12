@@ -1489,3 +1489,24 @@ mark[data-ai-pending], mark[data-unknown-var] { outline: 1px dashed var(--md-bor
 .settings-nav-group { font-size: 11px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--color-text-faint, var(--color-text-soft)); padding: 14px 12px 4px; }
 .settings-nav .back-to-mail + .settings-nav-group { padding-top: 6px; }
 @media (max-width: 900px) { .settings-nav-group { display: none; } }
+
+/* search options panel (Gmail-style) */
+.adv-scrim { position: fixed; inset: 0; z-index: 80; }
+.adv-search { position: absolute; top: calc(100% + 6px); left: 0; right: 0; z-index: 90; background: var(--color-surface); color: var(--color-text); border: 1px solid var(--color-border); border-radius: 10px; box-shadow: var(--md-shadow-heavy); padding: 14px 16px; min-width: 380px; }
+.adv-row { display: grid; grid-template-columns: 110px 1fr; align-items: center; gap: 8px; margin-bottom: 8px; font-size: 13px; }
+.adv-row .text-input { width: 100%; box-sizing: border-box; }
+.adv-inline { display: flex; gap: 6px; align-items: center; }
+.adv-checks { display: flex; gap: 18px; flex-wrap: wrap; font-size: 13px; margin: 6px 0 4px 118px; }
+.adv-checks.col { flex-direction: column; gap: 9px; margin-left: 0; }
+.adv-foot { display: flex; align-items: center; gap: 8px; margin-top: 12px; padding-top: 10px; border-top: 1px solid var(--color-border); }
+.adv-note { font-size: 13px; margin: 0 0 8px; }
+.adv-warn { font-size: 12.5px; color: var(--color-text-soft); margin: 0 0 8px; }
+@media (max-width: 700px) { .adv-search { position: fixed; left: 8px; right: 8px; top: 60px; min-width: 0; } .adv-row { grid-template-columns: 1fr; } .adv-checks { margin-left: 0; } }
+.topbar .adv-search input.text-input, .topbar .adv-search select.text-input {
+  background: var(--color-surface); color: var(--color-text); border: 1px solid var(--color-border); border-radius: 6px;
+  padding: 7px 9px; height: auto; flex: none; box-shadow: none; width: 100%; box-sizing: border-box; font-size: 13px;
+}
+.topbar .adv-search .adv-inline input.text-input, .topbar .adv-search .adv-inline select.text-input { width: auto; flex: 1; }
+.topbar .adv-search .adv-inline input.text-input { flex: 0 0 80px; }
+.topbar .adv-search input[type=checkbox] { width: auto; height: auto; padding: 0; }
+.topbar .adv-search .adv-checks.col select.text-input { width: auto; margin-left: 6px; }

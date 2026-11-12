@@ -124,7 +124,7 @@ mailing services add, such as Mailchimp, SendGrid and Mailgun).
 
 - **Keep in Inbox** – nothing changes; the bar stays out of your way afterwards.
 - **Read later** – this issue and every future one from that sender skip the Inbox and wait in the **Read later** folder
-  (sidebar → *More*). The list shows each item's estimated reading time (words ÷ 230 per minute). Read later items don't
+  (there is no sidebar entry for Read later at the moment). The list shows each item's estimated reading time (words ÷ 230 per minute). Read later items don't
   count towards the Inbox's unread number.
 - **Unsubscribe** – see below.
 

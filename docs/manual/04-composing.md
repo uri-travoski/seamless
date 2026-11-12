@@ -40,7 +40,7 @@ Ask to be told if nobody answers.
 - When the time comes: if someone you wrote to has replied, nothing happens. Otherwise you get a **No reply from Bob**
   notification (or "Opened 3× but no reply from Bob" if you tracked it). The sent message shows a banner with
   **Follow up now** (opens a reply) and **Remind me again**.
-- **Waiting for reply** (sidebar, under *More*) lists every sent message that still has a reminder.
+- **Waiting for reply** (the **Waiting for reply** smart view in the filter row above the message list) lists every sent message that still has a reminder.
 - Only a reply from one of the people you wrote to counts — a reply from someone else doesn't. **Cancel reminder** is in the
   banner and the right-click menu.
 

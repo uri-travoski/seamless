@@ -13,14 +13,14 @@ Scheduled (send-later) mail is not delayed. More: [Composing & sending](04-compo
 ## Snooze
 1. Hover a message and click the **clock**, or select it and press **b**.
 2. Pick *Later today*, *Tomorrow*, *Next week*… or *Pick date and time…*.
-3. See what is waiting under **Snoozed** in the sidebar (under *More*).
+3. See what is waiting under **Snoozed** in the sidebar.
 4. To stop a conversation coming back early on a reply, untick **Settings → General → Snooze: bring a conversation back
    early when someone replies**.
 
 ## Follow-up reminders
 1. In a new message open the **⋮** menu → **Remind me if no reply…** → choose 1, 2, 3 days, 1 week or your own number.
 2. Send. If nobody you wrote to answers, you get a **No reply from…** notification.
-3. **Waiting for reply** in the sidebar lists everything still pending.
+3. The **Waiting for reply** pill in the row above the message list lists everything still pending.
 
 ## Phishing warnings
 1. Nothing to switch on — every incoming message is checked.
@@ -88,6 +88,6 @@ Scheduled (send-later) mail is not delayed. More: [Composing & sending](04-compo
 
 ## Newsletters and Read later
 1. Open a newsletter. In the bar above it press **Keep in Inbox**, **Read later** or **Unsubscribe**.
-2. Read later items wait in **Read later** in the sidebar.
+2. Read later items skip the Inbox (there is no sidebar entry for Read later at the moment).
 3. **Settings → Newsletters** controls archiving after reading, how long Read later items are kept,
    and where unsubscribed senders' mail goes. See [Trash & retention](27-trash-retention.md).

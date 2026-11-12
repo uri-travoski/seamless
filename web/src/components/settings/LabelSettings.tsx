@@ -6,7 +6,7 @@ import { useEffect, useMemo, useState } from 'react';
 import type { ApiLabel } from '@seamless/shared';
 import { api } from '../../api/client.ts';
 import { useMail } from '../../state/mail.ts';
-import { useSession, DEFAULT_SIDEBAR, SIDEBAR_FOLDERS } from '../../state/session.ts';
+import { useSession, DEFAULT_SIDEBAR, SIDEBAR_FOLDERS, normaliseSidebar } from '../../state/session.ts';
 import { FOLDER_TITLE } from '../../router.ts';
 import { toast } from '../../toast.ts';
 import { labelTree } from '../Sidebar.tsx';
@@ -29,7 +29,7 @@ function retentionSummary(l: ApiLabel): string {
 }
 
 function SidebarLayout() {
-  const sidebar = useSession((s) => s.settings.sidebar) ?? DEFAULT_SIDEBAR;
+  const sidebar = normaliseSidebar(useSession((s) => s.settings.sidebar));
   const save = useSession((s) => s.saveSettings);
   const all = [...sidebar.order, ...sidebar.more, ...SIDEBAR_FOLDERS.filter((f) => !sidebar.order.includes(f) && !sidebar.more.includes(f))];
   const set = (order: string[], more: string[]) => save({ sidebar: { order, more } });

@@ -11,7 +11,7 @@ import type { ComponentType } from 'react';
 import type { ApiLabel } from '@seamless/shared';
 import { useMail, scopeToSlug } from '../state/mail.ts';
 import { useCompose } from '../state/compose.ts';
-import { useSession, DEFAULT_SIDEBAR, SIDEBAR_FOLDERS } from '../state/session.ts';
+import { useSession, normaliseSidebar, SIDEBAR_FOLDERS } from '../state/session.ts';
 import { useRouter, navigate, FOLDER_ROLE, FOLDER_TITLE } from '../router.ts';
 import {
   InboxIcon, DraftsIcon, SentIcon, ScheduledIcon, ArchiveIcon, JunkIcon, TrashIcon, FolderIcon, ComposeIcon,
@@ -64,7 +64,7 @@ export default function Sidebar({ open, onNavigate, onAddLabel }: { open: boolea
   const [moreOpen, setMoreOpen] = useState(false);
   const [collapsedLabels, setCollapsedLabels] = useState<Set<number>>(new Set());
 
-  const saved = settings.sidebar ?? DEFAULT_SIDEBAR;
+  const saved = normaliseSidebar(settings.sidebar);
   // folders added after the user saved their layout (Snoozed, Waiting for reply) show up under "More"
   const sidebar = { order: saved.order, more: [...saved.more, ...SIDEBAR_FOLDERS.filter((f) => !saved.order.includes(f) && !saved.more.includes(f))] };
   const slug = scopeToSlug(scope, overview);
