@@ -49,6 +49,9 @@ import { register as vips } from './vips.ts';
 import { register as webhooks } from './webhooks.ts';
 import { register as apiv1 } from './apiv1.ts';
 import { register as leads } from './leads.ts';
+import { register as auditRoutes } from './audit.ts';
+import { audit } from '../audit/log.ts';
+import { AUDITED_ROUTES } from '../audit/routeMap.ts';
 import { sessionToken } from '../auth/sessions.ts';
 import { authenticate, ApiError, onApiCall } from '../api/tokens.ts';
 
@@ -73,9 +76,29 @@ export function registerRoutes(app: FastifyInstance): void {
       throw e;
     }
   });
-  app.addHook('onResponse', async (req, reply) => {
+  // Audit in onSend (not onResponse): the row is committed before the client gets its answer, so "the action
+  // happened" and "the audit row exists" can't be observed out of order. Creates answer with the new row's id,
+  // which is read from the JSON body so the row can name its target.
+  // Callback style on purpose: requests that need no audit row must go through synchronously. An async hook defers
+  // the send by a tick, and routes that call `reply.send()` and then `return;` (the admin guards) would double-send.
+  app.addHook('onSend', (req, reply, payload, done) => {
+    const pattern = req.routeOptions?.url ?? req.url;
     const a = (req as any).apiAuth;
-    if (a) onApiCall(a.tokenId, `${req.method} ${req.routeOptions?.url ?? req.url}`, reply.statusCode);
+    if (a) {
+      onApiCall(a.tokenId, `${req.method} ${pattern}`, reply.statusCode);
+      // one audit row per v1 call: route + status (never the body or the query string)
+      void audit(req, 'api.call', { type: 'route', id: `${req.method} ${pattern}` }, { status: reply.statusCode }).then(() => done(null, payload));
+      return;
+    }
+    const hit = AUDITED_ROUTES[`${req.method} ${pattern}`];   // sensitive session-authenticated actions (audit/routeMap.ts)
+    if (!hit || reply.statusCode >= 400) { done(null, payload); return; }
+    let newId: unknown = null;
+    if (typeof payload === 'string' && payload.length < 4096 && payload.startsWith('{')) {
+      try { const j = JSON.parse(payload); if (typeof j?.id === 'number' || typeof j?.id === 'string') newId = j.id; } catch { /* not json */ }
+    }
+    const params = (req.params ?? {}) as Record<string, string>;
+    void audit(req, hit.action, { type: hit.type, id: params[hit.idParam ?? 'id'] ?? (newId as any) }, { params, status: reply.statusCode })
+      .then(() => done(null, payload));
   });
 
   app.addHook('preHandler', async (req, reply) => {
@@ -84,7 +107,7 @@ export function registerRoutes(app: FastifyInstance): void {
     (req as any).sessionUser = su;
     if (PUBLIC_PATHS.some((re) => re.test(req.url))) return;
     if (!su) {
-      reply.code(401).send({ error: 'unauthorized' });
+      return reply.code(401).send({ error: 'unauthorized' });
     }
   });
 
@@ -136,4 +159,5 @@ export function registerRoutes(app: FastifyInstance): void {
   webhooks(app);
   apiv1(app);
   leads(app);
+  auditRoutes(app);
 }

@@ -10,6 +10,7 @@ import {
   startTotp, confirmTotp, disableTotp, regenerateRecoveryCodes, mfaStatus, mfaRequiredForAll,
 } from '../auth/mfa.ts';
 import { emitEvent } from '../events/emit.ts';
+import { audit } from '../audit/log.ts';
 
 /** Minimum length for new passwords. (The plan asks for 12; kept at 8 so existing logins and
  *  the owner's standard password still work — see PASSWORD_MIN in the tier notes.) */
@@ -64,6 +65,7 @@ export function register(app: FastifyInstance): void {
     const user = await one<{ id: number; password_hash: string }>(
       'SELECT id, password_hash FROM users WHERE email = ?', [lc]);
     if (!user || !verifyPassword(password ?? '', user.password_hash)) {
+      await audit(req, 'login.failed', { type: 'user', id: user?.id ?? null }, { email: lc, reason: 'password' }, { userId: user?.id ?? null });
       if (throttled(req, lc)) return reply.code(429).send({ error: 'too many attempts, try later' });
       return reply.code(401).send({ error: 'wrong email or password' });
     }
@@ -74,6 +76,7 @@ export function register(app: FastifyInstance): void {
     authLimiter.reset(`ip:${req.ip}`); authLimiter.reset(`email:${lc}`);
     await makeSession(req, reply, user.id);
     await emitEvent(user.id, 'security.login', { type: 'user', id: user.id }, { ip: req.ip, ua: String(req.headers['user-agent'] ?? '').slice(0, 200) });
+    await audit(req, 'login.ok', { type: 'user', id: user.id }, { mfa: false }, { userId: user.id });
     return { ok: true };
   });
 
@@ -84,12 +87,14 @@ export function register(app: FastifyInstance): void {
     if (alreadyBlocked(req, `uid:${userId}`)) return reply.code(429).send({ error: 'too many attempts, try later' });
     const how = await verifySecondFactor(userId, String(code ?? ''));
     if (!how) {
+      await audit(req, 'login.failed', { type: 'user', id: userId }, { reason: 'second factor' }, { userId });
       if (throttled(req, `uid:${userId}`)) return reply.code(429).send({ error: 'too many attempts, try later' });
       return reply.code(401).send({ error: 'wrong code' });
     }
     consumeMfaChallenge(String(mfaToken));
     await makeSession(req, reply, userId);
     await emitEvent(userId, 'security.login', { type: 'user', id: userId }, { ip: req.ip, mfa: how });
+    await audit(req, 'login.ok', { type: 'user', id: userId }, { mfa: how }, { userId });
     return { ok: true, usedRecoveryCode: how === 'recovery' };
   });
 

@@ -10,6 +10,7 @@ import { queryEmails, getMsgRow, setKeywords, moveEmail, setLabels, destroyEmail
 import { randomToken } from '../crypto.ts';
 import { snoozeThread, unsnoozeThread } from '../mail/snooze.ts';
 import { uid } from './util.ts';
+import { audit } from '../audit/log.ts';
 
 export type BulkAction = 'read' | 'unread' | 'star' | 'unstar' | 'archive' | 'inbox' | 'spam' | 'delete' | 'move' | 'label' | 'unlabel' | 'snooze';
 
@@ -111,7 +112,13 @@ export function register(app: FastifyInstance): void {
     if ((b.action === 'label' || b.action === 'unlabel') && !Number(b.value)) return reply.code(400).send({ error: 'label id required' });
     if (b.action === 'snooze' && !(Number(b.value) > Date.now())) return reply.code(400).send({ error: 'snooze time must be in the future' });
     if (b.action === 'move' && !/^(mb|u):/.test(String(b.value ?? ''))) return reply.code(400).send({ error: 'target mailbox required' });
-    return runBulk(uid(req), b);
+    const res = await runBulk(uid(req), b);
+    // a big delete is worth a trail (the count comes from what actually changed, not what was asked for)
+    if (b.action === 'delete') {
+      const n = res.affected;
+      if (n > 50) await audit(req, 'bulk.delete', { type: 'messages' }, { count: n, byFilter: !b.ids });
+    }
+    return res;
   });
 
   app.post('/api/bulk/undo', async (req, reply) => {

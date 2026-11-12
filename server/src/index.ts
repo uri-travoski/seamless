@@ -17,6 +17,7 @@ import { initPush } from './push.ts';
 import { categorizeEmail } from './ai/tasks.ts';
 import { startScheduler, onScheduledSend } from './mail/scheduler.ts';
 import { startJobRunner } from './jobs/runner.ts';
+import { ensureAuditPruneJob } from './audit/prune.ts';
 import { startHealthAlerts, shouldAlert } from './health/alerts.ts';
 import { wakeOnReply } from './mail/snooze.ts';
 import { settleOnReply } from './mail/followups.ts';
@@ -141,6 +142,7 @@ setScheduleCanceller((messageId) => cancelScheduleByMessageId(messageId));
 onScheduledSend(async () => broadcast({ type: 'stateChange', state: await currentState() }));
 startScheduler();
 startJobRunner();
+ensureAuditPruneJob().catch((err) => console.error('audit prune schedule failed:', err?.message ?? err));
 resumeMigrations().catch((err) => console.error('storage migration resume failed:', err?.message ?? err));
 startHealthAlerts();
 

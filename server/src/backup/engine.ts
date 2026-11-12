@@ -299,6 +299,7 @@ export async function replayDump(db: pg.Pool, lines: string[], opts: { transform
   try {
     await client.query('BEGIN');
     await client.query('SET LOCAL session_replication_role = replica');
+    await client.query("SET LOCAL seamless.audit_prune = 'on'");   // a restore may replace the append-only audit_log
 
     const truncatable = [...live].map(ident).join(', ');
     if (truncatable) await client.query(`TRUNCATE ${truncatable} RESTART IDENTITY CASCADE`);

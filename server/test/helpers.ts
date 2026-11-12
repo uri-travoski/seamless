@@ -57,6 +57,15 @@ export let TEST_USER = 0;
 
 /** Wipe all data and recreate the default test user. */
 export async function resetDb(): Promise<void> {
+  // audit_log is append-only by trigger; the test reset is one of the two places allowed to clear it
+  const { pool } = await import('../src/db.ts');
+  const c = await pool.connect();
+  try {
+    await c.query('BEGIN');
+    await c.query("SET LOCAL seamless.audit_prune = 'on'");
+    await c.query('TRUNCATE audit_log RESTART IDENTITY');
+    await c.query('COMMIT');
+  } catch (e) { await c.query('ROLLBACK').catch(() => {}); throw e; } finally { c.release(); }
   await run('TRUNCATE users RESTART IDENTITY CASCADE');
   await run('TRUNCATE tracking_opens, op_queue, scheduled_sends, jobs, storage_targets, storage_migrations, storage_migration_items RESTART IDENTITY');
   await run("DELETE FROM settings WHERE key = 'state' OR key LIKE 'alert:%'");

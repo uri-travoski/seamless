@@ -1277,6 +1277,44 @@ CREATE TABLE smime_certs (
 CREATE INDEX smime_certs_user_email ON smime_certs(user_id, lower(email));
 `,
   },
+  {
+    id: 39,
+    sql: `
+-- T6.1 F-42: append-only audit log. No FK on the actor: rows must outlive a deleted user.
+CREATE TABLE audit_log (
+  id BIGSERIAL PRIMARY KEY,
+  actor_user_id INTEGER,
+  actor_kind TEXT NOT NULL CHECK (actor_kind IN ('user','api_token','system')),
+  actor_token_id INTEGER,
+  action TEXT NOT NULL,
+  target_type TEXT,
+  target_id TEXT,
+  ip TEXT,
+  user_agent TEXT,
+  details JSONB,
+  created_at BIGINT NOT NULL
+);
+CREATE INDEX audit_log_actor ON audit_log(actor_user_id, created_at DESC);
+CREATE INDEX audit_log_action ON audit_log(action, created_at DESC);
+CREATE INDEX audit_log_time ON audit_log(created_at DESC);
+-- The app's DB user owns the table, so REVOKE would protect nothing: guard with triggers.
+-- Only the retention job (and restore/test reset) sets seamless.audit_prune = 'on' inside its transaction.
+CREATE FUNCTION audit_log_guard() RETURNS trigger AS $$
+BEGIN
+  IF current_setting('seamless.audit_prune', true) = 'on' THEN
+    IF TG_OP = 'DELETE' THEN RETURN OLD; END IF;
+    IF TG_OP = 'TRUNCATE' THEN RETURN NULL; END IF;
+    RETURN NEW;
+  END IF;
+  RAISE EXCEPTION 'audit_log is append-only (% refused)', TG_OP;
+END;
+$$ LANGUAGE plpgsql;
+CREATE TRIGGER audit_log_no_change BEFORE UPDATE OR DELETE ON audit_log
+  FOR EACH ROW EXECUTE FUNCTION audit_log_guard();
+CREATE TRIGGER audit_log_no_truncate BEFORE TRUNCATE ON audit_log
+  FOR EACH STATEMENT EXECUTE FUNCTION audit_log_guard();
+`,
+  },
 ];
 
 /** Run `fn` in one transaction. Events emitted through the client are only turned into

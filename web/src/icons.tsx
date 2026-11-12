@@ -101,6 +101,7 @@ export {
   TreeStructure as RulesIcon,
   UploadSimple as ImportIcon,
   ListMagnifyingGlass as LogsIcon,
+  ShieldCheck as AuditIcon,
   Question as ReviewIcon,
   DeviceMobileCamera as DevicesIcon,
   AddressBook as ContactsIcon,
