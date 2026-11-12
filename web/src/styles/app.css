@@ -1445,3 +1445,6 @@ mark[data-ai-pending], mark[data-unknown-var] { outline: 1px dashed var(--md-bor
 .settings-section textarea.text-input { width: 100%; font-family: monospace; font-size: 12px; }
 .settings-help-btn { float: right; margin: -2px 0 0 8px; }
 .help-content ol { padding-left: 22px; }
+.help-table { border-collapse: collapse; margin: 10px 0; font-size: 13px; }
+.help-table th, .help-table td { border: 1px solid var(--md-border); padding: 5px 9px; text-align: left; vertical-align: top; }
+.help-table th { background: var(--md-hover); }

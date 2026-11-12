@@ -17,7 +17,23 @@ function mdToHtml(md: string): string {
   let inList: '' | 'ul' | 'ol' = ''; let para: string[] = [];
   const flushPara = () => { if (para.length) { out.push(`<p>${inline(para.join(' '))}</p>`); para = []; } };
   const flushList = () => { if (inList) { out.push(`</${inList}>`); inList = ''; } };
+  let table: string[][] | null = null;
+  const flushTable = () => {
+    if (!table) return;
+    const [head, ...rows] = table;
+    out.push(`<table class="help-table"><thead><tr>${head.map((c) => `<th>${inline(c)}</th>`).join('')}</tr></thead><tbody>${
+      rows.map((r) => `<tr>${r.map((c) => `<td>${inline(c)}</td>`).join('')}</tr>`).join('')}</tbody></table>`);
+    table = null;
+  };
   for (const line of lines) {
+    if (/^\s*\|.*\|\s*$/.test(line)) {
+      flushPara(); flushList();
+      const cells = line.trim().replace(/^\||\|$/g, '').split(/(?<!\\)\|/).map((c) => c.trim().replace(/\\\|/g, '|'));
+      if (cells.every((c) => /^:?-{3,}:?$/.test(c))) continue; // the |---|---| divider
+      (table ??= []).push(cells);
+      continue;
+    }
+    flushTable();
     const h = line.match(/^(#{1,3})\s+(.*)$/);
     if (h) { flushPara(); flushList(); out.push(`<h${h[1].length + 1}>${inline(h[2])}</h${h[1].length + 1}>`); continue; }
     const ul = line.match(/^\s*[-*]\s+(.*)$/);
@@ -32,7 +48,7 @@ function mdToHtml(md: string): string {
     if (line.trim() === '') { flushPara(); flushList(); continue; }
     para.push(line.trim());
   }
-  flushPara(); flushList();
+  flushPara(); flushList(); flushTable();
   return out.join('\n');
 }
 
