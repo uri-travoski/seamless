@@ -3,7 +3,7 @@ import { useVirtualizer } from '@tanstack/react-virtual';
 import type { ApiEmail } from '@seamless/shared';
 import { AttachmentMatch } from './AttachmentMatch.tsx';
 import { AssigneeChip } from './SharedThread.tsx';
-import { useMail, PAGE } from '../state/mail.ts';
+import { useMail, PAGE, PAGINATE_AT, BULK_MAX } from '../state/mail.ts';
 import { actions, runBulk } from '../state/actions.ts';
 import { useCompose } from '../state/compose.ts';
 import LabelPicker from './LabelPicker.tsx';
@@ -252,6 +252,9 @@ export default function MessageList() {
   const emails = useMail((s) => s.emails);
   const selectedId = useMail((s) => s.selectedId);
   const loadPage = useMail((s) => s.loadPage);
+  const goToPage = useMail((s) => s.goToPage);
+  const pageIndex = useMail((s) => s.pageIndex);
+  const paged = total > PAGINATE_AT;
   const checkedCount = useMail((s) => s.checked.size);
   const allMatching = useMail((s) => s.allMatching);
   const setAllChecked = useMail((s) => s.setAllChecked);
@@ -279,7 +282,7 @@ export default function MessageList() {
   const rowH = DENSITY[density ?? 'comfortable'][table ? 'table' : 'split'];
 
   const virtualizer = useVirtualizer({
-    count: total,
+    count: paged ? ids.length : total,
     getScrollElement: () => scrollRef.current,
     estimateSize: () => rowH,
     overscan: 12,
@@ -292,13 +295,14 @@ export default function MessageList() {
 
   // request pages for whatever range is visible (server pages of 120)
   useEffect(() => {
+    if (paged) return;                       // paged lists load a page when you ask for it
     const needed = new Set<number>();
     for (const item of items) needed.add(Math.floor(item.index / PAGE));
     for (const p of needed) void loadPage(p);
-  }, [items, loadPage, view]);
+  }, [items, loadPage, view, paged]);
 
   // reset scroll on view change
-  useEffect(() => { scrollRef.current?.scrollTo({ top: 0 }); }, [view]);
+  useEffect(() => { scrollRef.current?.scrollTo({ top: 0 }); }, [view, pageIndex]);
 
   // keep the selected row in view when moving with j/k
   useEffect(() => {
@@ -358,7 +362,8 @@ export default function MessageList() {
     return () => window.removeEventListener('keydown', onKey);
   }, []);
 
-  const selectedCount = allMatching ? total : checkedCount;
+  const bulkTotal = Math.min(total, BULK_MAX);
+  const selectedCount = allMatching ? bulkTotal : checkedCount;
   const pageAllChecked = loadedCount > 0 && checkedCount >= loadedCount;
 
   return (
@@ -402,13 +407,16 @@ export default function MessageList() {
       {!checkedCount && <QuickStrip view={view} unread={viewMailbox?.unreadEmails ?? 0} />}
       {!allMatching && pageAllChecked && total > checkedCount && (
         <div className="select-all-banner">
-          All {checkedCount.toLocaleString()} loaded messages are selected.{' '}
-          <button className="linklike" onClick={() => setAllMatching(true)}>Select all {total.toLocaleString()} in “{view.title}”</button>
+          {paged ? `All ${checkedCount.toLocaleString()} messages on this page are selected.` : `All ${checkedCount.toLocaleString()} loaded messages are selected.`}{' '}
+          <button className="linklike" onClick={() => setAllMatching(true)}>
+            {total > BULK_MAX ? `Select the newest ${BULK_MAX.toLocaleString()} of ${total.toLocaleString()}` : `Select all ${total.toLocaleString()}`} in “{view.title}”
+          </button>
+          {total > BULK_MAX && <span className="dim"> (one action covers at most {BULK_MAX.toLocaleString()})</span>}
         </div>
       )}
       {allMatching && (
         <div className="select-all-banner">
-          All {total.toLocaleString()} messages in “{view.title}” are selected.{' '}
+          {total > BULK_MAX ? `The newest ${bulkTotal.toLocaleString()} of ${total.toLocaleString()} messages` : `All ${total.toLocaleString()} messages`} in “{view.title}” are selected.{' '}
           <button className="linklike" onClick={() => clearChecked()}>Clear selection</button>
         </div>
       )}
@@ -429,8 +437,31 @@ export default function MessageList() {
           })}
         </div>
       </div>
+      {paged && <Pager total={total} pageIndex={pageIndex} onGo={(p) => void goToPage(p)} />}
       {menu && <ContextMenu email={menu.email} pos={menu.pos} onClose={() => setMenu(null)} />}
     </section>
+  );
+}
+
+/** Gmail-style pager for very long lists: "1–120 of 2,000,000", Newer / Older, jump to a page. */
+function Pager({ total, pageIndex, onGo }: { total: number; pageIndex: number; onGo: (page: number) => void }) {
+  const pages = Math.max(1, Math.ceil(total / PAGE));
+  const from = pageIndex * PAGE + 1;
+  const to = Math.min(total, (pageIndex + 1) * PAGE);
+  const [jump, setJump] = useState('');
+  const go = () => { const n = Number(jump.replace(/[, ]/g, '')); if (n >= 1) onGo(n - 1); setJump(''); };
+  return (
+    <div className="list-pager" role="navigation" aria-label="Pages">
+      <button className="btn ghost small" disabled={pageIndex === 0} onClick={() => onGo(0)} title="Newest">« Newest</button>
+      <button className="btn ghost small" disabled={pageIndex === 0} onClick={() => onGo(pageIndex - 1)}>‹ Newer</button>
+      <span className="pager-range">{from.toLocaleString()}–{to.toLocaleString()} of {total.toLocaleString()}</span>
+      <button className="btn ghost small" disabled={pageIndex >= pages - 1} onClick={() => onGo(pageIndex + 1)}>Older ›</button>
+      <label className="pager-jump">Page
+        <input className="text-input" inputMode="numeric" placeholder={`${(pageIndex + 1).toLocaleString()} / ${pages.toLocaleString()}`} value={jump}
+          onChange={(e) => setJump(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') go(); }} aria-label="Go to page" />
+        <button className="btn ghost small" onClick={go} disabled={!jump.trim()}>Go</button>
+      </label>
+    </div>
   );
 }
 

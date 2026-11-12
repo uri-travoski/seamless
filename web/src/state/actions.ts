@@ -3,7 +3,7 @@
  * pane toolbar, the bulk bar and keyboard shortcuts. Destructive ones show a 5 s Undo.
  */
 import type { ApiEmail } from '@seamless/shared';
-import { useMail, viewFilter } from './mail.ts';
+import { useMail, viewFilter, BULK_MAX } from './mail.ts';
 import { useCompose } from './compose.ts';
 import { api, emailSet, fetchBody } from '../api/client.ts';
 import { toast, undoToast } from '../toast.ts';
@@ -166,8 +166,8 @@ export async function runBulk(action: BulkAction, value?: string | number): Prom
   const ids = [...st.checked];
   const body = st.allMatching ? { filter: viewFilter(st.view, st.scope), action, value } : { ids, action, value };
   if (!st.allMatching && ids.length === 0) return;
-  const n = st.allMatching ? st.total : ids.length;
-  if (action === 'delete' && st.allMatching && !window.confirm(`Delete all ${n.toLocaleString()} matching messages?`)) return;
+  const n = st.allMatching ? Math.min(st.total, BULK_MAX) : ids.length;
+  if (action === 'delete' && st.allMatching && !window.confirm(`Delete ${st.total > BULK_MAX ? `the newest ${n.toLocaleString()} of ${st.total.toLocaleString()}` : `all ${n.toLocaleString()}`} matching messages?`)) return;
 
   // optimistic: rows that leave this view disappear now
   if (REMOVES.has(action) && !st.allMatching) {

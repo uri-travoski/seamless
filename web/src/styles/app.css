@@ -1515,3 +1515,14 @@ mark[data-ai-pending], mark[data-unknown-var] { outline: 1px dashed var(--md-bor
 .sidebar .side-item.label-item { font-size: 0.8164em; }
 .sidebar .side-item.label-item .label-dot { width: 8.91px !important; height: 8.91px !important; border-radius: 2.85px; }
 .list-toolbar .row-check.master.always { margin-left: 8px; opacity: 1; visibility: visible; flex: 0 0 auto; }
+
+/* pager for very long lists */
+.list-pager { flex: 0 0 auto; display: flex; align-items: center; gap: 6px; padding: 8px 10px; border-top: 1px solid var(--md-border); font-size: 12.5px; flex-wrap: wrap; background: var(--md-surface); }
+.list-pager .pager-range { font-weight: 600; margin: 0 6px; white-space: nowrap; }
+.list-pager .pager-jump { display: inline-flex; align-items: center; gap: 5px; margin-left: auto; }
+.list-pager .pager-jump input { width: 110px; padding: 4px 8px; }
+
+/* Seamless and Simply Seamless (light): read mail has a #f2f4f8 background in every message list (Inbox, Starred, Drafts, Sent, search…) */
+:root[data-theme="seamless"][data-mode="light"] .msg-row:not(.unread):not(.selected):not(.checked):not(:hover),
+:root[data-theme="simply"][data-mode="light"] .msg-row:not(.unread):not(.selected):not(.checked):not(:hover),
+:root[data-theme="simply"] .msg-row.table:not(.unread):not(.selected):not(.checked):not(:hover) { background: #f2f4f8; }

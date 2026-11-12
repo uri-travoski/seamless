@@ -4,6 +4,10 @@ import { api, fetchMailboxes, queryEmailPage, getEmailsByIds, getThread, emailSe
 import { cache } from '../api/cache.ts';
 
 export const PAGE = 120;
+/** Lists longer than this switch from one long scroll to real pages (a browser can't scroll millions of rows). */
+export const PAGINATE_AT = 20_000;
+/** One bulk action touches at most this many messages (the server caps it too). */
+export const BULK_MAX = 20_000;
 
 export interface View {
   kind: 'mailbox' | 'label' | 'search' | 'review' | 'snoozed' | 'waiting' | 'readlater';
@@ -87,6 +91,7 @@ interface MailState {
   emails: Record<string, ApiEmail>;
   loadedPages: Set<number>;
   loadingPages: Set<number>;
+  pageIndex: number;                // paged lists (> PAGINATE_AT): the page on screen; ids then holds ONLY that page
   selectedId: string | null;
   threadIds: string[];
   online: boolean;
@@ -102,6 +107,7 @@ interface MailState {
   refreshLabels: () => Promise<void>;
   setView: (view: View) => void;
   loadPage: (page: number) => Promise<void>;
+  goToPage: (page: number) => Promise<void>;
   refreshCurrent: () => Promise<void>;
   select: (id: string | null) => Promise<void>;
   patchEmail: (id: string, patch: Partial<ApiEmail>) => void;
@@ -121,6 +127,14 @@ interface MailState {
   bulkAddLabel: (labelId: number) => void;
 }
 
+/** Paged lists keep only the page on screen (plus the open message/thread) in memory. */
+function pagedEmails(cur: { emails: Record<string, ApiEmail>; selectedId: string | null; threadIds: string[] }, fresh: ApiEmail[]): Record<string, ApiEmail> {
+  const out: Record<string, ApiEmail> = {};
+  for (const k of [cur.selectedId, ...cur.threadIds]) if (k && cur.emails[k]) out[k] = cur.emails[k]!;
+  for (const e of fresh) out[e.id] = e;
+  return out;
+}
+
 export const useMail = create<MailState>((set, get) => ({
   scope: 'unified',
   overview: null,
@@ -133,6 +147,7 @@ export const useMail = create<MailState>((set, get) => ({
   ids: [],
   emails: {},
   loadedPages: new Set(),
+  pageIndex: 0,
   loadingPages: new Set(),
   selectedId: null,
   threadIds: [],
@@ -202,7 +217,7 @@ export const useMail = create<MailState>((set, get) => ({
   },
 
   setView: (view) => {
-    set({ view, ids: [], total: 0, loadedPages: new Set(), loadingPages: new Set(), selectedId: null, threadIds: [], checked: new Set(), allMatching: false });
+    set({ view, ids: [], total: 0, pageIndex: 0, loadedPages: new Set(), loadingPages: new Set(), selectedId: null, threadIds: [], checked: new Set(), allMatching: false });
     // cached page 0 first for instant switch
     void cache.getQuery(viewKey(view)).then(async (cached) => {
       if (!cached || viewKey(get().view) !== viewKey(view)) return;
@@ -224,6 +239,14 @@ export const useMail = create<MailState>((set, get) => ({
       const { query, emails } = await queryEmailPage(viewFilter(view), page * PAGE, PAGE);
       if (viewKey(get().view) !== viewKey(view)) return;
       const cur = get();
+      if (query.total > PAGINATE_AT) {
+        set({ ids: [...query.ids], total: query.total, emails: pagedEmails(cur, emails), online: true, loadedPages: new Set([page]), pageIndex: page });
+        if (page === 0) {
+          void cache.putQuery(viewKey(view), { ids: query.ids, total: query.total, state: query.queryState, ts: Date.now() });
+          void cache.putEmails(emails);
+        }
+        return;
+      }
       const ids = [...cur.ids];
       ids.length = query.total;
       query.ids.forEach((id, i) => { ids[page * PAGE + i] = id; });
@@ -246,6 +269,13 @@ export const useMail = create<MailState>((set, get) => ({
     }
   },
 
+  goToPage: async (page) => {
+    const pages = Math.max(1, Math.ceil(get().total / PAGE));
+    const p = Math.min(Math.max(0, Math.floor(page) || 0), pages - 1);
+    set({ loadedPages: new Set(), selectedId: null, threadIds: [], checked: new Set(), allMatching: false });
+    await get().loadPage(p);
+  },
+
   refreshCurrent: async () => {
     const state = get();
     const view = state.view;
@@ -255,6 +285,10 @@ export const useMail = create<MailState>((set, get) => ({
         const { query, emails } = await queryEmailPage(viewFilter(view), page * PAGE, PAGE);
         if (viewKey(get().view) !== viewKey(view)) return;
         const cur = get();
+        if (query.total > PAGINATE_AT) {
+          set({ ids: [...query.ids], total: query.total, emails: pagedEmails(cur, emails), online: true, loadedPages: new Set([page]), pageIndex: page });
+          break;
+        }
         const ids = page === pages[0] ? new Array(query.total) : [...cur.ids];
         ids.length = query.total;
         query.ids.forEach((id, i) => { ids[page * PAGE + i] = id; });
