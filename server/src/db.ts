@@ -1478,6 +1478,52 @@ ALTER TABLE accounts ADD COLUMN archived BOOLEAN NOT NULL DEFAULT false;
 ALTER TABLE accounts ADD COLUMN source_archive_id INTEGER;
 `,
   },
+  {
+    id: 47,
+    // T8.9: critical alerts. alert_channels = where to send (config_enc holds the secrets, encrypted with SEAMLESS_SECRET);
+    // scope 'team' = an admin's channel that also gets alerts about shared mailboxes and instance problems.
+    // alerts = one open row per problem (unique partial index); deliveries = per-channel result of the send.
+    sql: `
+CREATE TABLE alert_channels (
+  id SERIAL PRIMARY KEY,
+  user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  kind TEXT NOT NULL CHECK (kind IN ('email','twilio','sms_gateway','telegram')),
+  name TEXT NOT NULL DEFAULT '',
+  scope TEXT NOT NULL DEFAULT 'user' CHECK (scope IN ('user','team')),
+  config_enc TEXT NOT NULL,
+  enabled BOOLEAN NOT NULL DEFAULT true,
+  verified_at BIGINT,
+  last_ok_at BIGINT,
+  last_error TEXT,
+  created_at BIGINT NOT NULL
+);
+CREATE INDEX alert_channels_user ON alert_channels(user_id);
+CREATE TABLE alerts (
+  id SERIAL PRIMARY KEY,
+  user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  kind TEXT NOT NULL,
+  source_type TEXT NOT NULL DEFAULT '',
+  source_id TEXT NOT NULL DEFAULT '',
+  severity TEXT NOT NULL DEFAULT 'critical' CHECK (severity IN ('critical')),
+  title TEXT NOT NULL,
+  body TEXT NOT NULL DEFAULT '',
+  link TEXT,
+  account_id INTEGER,
+  state TEXT NOT NULL DEFAULT 'open' CHECK (state IN ('open','resolved')),
+  read_at BIGINT,
+  opened_at BIGINT NOT NULL,
+  resolved_at BIGINT,
+  last_sent_at BIGINT,
+  send_count INTEGER NOT NULL DEFAULT 0,
+  attempts INTEGER NOT NULL DEFAULT 0,
+  next_attempt_at BIGINT,
+  recovered_sent BOOLEAN NOT NULL DEFAULT false,
+  deliveries JSONB NOT NULL DEFAULT '{}'
+);
+CREATE UNIQUE INDEX alerts_one_open ON alerts(user_id, kind, source_type, source_id) WHERE state = 'open';
+CREATE INDEX alerts_user ON alerts(user_id, id DESC);
+`,
+  },
 ];
 
 /** Run `fn` in one transaction. Events emitted through the client are only turned into

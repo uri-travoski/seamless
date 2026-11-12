@@ -18,6 +18,8 @@ Connect **Gmail** or **Microsoft / Outlook** with **Connect with OAuth** instead
 
 The OAuth app credentials are entered once per instance (they are shared by everyone on your server); each user's account tokens are separate and private.
 
+> **Be told if a mailbox stops working.** Set up a phone or Telegram channel in Settings > Alerts: [Critical alerts](31-alerts.md).
+
 ## Safe delete (origin-side cleanup)
 
 By default Seamless keeps your mail on the origin server untouched. If you turn on **Safe delete** for an account (per account, off by default), Seamless can remove mail **at the source** after it has been safely archived here — but only when every check passes: the raw message is stored with a matching checksum, it is older than the grace window you set, and the account toggle is on.

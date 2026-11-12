@@ -20,6 +20,9 @@ import AppHeader from './components/header/AppHeader.tsx';
 import ShortcutsHelp from './components/ShortcutsHelp.tsx';
 import { SnoozePopup } from './components/SnoozeMenu.tsx';
 import { useUi } from './state/ui.ts';
+import { useAlerts } from './state/alerts.ts';
+import { NoChannelBanner } from './components/AlertItems.tsx';
+import { AlertsSetup } from './components/settings/AlertsSettings.tsx';
 import { ComposeIcon } from './icons.tsx';
 
 const Settings = lazy(() => import('./components/settings/Settings.tsx'));
@@ -52,6 +55,7 @@ function useWebSocket(enabled: boolean): boolean {
             void useViews.getState().loadCounts();
           }
           if (msg.type === 'notifications' || msg.type === 'newMail') void useNotifs.getState().refresh();
+          if (msg.type === 'notifications' || msg.type === 'stateChange') void useAlerts.getState().refresh();
         } catch { /* ignore */ }
       };
       ws.onclose = () => {
@@ -142,6 +146,7 @@ export default function App() {
   const appName = useSession((s) => s.settings.appName) || 'Seamless';
   const mfaEnrollRequired = useSession((s) => s.mfaEnrollRequired);
   const mustChangePassword = useSession((s) => s.mustChangePassword);
+  const alertsSetupRequired = useSession((s) => s.alertsSetupRequired);
   const route = useRouter((s) => s.route);
   const helpOpen = useUi((s) => s.helpOpen);
   const shortcutsOpen = useUi((s) => s.shortcutsOpen);
@@ -194,6 +199,7 @@ export default function App() {
   if (status === 'loading') return null;
   if (status !== 'ready') return <Login />;
   if (mustChangePassword) return <ForcePasswordChange />;
+  if (alertsSetupRequired) return <AlertsSetup />;
 
   const addLabel = () => { sessionStorage.setItem('seamless-new-label', '1'); navigate({ page: 'settings', tab: 'labels' }); };
   const isMail = route.page === 'mail' && route.folder !== 'templates';
@@ -202,6 +208,7 @@ export default function App() {
     <div className="app">
       <SaveViewDialog />
       <AppHeader onMenu={() => setSidebarOpen(!sidebarOpen)} connected={wsConnected} />
+      <NoChannelBanner />
       {viewingMode && <div className="viewing-bar" role="status">Viewing mode — reference copy. Mail cannot be sent or received.</div>}
       <div className={`main ${isMail && layout === 'table' ? 'table-mode' : ''} ${isMail && selectedId ? 'reading' : ''} ${isMail ? '' : 'page-mode'}`}>
         <Sidebar open={sidebarOpen} onNavigate={() => setSidebarOpen(false)} onAddLabel={addLabel} />

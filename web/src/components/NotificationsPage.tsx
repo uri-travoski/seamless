@@ -10,6 +10,7 @@ import { navigate } from '../router.ts';
 import { useMail } from '../state/mail.ts';
 import { useNotifs } from '../state/notifications.ts';
 import { NotifRow, openNotification } from './header/NotificationBell.tsx';
+import { AlertList } from './AlertItems.tsx';
 import { toast } from '../toast.ts';
 import { NO_AUTOFILL } from '../state/ui.ts';
 import { ChecksIcon, EnvelopeIcon, TrashIcon, SettingsIcon, CaretLeftIcon, CaretRightIcon } from '../icons.tsx';
@@ -107,6 +108,8 @@ export default function NotificationsPage({ params }: { params: Record<string, s
         <button className="btn" disabled={!data?.unread} onClick={async () => { await useNotifs.getState().markRead('all'); await load(); }}><ChecksIcon size={15} /> Mark all read</button>
         <button className="btn ghost" onClick={() => navigate({ page: 'settings', tab: 'notifications' })}><SettingsIcon size={15} /> Settings</button>
       </div>
+
+      <AlertList />
 
       <div className="filter-bar">
         <div className="seg" role="group" aria-label="Read status">

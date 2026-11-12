@@ -10,7 +10,7 @@ import net from 'node:net';
 import http from 'node:http';
 import https from 'node:https';
 
-export class SsrfError extends Error {}
+export class SsrfError extends Error { constructor(m?: string) { super(m); this.name = 'SsrfError'; } }
 
 export type LookupFn = (host: string) => Promise<{ address: string; family: number }[]>;
 

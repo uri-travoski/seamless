@@ -12,6 +12,7 @@ import AdvancedSearch from './AdvancedSearch.tsx';
 import { NO_AUTOFILL } from '../../state/ui.ts';
 import ScopeSwitcher from './ScopeSwitcher.tsx';
 import NotificationBell from './NotificationBell.tsx';
+import { AlertPill } from '../AlertItems.tsx';
 import AppMenu from './AppMenu.tsx';
 import { api } from '../../api/client.ts';
 import { useViews } from '../../state/views.ts';
@@ -87,6 +88,7 @@ export default function AppHeader({ onMenu, connected }: { onMenu: () => void; c
                 : mbHealth.problems.map((p) => `${p.email}: ${p.paused ? 'paused' : p.status === 'red' ? 'not working' : 'having trouble'}`).join('\n')}
             aria-label={live ? (mbHealth.status === 'ok' ? 'Live connection, all mailboxes working' : 'Live connection, a mailbox has a problem') : 'Offline, reconnecting'} />
         } />
+        <AlertPill />
         <NotificationBell />
         <AppMenu />
       </div>

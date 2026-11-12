@@ -3,6 +3,8 @@ import { useEffect, useRef, useState } from 'react';
 import type { ApiNotification, EventType } from '@seamless/shared';
 import { useNotifs, relTime } from '../../state/notifications.ts';
 import { navigate } from '../../router.ts';
+import { AlertList } from '../AlertItems.tsx';
+import { useAlerts } from '../../state/alerts.ts';
 import {
   BellIcon, SettingsIcon, EnvelopeIcon, EyeIcon, WarningIcon, BackupIcon, ShieldIcon, ScheduledIcon, ChecksIcon,
 } from '../../icons.tsx';
@@ -45,13 +47,14 @@ export default function NotificationBell() {
   const latest = useNotifs((s) => s.latest);
   const refresh = useNotifs((s) => s.refresh);
   const markRead = useNotifs((s) => s.markRead);
+  const alertCount = useAlerts((s) => s.status.active);
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
 
-  useEffect(() => { void refresh(); void useNotifs.getState().loadPrefs(); }, [refresh]);
+  useEffect(() => { void refresh(); void useAlerts.getState().refresh(); void useNotifs.getState().loadPrefs(); }, [refresh]);
   useEffect(() => {
     if (!open) return;
-    void refresh();
+    void refresh(); void useAlerts.getState().refresh();
     const onDown = (e: MouseEvent) => { if (!ref.current?.contains(e.target as Node)) setOpen(false); };
     const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setOpen(false); };
     window.addEventListener('mousedown', onDown);
@@ -73,7 +76,8 @@ export default function NotificationBell() {
             <button className="icon-btn" title="Notification settings" onClick={() => { setOpen(false); navigate({ page: 'settings', tab: 'notifications' }); }}><SettingsIcon size={16} /></button>
           </div>
           <div className="notif-list">
-            {latest.length === 0 && <div className="menu-empty">You're all caught up.</div>}
+            <AlertList onOpen={() => setOpen(false)} />
+            {latest.length === 0 && alertCount === 0 && <div className="menu-empty">You're all caught up.</div>}
             {latest.map((n) => <NotifRow key={n.id} n={n} onOpen={() => { setOpen(false); openNotification(n); }} />)}
           </div>
           <button className="switch-foot" onClick={() => { setOpen(false); navigate({ page: 'notifications', params: {} }); }}>See all notifications</button>

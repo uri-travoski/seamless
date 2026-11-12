@@ -37,6 +37,7 @@ const ENTRIES: Omit<SettingsEntry, 'tabName'>[] = [
   { label: 'Lead sources', tab: 'leads', words: 'form enquiry website quote' },
   { label: 'Contacts and address book', tab: 'contacts', words: 'carddav import export' },
   { label: 'App passwords, IMAP/SMTP/CardDAV for phones', tab: 'devices', words: 'thunderbird apple mail android' },
+  { label: 'Critical alerts: be told when a mailbox stops working (SMS, Twilio, Telegram, phone gateway, email)', tab: 'alerts', words: 'alert sms twilio telegram notify down offline stopped broken phone gateway bot red pinned reminder whatsapp no' },
   { label: 'Health checks and alerts', tab: 'health', words: 'status monitor ignore mailbox' },
   { label: 'Logs', tab: 'logs', words: 'errors debug activity' },
   { label: 'Audit log (who did what), audit retention', tab: 'audit', words: 'security history export csv retention keep days' },

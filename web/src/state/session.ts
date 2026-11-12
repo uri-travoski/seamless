@@ -84,6 +84,8 @@ interface SessionState {
   mfaEnrollRequired: boolean;
   /** An administrator set a temporary password: the app shows only the choose-a-password screen. */
   mustChangePassword: boolean;
+  /** first-run: a new admin must add an alert channel and pass its test before using the app */
+  alertsSetupRequired: boolean;
   setup: (email: string, name: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
   saveSettings: (patch: Partial<ClientSettings>) => void;
@@ -130,7 +132,7 @@ export const useSession = create<SessionState>((set, get) => ({
 
   init: async () => {
     try {
-      const me = await api.get<{ needsSetup: boolean; loggedIn: boolean; user?: ApiUser | null; settings: Partial<ClientSettings>; mfaEnrollRequired?: boolean; mustChangePassword?: boolean; mode?: 'live' | 'viewing'; modeLocked?: boolean }>('/api/me');
+      const me = await api.get<{ needsSetup: boolean; loggedIn: boolean; user?: ApiUser | null; settings: Partial<ClientSettings>; mfaEnrollRequired?: boolean; mustChangePassword?: boolean; alertsSetupRequired?: boolean; mode?: 'live' | 'viewing'; modeLocked?: boolean }>('/api/me');
       const settings = { ...DEFAULTS, ...me.settings };
       applyAppearance(settings);
       set({
@@ -139,6 +141,7 @@ export const useSession = create<SessionState>((set, get) => ({
         settings,
         mfaEnrollRequired: !!me.mfaEnrollRequired,
         mustChangePassword: !!me.mustChangePassword,
+        alertsSetupRequired: !!me.alertsSetupRequired,
         mode: me.mode === 'viewing' ? 'viewing' : 'live',
         modeLocked: !!me.modeLocked,
       });
@@ -161,6 +164,7 @@ export const useSession = create<SessionState>((set, get) => ({
   },
   mfaEnrollRequired: false,
   mustChangePassword: false,
+  alertsSetupRequired: false,
   mode: 'live',
   modeLocked: false,
   setMode: (mode, locked) => set((s) => ({ mode, modeLocked: locked ?? s.modeLocked })),

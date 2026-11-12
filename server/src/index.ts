@@ -22,6 +22,7 @@ import { ensureAuditPruneJob } from './audit/prune.ts';
 import { ensureQuotaJob } from './admin/quota.ts';
 import { ensureArchiveScheduleJob } from './archive/schedule.ts';
 import { startHealthAlerts, shouldAlert } from './health/alerts.ts';
+import { startAlertEngine } from './alerts/engine.ts';
 import { wakeOnReply } from './mail/snooze.ts';
 import { settleOnReply } from './mail/followups.ts';
 import { notifyViewMatches } from './mail/views.ts';
@@ -151,6 +152,7 @@ ensureArchiveScheduleJob().catch((err) => console.error('archive schedule failed
 ensureAuditPruneJob().catch((err) => console.error('audit prune schedule failed:', err?.message ?? err));
 resumeMigrations().catch((err) => console.error('storage migration resume failed:', err?.message ?? err));
 startHealthAlerts();
+startAlertEngine();
 
 // classification + retention workers
 onClassified(async (userId) => broadcast({ type: 'stateChange', state: await currentState() }, userId));

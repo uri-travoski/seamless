@@ -43,6 +43,7 @@ In Settings, the **?** at the top right of each tab opens the matching page.
 - [Backup and restore](11-backup-restore.md)
 - [Storage](17-storage.md)
 - [Health](15-health.md)
+- [Critical alerts](31-alerts.md) — be told by SMS, Telegram or email when a mailbox stops working; red pinned notifications
 - [Troubleshooting](10-troubleshooting.md)
 
 ## Integrations
@@ -64,7 +65,7 @@ The Settings menu is grouped. Use the **Search settings…** box at the top to j
 | Business | Businesses, Leads, Integrations |
 | Organise | Labels, Filters, Rules, Templates, Newsletters, AI |
 | Alerts & look | Notifications, Appearance |
-| Security | Security, Encryption, Audit log |
+| Security | Security, Alerts ([details](31-alerts.md)), Encryption, Audit log |
 | Data | Storage (buckets, **Trash & retention**), Backup, Archives ([details](30-viewing-old-mail.md)), Import |
 | Devices | Contacts, Devices |
 | System | Health, Logs, Users (admins: [details](29-administrator.md)) |

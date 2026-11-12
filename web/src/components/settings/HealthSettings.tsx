@@ -1,4 +1,5 @@
 /** Settings → Health (T2 F-21): one page for everything that can quietly go wrong. Refreshes every 30 s. */
+import { NoChannelBanner } from '../AlertItems.tsx';
 import { useCallback, useEffect, useState } from 'react';
 import { api } from '../../api/client.ts';
 import { toast } from '../../toast.ts';
@@ -59,6 +60,7 @@ export default function HealthSettings() {
   return (
     <div className="health-page">
       <h2>Health <Dot s={r.overall} /></h2>
+      <NoChannelBanner />
       <p className="settings-desc">
         {r.overall === 'ok' ? 'Everything is working.' : r.overall === 'warn' ? 'Some things need a look.' : 'Something needs fixing.'}
         {' '}Updated {ago(r.generatedAt)}; refreshes by itself. To watch from outside, point an uptime monitor at <code>/healthz</code>.

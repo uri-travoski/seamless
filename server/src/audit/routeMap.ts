@@ -20,6 +20,9 @@ export const AUDITED_ROUTES: Record<string, RouteAudit> = {
   'DELETE /api/users/:id': r('user.delete', 'user'),
   'PUT /api/users/password': r('user.password_change', 'user'),
   'PUT /api/mode': r('instance.mode', 'instance'),
+  'PUT /api/alerts/settings': r('alerts.settings', 'instance'),
+  'POST /api/alert-channels': r('alerts.channel_add', 'alert_channel'),
+  'DELETE /api/alert-channels/:id': r('alerts.channel_delete', 'alert_channel'),
   // accounts, transports
   'POST /api/accounts': r('account.add', 'account'),
   'PUT /api/accounts/:id': r('account.update', 'account'),

@@ -24,6 +24,7 @@ import DisposableSettings from './DisposableSettings.tsx';
 import BusinessSettings from './BusinessSettings.tsx';
 import ContactsSettings from './ContactsSettings.tsx';
 import IntegrationsSettings from './IntegrationsSettings.tsx';
+import AlertsSettings from './AlertsSettings.tsx';
 import TemplatesView from '../TemplatesView.tsx';
 import { useSession } from '../../state/session.ts';
 import { useMail, scopeToSlug } from '../../state/mail.ts';
@@ -56,6 +57,7 @@ const TABS: Tab[] = [
   { id: 'notifications', name: 'Notifications', group: 'Alerts & look', Icon: BellIcon, C: NotificationSettings },
   { id: 'appearance', name: 'Appearance', group: 'Alerts & look', Icon: PaletteIcon, C: AppearanceSettings },
   { id: 'security', name: 'Security', group: 'Security', Icon: LockIcon, C: SecuritySettings },
+  { id: 'alerts', name: 'Alerts', group: 'Security', Icon: BellIcon, C: AlertsSettings },
   { id: 'encryption', name: 'Encryption', group: 'Security', Icon: KeyIcon, C: EncryptionSettings },
   { id: 'audit', name: 'Audit log', group: 'Security', Icon: AuditIcon, C: AuditSettings },
   { id: 'storage', name: 'Storage', group: 'Data', Icon: CloudIcon, C: StorageSettings },
@@ -77,7 +79,7 @@ export const TAB_HELP: Record<string, string> = {
   templates: '04-composing', notifications: '13-notifications', security: '12-security', encryption: '23-encryption',
   rules: '06-ai-automation', automation: '06-ai-automation', filters: '26-stopping-unwanted-senders', ai: '06-ai-automation',
   integrations: '20-integrations', leads: '21-leads', contacts: '08-devices-contacts', devices: '08-devices-contacts',
-  health: '15-health', logs: '10-troubleshooting', audit: '22-audit-log', storage: '17-storage', backup: '11-backup-restore', archives: '30-viewing-old-mail',
+  health: '15-health', alerts: '31-alerts', logs: '10-troubleshooting', audit: '22-audit-log', storage: '17-storage', backup: '11-backup-restore', archives: '30-viewing-old-mail',
   users: '29-administrator', newsletters: '02-reading-organizing',
 };
 

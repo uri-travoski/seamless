@@ -53,6 +53,7 @@ import { register as leads } from './leads.ts';
 import { register as auditRoutes } from './audit.ts';
 import { register as archives } from './archives.ts';
 import { register as modeRoutes } from './mode.ts';
+import { register as alertRoutes } from './alerts.ts';
 import { ViewingModeError, viewingBody, isViewing } from '../mode.ts';
 import { audit } from '../audit/log.ts';
 import { AUDITED_ROUTES } from '../audit/routeMap.ts';
@@ -203,4 +204,5 @@ export function registerRoutes(app: FastifyInstance): void {
   auditRoutes(app);
   archives(app);
   modeRoutes(app);
+  alertRoutes(app);
 }

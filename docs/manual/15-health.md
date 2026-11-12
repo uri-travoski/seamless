@@ -28,6 +28,10 @@ Seamless raises a notification (bell, and push if you allow it) when something t
 sign-in has stopped working, backups are overdue, mail storage is unreachable, or a background task failed for good. The same
 problem alerts at most once every 6 hours so you aren't nagged. Choose which ones push in **Settings > Notifications**.
 
+For the problems that matter most — a mailbox that has stopped working, a revoked sign-in, failing backups, unreachable storage — set up
+**critical alerts** (SMS, Telegram or email to another address, plus a red pinned notification): see [Critical alerts](31-alerts.md).
+If none is set up, a red banner at the top of this page says so.
+
 ## Watching from outside
 
 Point an uptime monitor (UptimeRobot, Uptime Kuma, a cron job with `curl`) at:

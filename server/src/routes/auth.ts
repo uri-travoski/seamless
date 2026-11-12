@@ -1,7 +1,8 @@
 import { currentMode, modeLocked } from '../mode.ts';
 /** Session auth: who am I, first-run setup, login (+ second factor), logout, sessions, 2FA enrolment. */
 import type { FastifyInstance, FastifyRequest } from 'fastify';
-import { one, run, insertId, setSetting } from '../db.ts';
+import { one, run, insertId, setSetting, getSetting } from '../db.ts';
+import { hasVerifiedChannel } from '../alerts/store.ts';
 import { hashPassword, verifyPassword } from '../crypto.ts';
 import { makeSession, isAdmin, uid, type SessionUser } from './util.ts';
 import { authLimiter } from '../security/ratelimit.ts';
@@ -45,6 +46,8 @@ export function register(app: FastifyInstance): void {
       settings: JSON.parse(user?.settings_json ?? '{}'),
       // admin switched on "require 2FA" and this user has none yet: the UI forces enrolment
       mustChangePassword: !!user?.must_change_password,
+      alertsSetupRequired: user?.role === 'admin' && (await getSetting('alerts_wizard')) === '1' && !(await hasVerifiedChannel(su.userId)),
+      alertsChannelMissing: !(await hasVerifiedChannel(su.userId)),
       mfaEnrollRequired: (await mfaRequiredForAll()) && !(await hasMfa(su.userId)),
     };
   });
@@ -58,6 +61,8 @@ export function register(app: FastifyInstance): void {
     const userId = await insertId(
       'INSERT INTO users(email, name, password_hash, role, created_at) VALUES (?,?,?,?,?)',
       [email.toLowerCase(), name ?? '', hashPassword(password), 'admin', Date.now()]);
+    // first-run: the wizard's "Alerts" step can't be skipped until one outside channel has passed its test
+    await setSetting('alerts_wizard', '1');
     await makeSession(req, reply, userId);
     return { ok: true };
   });
