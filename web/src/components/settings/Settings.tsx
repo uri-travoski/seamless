@@ -32,6 +32,7 @@ import {
   LogsIcon, DevicesIcon, ContactsIcon, SentIcon, BackupIcon, PaletteIcon, TemplateIcon, BellIcon, LockIcon, HelpIcon, KeyboardIcon, HealthIcon, TimerIcon, CloudIcon, KeyIcon, AuditIcon,
 } from '../../icons.tsx';
 import LeadSettings from './LeadSettings.tsx';
+import SettingsSearch from './SettingsSearch.tsx';
 import { useUi } from '../../state/ui.ts';
 
 const TABS: { id: string; name: string; Icon: ComponentType<{ className?: string }>; C: ComponentType; admin?: boolean }[] = [
@@ -84,6 +85,7 @@ export default function Settings({ tab }: { tab: string }) {
   return (
     <section className="page settings-page">
       <nav className="settings-nav" aria-label="Settings">
+        <SettingsSearch tabs={tabs} isAdmin={isAdmin} />
         <button className="side-item back-to-mail" onClick={back}><BackIcon className="glyph" /><span className="name">Back to mail</span></button>
         {tabs.map((t) => (
           <button key={t.id} className={`side-item ${current.id === t.id ? 'active' : ''}`} onClick={() => navigate({ page: 'settings', tab: t.id })}>
