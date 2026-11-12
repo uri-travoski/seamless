@@ -307,6 +307,7 @@ export async function replayDump(db: pg.Pool, lines: string[], opts: { transform
     let cols: string[] = [];
     let keep: number[] = [];   // indexes of dump columns that still exist in the live schema
     let batch: unknown[][] = [];
+    let arrayCols = new Set<string>();   // real Postgres array columns (text[], int[]) keep a JS array
 
     const flush = async () => {
       if (!batch.length || !table) return;
@@ -316,7 +317,8 @@ export async function replayDump(db: pg.Pool, lines: string[], opts: { transform
         const ps = keep.map((_, c) => `$${r * keep.length + c + 1}`);
         // node-pg turns a JS array into a Postgres array literal, which a jsonb column rejects:
         // jsonb values that happen to be arrays (message_risk.reasons) must go in as JSON text
-        for (const i of keep) values.push(Array.isArray(row[i]) ? JSON.stringify(row[i]) : row[i]);
+        // ...but genuine array columns (push_inboxes.domains text[]) need the JS array as-is
+        for (const i of keep) values.push(Array.isArray(row[i]) && !arrayCols.has(cols[i]) ? JSON.stringify(row[i]) : row[i]);
         return `(${ps.join(', ')})`;
       });
       await client.query(`INSERT INTO ${ident(table)} (${names}) VALUES ${tuples.join(', ')}`, values);
@@ -333,6 +335,9 @@ export async function replayDump(db: pg.Pool, lines: string[], opts: { transform
         cols = head.cols;
         keep = [];
         if (table) {
+          const arr: { column_name: string }[] = await dbq(
+            `SELECT column_name FROM information_schema.columns WHERE table_schema = 'public' AND table_name = ? AND data_type = 'ARRAY'`, [table]);
+          arrayCols = new Set(arr.map((r) => r.column_name));
           const liveCols = new Set((await columnsOf(table, dbq)).filter((c) => !c.generated).map((c) => c.name));
           cols.forEach((c, i) => {
             if (liveCols.has(c)) keep.push(i);

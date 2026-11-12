@@ -117,6 +117,19 @@ describe('backup round-trip', () => {
     expect(decision.reason).toBe('itemised invoice');
   });
 
+  it('restores real Postgres array columns (text[]) as arrays, not JSON text', async () => {
+    const { accountId } = await seedRealisticData();
+    await run('INSERT INTO push_inboxes(token, account_id, secret_enc, domains, created_at) VALUES (?,?,?,?,?)',
+      ['tok-arr', accountId, 'x', ['a.test', 'b.test'], Date.now()]);
+    await run('INSERT INTO push_inboxes(token, account_id, secret_enc, domains, created_at) VALUES (?,?,?,?,?)',
+      ['tok-empty', accountId, 'x', [], Date.now()]);
+    const manifest = await createBackup({ prefix: PREFIX, store, appVersion: 'test' });
+    await wipeDatabase();
+    await restoreBackup(manifest.key, { store });
+    const rows = await q<any>('SELECT token, domains FROM push_inboxes ORDER BY token');
+    expect(rows).toEqual([{ token: 'tok-arr', domains: ['a.test', 'b.test'] }, { token: 'tok-empty', domains: [] }]);
+  });
+
   it('restores the pgvector embedding intact', async () => {
     const { ids } = await seedRealisticData();
     const before = await one<{ embedding: string; dim: number }>('SELECT embedding, dim FROM email_vectors WHERE message_id = ?', [ids[0]]);
