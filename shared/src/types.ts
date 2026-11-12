@@ -544,8 +544,10 @@ export interface ApiNotificationPref {
 }
 
 export interface WsMessage {
-  type: 'stateChange' | 'newMail' | 'counts' | 'notifications' | 'presence';
+  type: 'stateChange' | 'newMail' | 'counts' | 'notifications' | 'presence' | 'contactsSaved';
   state?: string;
+  // contactsSaved (T8.11): contacts just auto-created by a send, for the "Saved to contacts · Undo" toast
+  contacts?: { id: number; name: string; email: string }[];
   // presence (T4 F-32)
   threadId?: string;
   action?: 'replying' | 'viewing' | 'left';
@@ -604,3 +606,4 @@ export interface ApiSavedView {
   pinned: boolean; showCount: boolean; sortOrder: number; notify: boolean;
 }
 export interface ApiViewSuggestion { key: string; name: string; icon: string; query: string }
+export * from './addresses.ts';

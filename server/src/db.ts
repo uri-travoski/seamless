@@ -1539,6 +1539,34 @@ ALTER TABLE corrections ADD COLUMN undo_json TEXT;
 ALTER TABLE corrections ADD COLUMN undone BOOLEAN NOT NULL DEFAULT false;
 `,
   },
+  {
+    id: 49,
+    // T8.11: contact management. Email labels, phones, groups; "undo" of an auto-save is remembered so neither the instant
+    // path nor the batch harvest recreates that contact.
+    sql: `
+ALTER TABLE contact_emails ADD COLUMN label TEXT NOT NULL DEFAULT '';
+ALTER TABLE contacts ADD COLUMN phones_json TEXT NOT NULL DEFAULT '[]';
+CREATE TABLE contact_groups (
+  id SERIAL PRIMARY KEY,
+  user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  name TEXT NOT NULL,
+  created_at BIGINT NOT NULL
+);
+CREATE UNIQUE INDEX contact_groups_name ON contact_groups(user_id, lower(name));
+CREATE TABLE contact_group_members (
+  group_id INTEGER NOT NULL REFERENCES contact_groups(id) ON DELETE CASCADE,
+  contact_id INTEGER NOT NULL REFERENCES contacts(id) ON DELETE CASCADE,
+  PRIMARY KEY(group_id, contact_id)
+);
+CREATE INDEX contact_group_members_contact ON contact_group_members(contact_id);
+CREATE TABLE contact_suppressed (
+  user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  email TEXT NOT NULL,
+  created_at BIGINT NOT NULL,
+  PRIMARY KEY(user_id, email)
+);
+`,
+  },
 ];
 
 /** Run `fn` in one transaction. Events emitted through the client are only turned into

@@ -78,7 +78,7 @@ export const TAB_HELP: Record<string, string> = {
   businesses: '18-businesses', disposable: '16-disposable', sending: '25-sending-receiving', labels: '02-reading-organizing',
   templates: '04-composing', notifications: '13-notifications', security: '12-security', encryption: '23-encryption',
   rules: '06-ai-automation', automation: '06-ai-automation', filters: '26-stopping-unwanted-senders', ai: '06-ai-automation',
-  integrations: '20-integrations', leads: '21-leads', contacts: '08-devices-contacts', devices: '08-devices-contacts',
+  integrations: '20-integrations', leads: '21-leads', contacts: '32-contacts', devices: '08-devices-contacts',
   health: '15-health', alerts: '31-alerts', logs: '10-troubleshooting', audit: '22-audit-log', storage: '17-storage', backup: '11-backup-restore', archives: '30-viewing-old-mail',
   users: '29-administrator', newsletters: '02-reading-organizing',
 };

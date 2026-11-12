@@ -1,7 +1,8 @@
 import type { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
 import { one, run } from '../db.ts';
 import { facadeLogin } from './auth.ts';
-import { listContacts, contactToVcf, contactEtag, importVcf, type ContactRow } from '../contacts.ts';
+import { listContacts, contactToVcf, contactEtag, type ContactRow } from '../contacts.ts';
+import { importVcf } from '../addressbook/manage.ts';
 
 /**
  * Minimal CardDAV server under /dav so phones sync the addressbook natively

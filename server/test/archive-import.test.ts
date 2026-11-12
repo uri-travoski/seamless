@@ -73,7 +73,10 @@ async function buildArchive(): Promise<string> {
   await run("INSERT INTO saved_views(user_id, name, query, scope) VALUES (?,?,?,?)", [TEST_USER, 'Flagged work', 'label:Work', 'unified']);
   await run("INSERT INTO templates(user_id, name, subject, body_html, shortcut, created_at, updated_at) VALUES (?,?,?,?,?,?,?)", [TEST_USER, 'Thanks', 'Thanks!', '<p>Thank you</p>', ';thx', NOW, NOW]);
   const cid = await insertId("INSERT INTO contacts(user_id, display_name, org, auto_created, created_at, updated_at) VALUES (?,?,?,?,?,?)", [TEST_USER, 'Sam Shop', 'Old Shop', false, NOW, NOW]);
-  await run("INSERT INTO contact_emails(contact_id, email, is_primary) VALUES (?,?,true)", [cid, 'sam@old.test']);
+  await run("INSERT INTO contact_emails(contact_id, email, is_primary, label) VALUES (?,?,true,'work')", [cid, 'sam@old.test']);
+  await run("UPDATE contacts SET phones_json = ? WHERE id = ?", [JSON.stringify([{ label: 'mobile', value: '0400 000 111' }]), cid]);  // T8.11
+  const gid = await insertId("INSERT INTO contact_groups(user_id, name, created_at) VALUES (?,?,?)", [TEST_USER, 'Suppliers', NOW]);
+  await run("INSERT INTO contact_group_members(group_id, contact_id) VALUES (?,?)", [gid, cid]);
   const bid = await insertId("INSERT INTO businesses(user_id, name, brand_color, created_at) VALUES (?,?,?,?)", [TEST_USER, 'Acme Pty', '#112233', NOW]);
   await run("INSERT INTO identities(user_id, account_id, business_id, email, display_name, signature_html) VALUES (?,?,?,?,?,?) ON CONFLICT (account_id, email) DO UPDATE SET business_id = EXCLUDED.business_id", [TEST_USER, acct, bid, 'alice@demo.test', 'Alice A', '<p>--Alice</p>']);
   await run("INSERT INTO vip_senders(user_id, kind, value, created_at) VALUES (?,?,?,?)", [TEST_USER, 'address', 'boss@old.test', NOW]);
@@ -304,6 +307,10 @@ describe('app data arrives and works', () => {
     expect((await one<any>("SELECT query FROM saved_views WHERE user_id = ? AND name = 'Flagged work'", [B]))!.query).toBe('label:Work');
     expect((await one<any>("SELECT shortcut FROM templates WHERE user_id = ? AND name = 'Thanks'", [B]))!.shortcut).toBe(';thx');
     expect((await q<any>("SELECT 1 FROM contact_emails ce JOIN contacts c ON c.id = ce.contact_id WHERE c.user_id = ? AND ce.email = 'sam@old.test'", [B])).length).toBe(1);
+    // T8.11: phones, email labels and groups travel with the contact
+    const sam = (await one<any>("SELECT c.phones_json, ce.label, (SELECT g.name FROM contact_group_members m JOIN contact_groups g ON g.id = m.group_id WHERE m.contact_id = c.id) AS grp FROM contacts c JOIN contact_emails ce ON ce.contact_id = c.id WHERE c.user_id = ? AND ce.email = 'sam@old.test'", [B]))!;
+    expect(JSON.parse(sam.phones_json)).toEqual([{ label: 'mobile', value: '0400 000 111' }]);
+    expect(sam).toMatchObject({ label: 'work', grp: 'Suppliers' });
     const biz = (await one<any>("SELECT id FROM businesses WHERE user_id = ? AND name = 'Acme Pty'", [B]))!;
     const [a] = await bAccounts();
     expect((await one<any>("SELECT business_id, is_default FROM identities WHERE account_id = ?", [a.id]))).toMatchObject({ business_id: biz.id, is_default: false });

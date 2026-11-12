@@ -55,6 +55,8 @@ async function deliverOne(row: SchedRow): Promise<void> {
     }
   }
 
+  const { autoSaveForSend } = await import('./send.ts');
+  await autoSaveForSend(acct.user_id, envelopeTo.map((email) => ({ email })), row.reply_to_email_id);
   if (row.reply_to_email_id) {
     try { await setKeywords(acct.user_id, row.reply_to_email_id, { $answered: true }); } catch { /* original gone */ }
   }

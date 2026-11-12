@@ -34,12 +34,16 @@ export async function buildConfig(userId: number, archiveId: number, messageIds:
   const views = await q<any>(`SELECT name, icon, color, query, scope, sort, pinned, show_count, sort_order FROM saved_views WHERE user_id = ? ORDER BY sort_order, id`, [userId]);
   const templates = await q<any>(`SELECT name, category, subject, body_html, shortcut, kind, pinned, pin_order, send_direct FROM templates WHERE user_id = ? ORDER BY id`, [userId]);
   const contactRows = await q<any>(
-    `SELECT c.id, c.display_name, c.org, c.notes, c.hidden, c.auto_created FROM contacts c WHERE c.user_id = ? ORDER BY c.id`, [userId]);
+    `SELECT c.id, c.display_name, c.org, c.notes, c.hidden, c.auto_created, c.phones_json, c.sent_count, c.received_count, c.last_interaction_at FROM contacts c WHERE c.user_id = ? ORDER BY c.id`, [userId]);
   const cEmails = await q<any>(
-    `SELECT ce.contact_id, ce.email, ce.is_primary FROM contact_emails ce JOIN contacts c ON c.id = ce.contact_id WHERE c.user_id = ? ORDER BY ce.contact_id`, [userId]);
+    `SELECT ce.contact_id, ce.email, ce.is_primary, ce.label FROM contact_emails ce JOIN contacts c ON c.id = ce.contact_id WHERE c.user_id = ? ORDER BY ce.contact_id`, [userId]);
+  const cGroups = await q<any>(
+    `SELECT m.contact_id, g.name FROM contact_group_members m JOIN contact_groups g ON g.id = m.group_id WHERE g.user_id = ? ORDER BY g.name`, [userId]);
   const contacts = contactRows.map((c) => ({
     displayName: c.display_name, org: c.org, notes: c.notes, hidden: c.hidden, autoCreated: c.auto_created,
-    emails: cEmails.filter((e) => e.contact_id === c.id).map((e) => ({ email: e.email, primary: e.is_primary })),
+    phones: parseJson(c.phones_json, []), sentCount: c.sent_count, receivedCount: c.received_count, lastInteractionAt: c.last_interaction_at == null ? null : Number(c.last_interaction_at),
+    groups: cGroups.filter((g) => g.contact_id === c.id).map((g) => g.name),
+    emails: cEmails.filter((e) => e.contact_id === c.id).map((e) => ({ email: e.email, primary: e.is_primary, label: e.label })),
   }));
 
   const bizRows = await q<any>(

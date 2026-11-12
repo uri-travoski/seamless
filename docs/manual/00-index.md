@@ -43,6 +43,7 @@ In Settings, the **?** at the top right of each tab opens the matching page.
 - [Backup and restore](11-backup-restore.md)
 - [Storage](17-storage.md)
 - [Health](15-health.md)
+- [Contacts](32-contacts.md) — auto-save and its switch, autocomplete, groups, merge duplicates, import/export (Google, Outlook, iPhone, Android)
 - [Critical alerts](31-alerts.md) — be told by SMS, Telegram or email when a mailbox stops working; red pinned notifications
 - [Troubleshooting](10-troubleshooting.md)
 

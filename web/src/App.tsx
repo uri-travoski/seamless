@@ -4,9 +4,9 @@ import { useSession } from './state/session.ts';
 import { useMail, scopeToSlug, slugToScope, type View } from './state/mail.ts';
 import { useCompose } from './state/compose.ts';
 import { useNotifs } from './state/notifications.ts';
-import { useToasts } from './toast.ts';
+import { useToasts, undoToast, toast } from './toast.ts';
 import { useRouter, navigate, FOLDER_ROLE, FOLDER_TITLE, ROLE_FOLDER, type Route } from './router.ts';
-import { getEmailsByIds } from './api/client.ts';
+import { getEmailsByIds, api } from './api/client.ts';
 import Login from './components/Login.tsx';
 import ForcePasswordChange from './components/ForcePasswordChange.tsx';
 import Sidebar from './components/Sidebar.tsx';
@@ -50,6 +50,13 @@ function useWebSocket(enabled: boolean): boolean {
         try {
           const msg = JSON.parse(ev.data) as WsMessage;
           if (msg.type === 'presence') { useShared.getState().onPresence(msg); return; }
+          if (msg.type === 'contactsSaved') {
+            // T8.11: a send just auto-saved someone — small toast with Undo (removes only that auto-created contact)
+            for (const c of msg.contacts ?? []) {
+              undoToast(`Saved ${c.name || c.email} to contacts`, () => { void api.post(`/api/contacts/${c.id}/undo-save`).then(() => toast('Removed from contacts')); });
+            }
+            return;
+          }
           if (msg.type === 'stateChange' || msg.type === 'newMail') {
             void useMail.getState().refreshCurrent();
             void useViews.getState().loadCounts();

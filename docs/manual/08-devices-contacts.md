@@ -21,8 +21,11 @@ Add a **CardDAV** account on your phone pointing at the address shown on the Dev
 
 ## The addressbook
 
-Seamless builds an addressbook automatically from your outgoing mail: every recipient of a message you send, and every sender you reply to, becomes a contact (it never adds unsolicited senders). Manage it under **Settings > Contacts**:
+Seamless builds an addressbook automatically, like Gmail: the moment you send, every recipient is saved, and so is every sender you reply to (never no-reply addresses, your own addresses or mailing-list mail). There is an **Undo** on the small "Saved to contacts" message and an on/off switch in **Settings > Contacts**. Manage it there:
 
-- Browse, search, edit, merge, or hide contacts, and add photos.
-- **Import / export vCards**.
-- Compose autocomplete ranks contacts by how recently and often you interact with them.
+- Add contacts with several emails and phones, edit, merge duplicates, hide, filter and sort.
+- Organise people into **groups** (they sync to phones as vCard categories, and a group name works in the To field).
+- **Import / export** vCard, Google CSV, Outlook CSV and generic CSV.
+- Compose autocomplete matches names, emails and organisations and ranks by how recently and often you interact.
+
+Everything is explained in [Contacts](32-contacts.md).

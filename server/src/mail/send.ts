@@ -16,6 +16,8 @@ import { logoAttachments } from '../business/logo.ts';
 import { transportForAccount, sendWithFallback } from '../transport/registry.ts';
 import { resolveSendIdentity, effectivePayload, type SendIdentity } from '../business/sending.ts';
 import { markLeadReplies } from '../leads/leads.ts';
+import { autoSaveAfterSend } from '../contacts.ts';
+import { broadcast } from '../ws.ts';
 import { protectMessage } from './pgp.ts';
 import { protectMessage as smimeProtect, SmimeError } from './smime.ts';
 
@@ -185,6 +187,22 @@ export async function buildRaw(payload: ComposePayload, acct: AccountRow, extraF
   return { raw, trackingToken };
 }
 
+/** T8.11: instant "like Gmail" auto-save after a message was accepted. Never lets a contacts problem break a send. */
+export async function autoSaveForSend(userId: number, recipients: { name?: string; email: string }[], replyToEmailId?: string | null): Promise<void> {
+  try {
+    let reply: { fromEmail: string; fromName: string; listMail: boolean } | null = null;
+    if (replyToEmailId) {
+      const o = await one<{ from_addr: string; from_name: string | null; is_newsletter: boolean; list_unsubscribe: string | null }>(
+        'SELECT from_addr, from_name, is_newsletter, list_unsubscribe FROM messages WHERE id = ?', [Number(String(replyToEmailId).replace(/^m/, '')) || 0]);
+      if (o) reply = { fromEmail: o.from_addr, fromName: o.from_name ?? '', listMail: o.is_newsletter || !!o.list_unsubscribe };
+    }
+    const created = await autoSaveAfterSend(userId, recipients, Date.now(), reply);
+    if (created.length) broadcast({ type: 'contactsSaved', contacts: created }, userId);
+  } catch (err: any) {
+    console.error('[contacts] auto-save failed:', err?.message ?? err);
+  }
+}
+
 export async function sendEmail(userId: number, original: ComposePayload): Promise<{ trackingToken: string | null }> {
   assertLive('sending mail');
   userId = await actingUser(userId, original.accountId);
@@ -237,6 +255,7 @@ export async function sendEmail(userId: number, original: ComposePayload): Promi
   if (followMsgId) {
     await createPendingFollowup(userId, followMsgId, now + payload.followupDays! * 86_400_000, { subject: payload.subject, to: envelopeTo });
   }
+  await autoSaveForSend(userId, [...payload.to, ...payload.cc, ...payload.bcc], payload.replyToEmailId);
   if (payload.replyToEmailId) await setKeywords(userId, payload.replyToEmailId, { $answered: true });
   if (payload.draftId) await destroyDraft(userId, payload.draftId);
   for (const id of payload.attachmentIds) removeUpload(id);

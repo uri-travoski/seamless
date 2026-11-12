@@ -16,6 +16,7 @@ import type { IndexEntry } from './restore.ts';
 import { sourceStore, readManifestIn, rebaser, type ImportSourceRef } from './source.ts';
 import { SECRET_KEY } from './config.ts';
 import { importAiSettings, importAiMessages, hasAiMemory } from './aimemory.ts';
+import { groupByName } from '../addressbook/manage.ts';
 
 const BUDGET_MS = 40_000;
 const MAX_ATTEMPTS = 5;
@@ -222,14 +223,19 @@ async function importTemplates(imp: ImportRow, cfg: any): Promise<Counts> {
 async function importContacts(imp: ImportRow, cfg: any): Promise<Counts> {
   const res = C(); const now = Date.now();
   for (const c of cfg.contacts ?? []) {
-    const emails: { email: string; primary: boolean }[] = (c.emails ?? []).map((e: any) => ({ email: String(e.email).toLowerCase(), primary: !!e.primary }));
+    const emails: { email: string; primary: boolean; label: string }[] = (c.emails ?? []).map((e: any) => ({ email: String(e.email).toLowerCase(), primary: !!e.primary, label: String(e.label ?? '') }));
     if (!emails.length) { res.skipped++; continue; }
     const have = await one('SELECT 1 FROM contact_emails ce JOIN contacts c ON c.id = ce.contact_id WHERE c.user_id = ? AND lower(ce.email) = ANY(?)', [imp.user_id, emails.map((e) => e.email)]);
     if (have) { res.skipped++; continue; }
     const id = await insertId(
-      `INSERT INTO contacts(user_id, display_name, org, notes, auto_created, hidden, created_at, updated_at) VALUES (?,?,?,?,?,?,?,?)`,
-      [imp.user_id, c.displayName ?? '', c.org ?? '', c.notes ?? '', c.autoCreated !== false, !!c.hidden, now, now]);
-    for (const e of emails) await run('INSERT INTO contact_emails(contact_id, email, is_primary) VALUES (?,?,?) ON CONFLICT DO NOTHING', [id, e.email, e.primary]);
+      `INSERT INTO contacts(user_id, display_name, org, notes, auto_created, hidden, phones_json, sent_count, received_count, last_interaction_at, created_at, updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)`,
+      [imp.user_id, c.displayName ?? '', c.org ?? '', c.notes ?? '', c.autoCreated !== false, !!c.hidden, JSON.stringify(Array.isArray(c.phones) ? c.phones : []),
+        Number(c.sentCount) || 0, Number(c.receivedCount) || 0, c.lastInteractionAt ?? null, now, now]);
+    for (const e of emails) await run('INSERT INTO contact_emails(contact_id, email, is_primary, label) VALUES (?,?,?,?) ON CONFLICT DO NOTHING', [id, e.email, e.primary, e.label]);
+    for (const g of Array.isArray(c.groups) ? c.groups : []) {
+      const gid = await groupByName(imp.user_id, String(g), true);
+      if (gid) await run('INSERT INTO contact_group_members(group_id, contact_id) VALUES (?,?) ON CONFLICT DO NOTHING', [gid, id]);
+    }
     res.created++;
   }
   return res;

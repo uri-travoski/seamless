@@ -12,6 +12,7 @@ import { cache } from '../api/cache.ts';
 import { toast } from '../toast.ts';
 import SnoozeButton from './SnoozeMenu.tsx';
 import { WhyLine } from './WhyLine.tsx';
+import SenderContact from './SenderContact.tsx';
 import { NewsletterPrompt } from './NewsletterPrompt.tsx';
 import PgpBar from './PgpBar.tsx';
 import { FollowupBanner } from './FollowupMenu.tsx';
@@ -331,7 +332,7 @@ function MessageCard({ email, expanded, onToggle }: { email: ApiEmail; expanded:
         <div className="avatar" style={{ background: email.accountColor }}>{initials}</div>
         <div className="who">
           <div className="from-line">
-            <span className="from-name">{from?.name || from?.email}</span>
+            {from?.email ? <SenderContact name={from.name} email={from.email} /> : <span className="from-name">{from?.name || from?.email}</span>}
             <span className="from-addr">{from?.name ? `<${from?.email}>` : ''}</span>
           </div>
           <div className="to-line">
