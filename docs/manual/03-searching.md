@@ -43,38 +43,55 @@ Plain words match the subject, body, and participants (full-text). Combine them 
 - Operators can be combined freely; everything is AND-ed together.
 - Clearing the box (the **x** or Escape) returns you to whatever mailbox you were in.
 
+## Search options (the sliders button)
+
+Click the **sliders** icon at the right end of the search bar for a Gmail-style form:
+
+1. Fill any of **From, To, Subject, Has the words, Doesn't have, Size, Date within, Search in** and **Has attachment**.
+2. The form writes the matching search text into the bar for you (for example `from:bank subject:statement has:attachment`).
+3. **Search** runs it. To keep it as a rule, click **Create filter** instead.
+4. In *Create filter* you see **how many emails the search found**, right beside **Also apply filter to matching conversations**.
+   Tick that to run the new filter on the existing mail too, then choose the actions (move, label, mark read, star, delete) and press **Create filter**.
+
 ## Smart views
 
-A **smart view** is nothing more than a **saved search** that lives in the sidebar under **Smart views**, with a live
+A **smart view** is nothing more than a **saved search** that appears as a pill in the filter strip above your mail, with a live
 count of the messages that match. It never moves, deletes or changes mail. The AI never "runs" a view either: the AI only
 *labels* mail (see [AI, rules & retention](06-ai-automation.md)), and a view that mentions a label simply searches for
 that label.
 
-### The suggested views
+### The default views and the filter strip
 
-The first time you have none, the sidebar offers a card of **Suggested views**. Press **+ Add** next to the ones you want;
-**Dismiss** hides the card for good. Each is exactly this search:
+Smart views no longer sit in the sidebar. They live in the **filter strip** at the top of the message list, next to
+**All**, **Unread** and **Attachments**:
+
+- Each view is a **pill** with its live count. Click a pill to see its mail; click it again (or **All**) to go back.
+- The strip **scrolls sideways** — drag it, use the mouse wheel with Shift, or swipe — so every view is reachable however many you have.
+- **Leads** (if you use [lead capture](21-leads.md)) is the last pill after your views.
+- On the pill you are viewing, a **pencil** edits it.
+- The strip hides while you have rows ticked (the bulk toolbar takes its place).
+
+Two views are created for you the first time: **Waiting for reply** (`is:waiting` — sent mail whose follow-up reminder is still open)
+and **Attachments 5 MB+** (`has:attachment size>5mb`). Edit or delete them like any other. Other handy ideas you can add yourself:
 
 | View | Search it saves | How it is decided |
 |---|---|---|
-| **VIPs** | `is:vip` | Rule: the sender is on **your** VIP list (an address or a whole domain — **Settings → Notifications → VIPs**). No AI. |
-| **Waiting for reply** | `is:waiting` | Rule: a sent message that still has a follow-up reminder open (waiting or due). No AI. See *Follow-up reminders*. |
-| **Unpaid invoices** | `label:Invoices is:unread` | **AI/rules label + unread.** Needs a label called **Invoices** (create it in **Settings → Labels**); rules or the AI apply it to invoice mail. "Unpaid" here only means *unread* — Seamless doesn't know if you paid. With no Invoices label the view is empty. |
-| **High risk** | `risk:high` | Rule: the phishing checks flagged the message as high risk ([Phishing](14-phishing.md)). No AI. |
-| **Attachments over 5 MB** | `has:attachment size>5mb` | Rule: the message has an attachment and is larger than 5 MB. No AI. |
-| **Disposable address mail** | `is:disposable` | Rule: the message was delivered to one of your disposable addresses ([Disposable addresses](16-disposable.md)). No AI. |
+| **VIPs** | `is:vip` | The sender is on **your** VIP list (**Settings → Notifications → VIPs**). |
+| **High risk** | `risk:high` | The phishing checks flagged it ([Phishing](14-phishing.md)). |
+| **Unpaid invoices** | `label:Invoices is:unread` | Needs a label called **Invoices**; "unpaid" only means *unread*. |
+| **Disposable address mail** | `is:disposable` | Delivered to a [disposable address](16-disposable.md). |
 
 ### Make your own
 
 1. Type a search in the box at the top (try `from:bank is:unread has:attachment`).
 2. Click the **bookmark** button next to the **x**.
 3. In **Save this search** give it a **Name**, an **Icon** and optionally a **Colour**.
-4. Tick **Show in the sidebar**, **Show how many messages match** and/or **Notify me when new mail matches**.
+4. Tick **Show in the filter strip**, **Show how many messages match** and/or **Notify me when new mail matches**.
 5. Press **Save view**.
 
 ### Change or remove one
 
-1. Hover the view in the sidebar and click the **pencil**.
+1. Open the view's pill in the strip and click the **pencil** on it.
 2. Edit the name, the **Search** text, icon, colour or the tick-boxes, then **Save** — or press **Delete** to remove the
    view (your mail is untouched).
 

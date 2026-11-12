@@ -30,7 +30,16 @@ In this example, blue marks one account and purple another. Add more accounts an
 
 ## Bulk actions
 
-Tick one or more checkboxes (or the master checkbox) and a bulk toolbar appears: mark read/unread, move, label, or delete many messages at once.
+Tick one or more checkboxes and a bulk toolbar appears: mark read/unread, move, label, snooze or delete many messages at once.
+
+### Select everything that matches
+
+1. Tick the **box at the top-left of the list** (it is always visible). This selects only the rows on the current page.
+2. A banner appears: *All 120 conversations on this page are selected. **Select all 3,000 conversations in this view**.* Click the link.
+3. The banner now says all 3,000 are selected. Choose any bulk action (mark read, delete, label, move…). It applies to every match, not only the rows you can see.
+4. Click **Clear selection** to cancel.
+
+**Limit:** one bulk action handles up to **20,000** messages. If a view has more, the banner says so — select the first 20,000, do the action, then repeat.
 
 ## The reading pane
 
@@ -58,7 +67,7 @@ Snooze hides a conversation from your Inbox and brings it back, unread and at th
   (Monday 8 am), **Someday** (30 days) or **Pick date and time…**. Times are in Perth time; choices that have already
   passed today aren't offered.
 - The whole conversation is snoozed, and snoozed mail doesn't count as unread. Look in **Snoozed** (sidebar, under
-  *More*) to see what's waiting — the list shows when each one returns. Right-click > **Remove snooze** brings one back now.
+  *Scheduled*) to see what's waiting — the list shows when each one returns. Right-click > **Remove snooze** brings one back now.
 - If someone replies while a conversation is snoozed it comes back straight away (turn this off in
   **Settings > General > Sending and snoozing**).
 - When it returns you get a **Back in your Inbox** notification.
@@ -86,7 +95,7 @@ Everything follows the scope: the list, folder counts, label counts, Starred and
 
 ## Sidebar
 
-Inbox (with **Review** under it when the AI needs a decision), Starred, Drafts, Scheduled, Sent, **Templates**, **Spam**, **Bin**, then **More** (Archive). Labels follow, A–Z by default, nested under their parent. Reorder the folders and choose what lives under More in **Settings > Labels > Sidebar**. When the scope is a single mailbox, its own folders appear under **Folders**.
+Inbox (with **Review** under it when the AI needs a decision), Starred, Drafts, Scheduled, **Snoozed**, Sent, **Templates**, **Spam**, **Archive**, **Bin**. Labels follow, A–Z by default, nested under their parent. Reorder the folders and choose what lives under More in **Settings > Labels > Sidebar**. When the scope is a single mailbox, its own folders appear under **Folders**.
 
 ## Labels
 

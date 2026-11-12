@@ -14,6 +14,10 @@ The **Check all mailboxes for new mail** item in the **menu** (the three-line ic
 
 The number next to the mailbox name (for example "Inbox 321") is the **total** count of mail in that view — all of it, not just the first page.
 
-Seamless loads mail in pages of 120 and fetches the next page automatically as you scroll. There are no page buttons — just keep scrolling and more rows fill in (you may briefly see "Loading…" placeholders on a page that is still being fetched). This keeps even a mailbox with tens of thousands of messages fast.
+Seamless loads mail in pages of 120 and fetches the next page automatically as you scroll (you may briefly see "Loading…" placeholders). This keeps a mailbox with thousands of messages fast.
+
+**Lists over 20,000 messages use page buttons instead.** A browser cannot scroll a list that tall, so a pager bar appears at the bottom of the list (*1–120 of 1,000,000*, **Newer / Older** and a jump-to-page box). The same pager is used for big search results. Only the rows of the current page are held in memory, so a million-message mailbox uses no more memory than a small one. The total is cached for big results, so it appears quickly after the first look.
+
+Select-all and bulk actions work across the whole result: see *Select everything that matches* in [Reading & organizing](02-reading-organizing.md) (limit 20,000 per action).
 
 Remember that **search covers everything**, not just the pages you have scrolled to — see **Searching your mail**.

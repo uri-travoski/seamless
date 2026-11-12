@@ -2,7 +2,7 @@
 
 ## The bell
 
-The bell in the top-right corner shows how many notifications are unread and, when clicked, the latest six: new mail, someone opening your email, send failures, mailboxes that can't sync, backups, security changes. Repeats collapse into one line ("Opened 5×"). Click a notification to go straight to it — an open goes to the **open report**, new mail to the message. **Mark all read** clears the badge (in every open tab); the gear opens the settings.
+The bell in the top-right corner shows how many notifications are unread and, when clicked, the latest 20 (the list scrolls inside the pop-up): new mail, someone opening your email, send failures, mailboxes that can't sync, backups, security changes. Repeats collapse into one line ("Opened 5×"). Click a notification to go straight to it — an open goes to the **open report**, new mail to the message. **Mark all read** clears the badge (in every open tab); the gear opens the settings.
 
 ## All notifications
 

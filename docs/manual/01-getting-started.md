@@ -12,7 +12,7 @@ Nothing shows up until you connect a mailbox. Open **Settings > Mailboxes > Add 
 
 ## The layout
 
-- **Top bar** — the app name, **search**, a small **dot** that is green while you're connected live to the server (amber while it reconnects), the **mailbox switcher** (Unified, Work, Personal, Disposable or a single mailbox) and the **notification bell** and, at the far right, the **menu** (check all mailboxes for new mail, Settings, Log out).
+- **Top bar** — the app name, **search**, a small **dot** that is green while you're connected live to the server (amber while it reconnects), the **mailbox switcher** (Unified, Work, Personal, Disposable or a single mailbox) and the **notification bell** and, at the far right, the **menu**. The **magnifier bar** has a small **sliders** button at its right end that opens the search options (see [Searching](03-searching.md)).
 - **Sidebar** (left) — Compose, your folders and labels, and a footer bar (see below).
 - **Message list** (middle) — the mail in the current view.
 - **Reading pane** (right) — the open conversation.
@@ -22,10 +22,25 @@ Two layouts are available (switch in **Settings > Appearance**, or with the layo
 - **Split view** — list beside the reading pane.
 - **Table view** — a full-width Gmail-style list; clicking a row opens the message.
 
+## The top-right menu
+
+Click the menu button at the far right of the top bar. It is grouped so you can find things quickly:
+
+1. **Check New Mail** — asks every connected mailbox for new mail right now.
+2. **Theme** — three buttons (Light, Dark, System). Your choice is saved to your account and follows you to other devices.
+3. **Settings**, **Help**, **Keyboard shortcuts**.
+4. **Log out**.
+
+Administrator pages live inside **Settings** (the tabs marked admin), not in this menu.
+
+## Finding a setting
+
+**Settings** is grouped into sections (Mail, Organize, Automation, Storage, Security & access, and so on). At the top of the Settings menu is a **search box**: type what you want — *trash*, *bin*, *retention*, *deleted*, *signature*, *backup* — and the matching settings are listed; click one to jump straight to it. Trash and retention live under **Storage**.
+
 ## The sidebar
 
 - **Compose** — start a new message.
-- **Inbox, Starred, Drafts, Scheduled, Sent, Templates, Spam, Bin** (Archive is under **More**) — your folders. Every connected account's Inbox is merged into one, and each account gets its own **coloured dot** at the left of a row (it turns into a tick-box when you point at the row) so you can tell them apart.
+- **Inbox, Starred, Drafts, Scheduled, Snoozed, Sent, Templates, Spam, Archive, Bin** — your folders, in that order (Snoozed sits under Scheduled, Archive just above Bin). Change the order in **Settings > Labels > Sidebar**. Every connected account's Inbox is merged into one, and each account gets its own **coloured dot** at the left of a row (it turns into a tick-box when you point at the row) so you can tell them apart.
 - **Review** — appears only when the AI is unsure about some mail and wants a quick decision from you.
 - **Labels** — your colored labels, across all accounts. Click the **+** on the right of the LABELS heading to add one; click the **color dot** in front of a label to recolor it.
 - **Folders** — when the switcher shows a single mailbox, that mailbox's own folders appear here.
