@@ -15,7 +15,7 @@ In Settings, the **?** at the top right of each tab opens the matching page.
 - [Reading & organising mail](02-reading-organizing.md) — labels, snooze, folders
 - [Searching](03-searching.md) — including smart views
 - [Composing & sending](04-composing.md) — undo send, follow-ups, templates, quick replies
-- [Shared mailboxes](19-shared-inbox.md)
+- [Shared mailboxes](19-shared-inbox.md) — roles, assignments, shared labels offered to members, team settings, archive and old mail
 - [Leads](21-leads.md)
 - [Setup recipes, click by click](28-setup-recipes.md)
 
@@ -31,7 +31,7 @@ In Settings, the **?** at the top right of each tab opens the matching page.
 
 ## Automate
 - [AI, rules & retention](06-ai-automation.md)
-- [Teach the AI](07-teach-the-ai.md)
+- [Teach the AI](07-teach-the-ai.md) — "Why is this here?", fixing wrong decisions, AI memory
 - [Notifications](13-notifications.md)
 
 ## Security & backups
