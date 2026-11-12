@@ -4,14 +4,13 @@ import { api } from '../../api/client.ts';
 import { toast } from '../../toast.ts';
 import { navigate } from '../../router.ts';
 import { useSession } from '../../state/session.ts';
-import { MenuIcon, RedoIcon, SettingsIcon, LogoutIcon, LockIcon, KeyboardIcon, HelpIcon, SunIcon, MoonIcon, SystemIcon } from '../../icons.tsx';
+import { MenuIcon, RedoIcon, SettingsIcon, LogoutIcon, KeyboardIcon, HelpIcon, SunIcon, MoonIcon, SystemIcon } from '../../icons.tsx';
 import { useUi } from '../../state/ui.ts';
 
 export default function AppMenu() {
   const [open, setOpen] = useState(false);
   const [fetching, setFetching] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
-  const isAdmin = useSession((x) => x.user?.role === 'admin');
   const mode = useSession((x) => x.settings.mode);
   const saveSettings = useSession((x) => x.saveSettings);
   const go = (fn: () => void) => () => { setOpen(false); fn(); };
@@ -52,11 +51,6 @@ export default function AppMenu() {
           <button className="side-item" role="menuitem" onClick={go(() => navigate({ page: 'settings', tab: 'general' }))}>
             <SettingsIcon size={17} /><span className="name">Settings</span>
           </button>
-          {isAdmin && (
-            <button className="side-item" role="menuitem" onClick={go(() => navigate({ page: 'settings', tab: 'storage' }))}>
-              <LockIcon size={17} /><span className="name">Admin settings</span>
-            </button>
-          )}
           <div className="menu-sep" />
           <div className="side-item menu-theme" role="group" aria-label="Colour mode">
             <SunIcon size={17} /><span className="name">Theme</span>

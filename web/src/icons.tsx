@@ -138,7 +138,7 @@ export {
   Bell as BellFillIcon,
   Users as PeopleIcon,
   ShieldWarning as ShieldWarnIcon,
-  ClockClockwise as SnoozeIcon,
+  BellSimpleZ as SnoozeIcon,
   BookOpenText as ReadLaterIcon,
   Hourglass as WaitingIcon,
   Alarm as AlarmIcon,
