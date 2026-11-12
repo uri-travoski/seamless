@@ -199,7 +199,9 @@ sdescribe('sending', () => {
   it('turns open tracking off for S/MIME mail', async () => {
     await importAlice();
     await send({ smimeSign: true, track: true });
-    expect(lastRaw().toString()).not.toMatch(/\/t\/|tracking/i);
+    // the signature is random base64 (it can contain "/t/" by chance), so only look at headers and readable text
+    const readable = lastRaw().toString().split(/\r?\n/).filter((l) => !/^[A-Za-z0-9+/=]{40,}$/.test(l)).join('\n');
+    expect(readable).not.toMatch(/\/t\/|tracking/i);
   });
 });
 
