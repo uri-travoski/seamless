@@ -385,6 +385,8 @@ export default function MessageList() {
         </div>
       ) : (
         <div className="list-toolbar">
+          <input type="checkbox" className="row-check master always" title="Select all on this page" aria-label="Select all on this page"
+            checked={false} disabled={total === 0} onChange={() => setAllChecked(true)} />
           <span className="title">{view.title}<span className="total">{total > 0 ? total.toLocaleString() : ''}</span></span>
           <span style={{ flex: 1 }} />
           <button className="icon-btn" title={table ? 'Split view' : 'Table view'}

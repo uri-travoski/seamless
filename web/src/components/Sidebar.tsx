@@ -123,7 +123,7 @@ export default function Sidebar({ open, onNavigate, onAddLabel }: { open: boolea
               {collapsed ? <CaretRightIcon size={11} /> : <CaretDownIcon size={11} />}
             </button>
           ) : <span className="label-caret" />}
-          <LabelColorPicker label={l} dotSize={9.9} stop />
+          <LabelColorPicker label={l} dotSize={8.91} stop />
           <button className="label-name-btn" onClick={() => go('label', String(l.id))} title={l.name}>
             <span className="name">{l.name}</span>
             {(l.unread ?? 0) > 0 && <span className="count muted">{l.unread}</span>}

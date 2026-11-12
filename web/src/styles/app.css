@@ -189,7 +189,7 @@ svg { flex: 0 0 auto; vertical-align: middle; }
   border-radius: 9px; padding: 1px 7px; min-width: 18px; text-align: center;
 }
 .side-item .count.muted { background: var(--md-border-strong); color: var(--md-text-soft); }
-.label-dot { width: 9.9px; height: 9.9px; border-radius: 3px; flex: 0 0 auto; }
+.label-dot { width: 8.91px; height: 8.91px; border-radius: 2.85px; flex: 0 0 auto; }
 .label-dot.dot-btn { border: none; padding: 0; cursor: pointer; }
 .color-pop-backdrop { position: fixed; inset: 0; z-index: 19; }
 .color-pop {
@@ -1510,3 +1510,8 @@ mark[data-ai-pending], mark[data-unknown-var] { outline: 1px dashed var(--md-bor
 .topbar .adv-search .adv-inline input.text-input { flex: 0 0 80px; }
 .topbar .adv-search input[type=checkbox] { width: auto; height: auto; padding: 0; }
 .topbar .adv-search .adv-checks.col select.text-input { width: auto; margin-left: 6px; }
+
+/* sidebar labels: text 15% smaller than the app's normal text, colour square 10% smaller with 5% less rounding — every theme */
+.sidebar .side-item.label-item { font-size: 0.8164em; }
+.sidebar .side-item.label-item .label-dot { width: 8.91px !important; height: 8.91px !important; border-radius: 2.85px; }
+.list-toolbar .row-check.master.always { margin-left: 8px; opacity: 1; visibility: visible; flex: 0 0 auto; }
