@@ -8,7 +8,7 @@ export type Role = 'mail' | 'backup' | 'spool';
 export const ROLES: Role[] = ['mail', 'backup', 'spool'];
 
 export interface TargetRow {
-  id: number; role: Role; provider: string; endpoint: string; region: string; bucket: string; prefix: string;
+  id: number; role: Role | 'archive_source'; provider: string; endpoint: string; region: string; bucket: string; prefix: string;
   force_path_style: boolean; creds_enc: string; active: boolean; accept_same_bucket: boolean;
   created_at: string | number; verified_at: string | number | null; last_test: string | null;
 }
@@ -26,14 +26,14 @@ export const PROVIDERS: Record<string, { name: string; endpoint: string; region:
 };
 
 export interface TargetInput {
-  role: Role; provider: string; endpoint: string; region: string; bucket: string; prefix?: string;
+  role: Role | 'archive_source'; provider: string; endpoint: string; region: string; bucket: string; prefix?: string;
   forcePathStyle?: boolean; accessKey?: string; secretKey?: string; acceptSameBucket?: boolean;
 }
 
 export interface TestStep { id: string; name: string; status: 'ok' | 'warn' | 'fail' | 'skipped'; ms: number; detail: string }
 export interface TestResult { ok: boolean; warnings: number; steps: TestStep[]; latencyMs: number }
 
-export function normalizePrefix(p: string | undefined, role: Role): string {
+export function normalizePrefix(p: string | undefined, role: Role | 'archive_source'): string {
   let v = (p ?? (role === 'spool' ? '' : 'seamless/')).trim().replace(/^\/+/, '');
   if (v && !v.endsWith('/')) v += '/';
   return v;
@@ -61,7 +61,9 @@ export function view(row: TargetRow) {
   };
 }
 
-export const listTargets = () => q<TargetRow>('SELECT * FROM storage_targets ORDER BY role, id');
+/** The mail / backup / spool targets. Archive sources (T8.6, read-only, many at once) have their own list. */
+export const listTargets = () => q<TargetRow>("SELECT * FROM storage_targets WHERE role <> 'archive_source' ORDER BY role, id");
+export const listSourceTargets = () => q<TargetRow>("SELECT * FROM storage_targets WHERE role = 'archive_source' ORDER BY id");
 export const getTarget = (id: number) => one<TargetRow>('SELECT * FROM storage_targets WHERE id = ?', [id]);
 export const activeTarget = (role: Role) =>
   one<TargetRow>('SELECT * FROM storage_targets WHERE role = ? AND active ORDER BY id DESC LIMIT 1', [role]);

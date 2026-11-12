@@ -5,7 +5,7 @@ import { api } from '../../api/client.ts';
 export interface Provider { name: string; endpoint: string; region: string; pathStyle: boolean }
 export interface TestStep { id: string; name: string; status: 'ok' | 'warn' | 'fail' | 'skipped'; ms: number; detail: string }
 export interface TestResult { ok: boolean; warnings: number; steps: TestStep[]; latencyMs: number }
-export type Role = 'mail' | 'backup' | 'spool';
+export type Role = 'mail' | 'backup' | 'spool' | 'archive_source';
 
 export const PROVIDERS: Record<string, Provider> = {
   r2: { name: 'Cloudflare R2', endpoint: 'https://<accountid>.r2.cloudflarestorage.com', region: 'auto', pathStyle: false },
@@ -24,7 +24,7 @@ export interface FormValue {
 }
 
 export const emptyForm = (role: Role, provider = 'r2'): FormValue => ({
-  provider, endpoint: '', region: PROVIDERS[provider].region, bucket: '', prefix: role === 'spool' ? '' : 'seamless/',
+  provider, endpoint: '', region: PROVIDERS[provider].region, bucket: '', prefix: role === 'spool' || role === 'archive_source' ? '' : 'seamless/',
   forcePathStyle: PROVIDERS[provider].pathStyle, accessKey: '', secretKey: '', acceptSameBucket: false,
 });
 

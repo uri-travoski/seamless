@@ -85,7 +85,7 @@ export function register(app: FastifyInstance): void {
   app.post('/api/storage/targets/:id/test', async (req, reply) => {
     if (guard(req, reply)) return;
     const row = await getTarget(Number((req.params as any).id));
-    if (!row) return reply.code(404).send({ error: 'not found' });
+    if (!row || row.role === 'archive_source') return reply.code(404).send({ error: 'not found' });
     const res = await testTarget(toS3Config(row), { prefix: row.prefix });
     await recordTest(row.id, res);
     return res;
@@ -111,13 +111,13 @@ export function register(app: FastifyInstance): void {
     const id = await insertTarget({ ...i, accessKey: i.accessKey, secretKey: i.secretKey }, active, test);
     const row = (await getTarget(id))!;
     if (active) await applyRow(row);
-    return { target: view(row), test, note, overriddenByEnv: active && overridden(row.role) };
+    return { target: view(row), test, note, overriddenByEnv: active && overridden(row.role as Role) };
   });
 
   app.put('/api/storage/targets/:id', async (req, reply) => {
     if (guard(req, reply)) return;
     const row = await getTarget(Number((req.params as any).id));
-    if (!row) return reply.code(404).send({ error: 'not found' });
+    if (!row || row.role === 'archive_source') return reply.code(404).send({ error: 'not found' });
     const i = parse((req.body ?? {}) as any, row);
     if (typeof i === 'string') return reply.code(400).send({ error: i });
     const old = toS3Config(row);
@@ -163,7 +163,7 @@ export function register(app: FastifyInstance): void {
   });
 }
 
-const overridden = (role: Role) => (role === 'mail' ? config.s3FromEnv : role === 'backup' ? config.s3FromEnv || backupEnvSet() : false);
+const overridden = (role: Role | 'archive_source') => (role === 'mail' ? config.s3FromEnv : role === 'backup' ? config.s3FromEnv || backupEnvSet() : false);
 
 /** Make a saved row live — unless the environment names the bucket (the operator wins). */
 async function applyRow(row: TargetRow): Promise<void> {

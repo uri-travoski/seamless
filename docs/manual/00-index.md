@@ -39,6 +39,7 @@ In Settings, the **?** at the top right of each tab opens the matching page.
 - [Encryption](23-encryption.md)
 - [Audit log](22-audit-log.md)
 - [Administrator tools & storage limits](29-administrator.md) — users, password reset, mailbox for a user, quotas
+- [Viewing old mail](30-viewing-old-mail.md) — attach a bucket of archives and import old mail to browse and search it
 - [Backup and restore](11-backup-restore.md)
 - [Storage](17-storage.md)
 - [Health](15-health.md)
@@ -64,6 +65,6 @@ The Settings menu is grouped. Use the **Search settings…** box at the top to j
 | Organise | Labels, Filters, Rules, Templates, Newsletters, AI |
 | Alerts & look | Notifications, Appearance |
 | Security | Security, Encryption, Audit log |
-| Data | Storage (buckets, **Trash & retention**), Backup, Import |
+| Data | Storage (buckets, **Trash & retention**), Backup, Archives ([details](30-viewing-old-mail.md)), Import |
 | Devices | Contacts, Devices |
 | System | Health, Logs, Users (admins: [details](29-administrator.md)) |

@@ -67,7 +67,7 @@ export async function resetDb(): Promise<void> {
     await c.query('COMMIT');
   } catch (e) { await c.query('ROLLBACK').catch(() => {}); throw e; } finally { c.release(); }
   await run('TRUNCATE users RESTART IDENTITY CASCADE');
-  await run('TRUNCATE tracking_opens, op_queue, scheduled_sends, jobs, mail_archive_items, mail_archives, archive_schedules, storage_targets, storage_migrations, storage_migration_items RESTART IDENTITY');
+  await run('TRUNCATE tracking_opens, op_queue, scheduled_sends, jobs, mail_archive_imports, archive_imports, mail_archive_items, mail_archives, archive_schedules, storage_targets, storage_migrations, storage_migration_items RESTART IDENTITY');
   await run("DELETE FROM settings WHERE key = 'state' OR key LIKE 'alert:%'");
   TEST_USER = await insertId('INSERT INTO users(email, name, password_hash, role, created_at) VALUES (?,?,?,?,?)',
     ['test@local', 'Test User', hashPassword('password123'), 'admin', Date.now()]);

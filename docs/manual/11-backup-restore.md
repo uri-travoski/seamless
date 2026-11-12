@@ -271,3 +271,8 @@ The **Archives** list under the card shows each run: date, rule, number of messa
 | `npm run restore -- --verify-only` | Check it reads back; change nothing |
 | `npm run restore -- --prefix <p>` | Look under a custom prefix |
 | `npm run restore -- --force` | Overwrite a database that still has users |
+
+
+## Reading an archive in another copy of the app
+
+An archive can be opened (read-only) in this app or in a second copy: **Settings → Archives**. See [Viewing old mail](30-viewing-old-mail.md).

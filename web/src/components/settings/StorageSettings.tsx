@@ -15,7 +15,7 @@ interface Target {
 }
 interface Listing { targets: Target[]; envOverride: { mail: boolean; backup: boolean }; current: { mail: { endpoint: string; bucket: string } } }
 
-const ROLE_NAME: Record<Role, string> = { mail: 'Mail', backup: 'Backups', spool: 'Inbound spool (optional)' };
+const ROLE_NAME: Record<Role, string> = { mail: 'Mail', backup: 'Backups', spool: 'Inbound spool (optional)', archive_source: 'Archive source' };
 const when = (t: number | null) => (t ? new Date(t).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' }) : 'never');
 
 function StorageAdmin() {

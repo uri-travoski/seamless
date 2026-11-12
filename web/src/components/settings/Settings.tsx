@@ -18,6 +18,7 @@ import HealthSettings from './HealthSettings.tsx';
 import StorageSettings from './StorageSettings.tsx';
 import DevicesSettings from './DevicesSettings.tsx';
 import BackupSettings from './BackupSettings.tsx';
+import ArchivesSettings from './ArchivesSettings.tsx';
 import SendingSettings from './SendingSettings.tsx';
 import DisposableSettings from './DisposableSettings.tsx';
 import BusinessSettings from './BusinessSettings.tsx';
@@ -59,6 +60,7 @@ const TABS: Tab[] = [
   { id: 'audit', name: 'Audit log', group: 'Security', Icon: AuditIcon, C: AuditSettings },
   { id: 'storage', name: 'Storage', group: 'Data', Icon: CloudIcon, C: StorageSettings },
   { id: 'backup', name: 'Backup', group: 'Data', Icon: BackupIcon, C: BackupSettings, admin: true },
+  { id: 'archives', name: 'Archives', group: 'Data', Icon: BackupIcon, C: ArchivesSettings, admin: true },
   { id: 'automation', name: 'Import', group: 'Data', Icon: ImportIcon, C: AutomationSettings },
   { id: 'contacts', name: 'Contacts', group: 'Devices', Icon: ContactsIcon, C: ContactsSettings },
   { id: 'devices', name: 'Devices', group: 'Devices', Icon: DevicesIcon, C: DevicesSettings },
@@ -75,7 +77,7 @@ export const TAB_HELP: Record<string, string> = {
   templates: '04-composing', notifications: '13-notifications', security: '12-security', encryption: '23-encryption',
   rules: '06-ai-automation', automation: '06-ai-automation', filters: '26-stopping-unwanted-senders', ai: '06-ai-automation',
   integrations: '20-integrations', leads: '21-leads', contacts: '08-devices-contacts', devices: '08-devices-contacts',
-  health: '15-health', logs: '10-troubleshooting', audit: '22-audit-log', storage: '17-storage', backup: '11-backup-restore',
+  health: '15-health', logs: '10-troubleshooting', audit: '22-audit-log', storage: '17-storage', backup: '11-backup-restore', archives: '30-viewing-old-mail',
   users: '29-administrator', newsletters: '02-reading-organizing',
 };
 

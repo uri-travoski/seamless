@@ -170,7 +170,7 @@ async function writeIndexAndManifest(a: ArchiveRow, store: BlobStore): Promise<v
   }
   const failed = (await itemCounts(a.id)).failed ?? 0;
   const manifest = {
-    format: 'seamless-archive', version: 1, appVersion: pkgVersion, createdAt: Date.now(), archiveId: a.id,
+    format: 'seamless-archive', version: 1, appVersion: pkgVersion, createdAt: Date.now(), archiveId: a.id, name: a.name,
     rule: { olderThanDays: a.older_than_days, scope: a.scope, mode: a.mode },
     accounts: accounts.map((x) => ({
       key: `A${x.id}`, email: x.email, displayName: x.name || x.email,

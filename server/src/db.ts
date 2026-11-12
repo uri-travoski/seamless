@@ -1436,6 +1436,48 @@ CREATE TABLE archive_schedules (
 );
 `,
   },
+  {
+    id: 46,
+    // T8.6: open an archive in another instance. archive_imports = one row per archive being imported (from a bucket,
+    // an uploaded .zip or a folder); mail_archive_imports = which archived message keys already arrived (idempotent resume).
+    // Read-only "archived mailboxes" are accounts with archived = true (inbound_kind 'none', enabled = false: never polled).
+    sql: `
+ALTER TABLE storage_targets DROP CONSTRAINT IF EXISTS storage_targets_role_check;
+ALTER TABLE storage_targets ADD CONSTRAINT storage_targets_role_check CHECK (role IN ('mail','backup','spool','archive_source'));
+CREATE TABLE archive_imports (
+  id SERIAL PRIMARY KEY,
+  user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  source_kind TEXT NOT NULL CHECK (source_kind IN ('bucket','zip','folder')),
+  target_id INTEGER REFERENCES storage_targets(id) ON DELETE SET NULL,
+  source_ref TEXT NOT NULL DEFAULT '',
+  archive_path TEXT NOT NULL,
+  name TEXT NOT NULL,
+  status TEXT NOT NULL DEFAULT 'queued' CHECK (status IN ('queued','running','paused','done','failed')),
+  options JSONB NOT NULL DEFAULT '{}',
+  summary JSONB NOT NULL DEFAULT '{}',
+  total INTEGER,
+  imported INTEGER NOT NULL DEFAULT 0,
+  skipped INTEGER NOT NULL DEFAULT 0,
+  failed INTEGER NOT NULL DEFAULT 0,
+  config_result JSONB,
+  account_ids JSONB NOT NULL DEFAULT '[]',
+  error TEXT,
+  created_at BIGINT NOT NULL,
+  finished_at BIGINT
+);
+CREATE INDEX archive_imports_user ON archive_imports(user_id, id DESC);
+CREATE TABLE mail_archive_imports (
+  import_id INTEGER NOT NULL REFERENCES archive_imports(id) ON DELETE CASCADE,
+  message_key TEXT NOT NULL,
+  message_id INTEGER,
+  state TEXT NOT NULL CHECK (state IN ('imported','skipped','failed')),
+  error TEXT,
+  PRIMARY KEY (import_id, message_key)
+);
+ALTER TABLE accounts ADD COLUMN archived BOOLEAN NOT NULL DEFAULT false;
+ALTER TABLE accounts ADD COLUMN source_archive_id INTEGER;
+`,
+  },
 ];
 
 /** Run `fn` in one transaction. Events emitted through the client are only turned into
