@@ -11,7 +11,8 @@ import { testIncoming, testOutgoing, type ServerSpec } from '../mail/connTest.ts
 import { syncManager, type AccountRow } from '../imap/sync.ts';
 import { broadcast } from '../ws.ts';
 import { sweepSafeDelete, safeDeletePreview } from '../classify/safedelete.ts';
-import { uid, accountToApi } from './util.ts';
+import { uid, isAdmin, accountToApi } from './util.ts';
+import { audit } from '../audit/log.ts';
 import { ensureLocalMailboxes } from '../mail/localbox.ts';
 import '../transport/inbound/pop3.ts'; // registers the POP3 poller with the sync manager
 import { testPop3Incoming } from '../mail/connTest.ts';
@@ -40,6 +41,14 @@ export function register(app: FastifyInstance): void {
   app.post('/api/accounts', async (req, reply) => {
     const b = req.body as any;
     if (!b.email || !/^[^@\s]+@[^@\s]+$/.test(b.email)) return reply.code(400).send({ error: 'valid email required' });
+    // an administrator can add a mailbox on behalf of another user (Settings → Users → Add mailbox); it then belongs to that user
+    let ownerId = uid(req);
+    const forUserId = b.forUserId == null || b.forUserId === '' ? null : Number(b.forUserId);
+    if (forUserId !== null && forUserId !== ownerId) {
+      if (!isAdmin(req)) return reply.code(403).send({ error: 'only an administrator can add a mailbox for someone else' });
+      if (!Number.isInteger(forUserId) || !(await one('SELECT 1 FROM users WHERE id = ?', [forUserId]))) return reply.code(404).send({ error: 'user not found' });
+      ownerId = forUserId;
+    }
     const pop3 = b.inboundKind === 'pop3';
     if (pop3 && (!b.pop3Host || !b.pop3User)) return reply.code(400).send({ error: 'POP3 host and user required' });
     const id = await insertId(`
@@ -48,7 +57,7 @@ export function register(app: FastifyInstance): void {
         inbound_kind, pop3_host, pop3_port, pop3_secure, pop3_user, pop3_pass_enc, pop3_interval_min, pop3_leave_on_server, pop3_delete_after_days)
       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
     `, [
-      uid(req), b.name ?? '', b.email, JSON.stringify(b.aliases ?? []),
+      ownerId, b.name ?? '', b.email, JSON.stringify(b.aliases ?? []),
       pop3 ? '' : b.imapHost, pop3 ? 0 : b.imapPort, !!b.imapSecure, pop3 ? '' : b.imapUser, encrypt(pop3 ? '' : b.imapPass),
       b.smtpHost ?? '', b.smtpPort ?? 0, !!b.smtpSecure, b.smtpUser ?? '', encrypt(b.smtpPass ?? ''),
       b.color ?? '#2f7ed8', b.signature ?? '', b.sentCopy !== false,
@@ -59,10 +68,12 @@ export function register(app: FastifyInstance): void {
     ]);
     await syncAccountIdentities(id);
     if (pop3) await ensureLocalMailboxes(id);
-    if (Array.isArray(b.categoryIds)) await setAccountCategories(uid(req), id, b.categoryIds);
+    // categories belong to the person who owns the mailbox: the admin's category ids mean nothing to someone else
+    if (Array.isArray(b.categoryIds) && ownerId === uid(req)) await setAccountCategories(uid(req), id, b.categoryIds);
     await syncManager.restartAccount(id);
     await bumpState();
-    broadcast({ type: 'stateChange' }, uid(req));
+    broadcast({ type: 'stateChange' }, ownerId);
+    if (ownerId !== uid(req)) await audit(req, 'account.add_for_user', { type: 'account', id }, { forUserId: ownerId, email: b.email });
     return { id };
   });
 

@@ -374,7 +374,7 @@ class SyncManager extends EventEmitter {
   setStatus(accountId: number, st: SyncStatus): void { this.external.set(accountId, st); }
 
   async startAll(): Promise<void> {
-    const accounts = await q<AccountRow>('SELECT * FROM accounts WHERE enabled = true');
+    const accounts = await q<AccountRow>('SELECT a.* FROM accounts a JOIN users u ON u.id = a.user_id WHERE a.enabled = true AND u.disabled = false');
     for (const acct of accounts) this.startAccount(acct);
   }
 
@@ -401,7 +401,7 @@ class SyncManager extends EventEmitter {
   }
 
   async restartAccount(accountId: number): Promise<void> {
-    const acct = await one<AccountRow>('SELECT * FROM accounts WHERE id = ? AND enabled = true', [accountId]);
+    const acct = await one<AccountRow>('SELECT a.* FROM accounts a JOIN users u ON u.id = a.user_id WHERE a.id = ? AND a.enabled = true AND u.disabled = false', [accountId]);
     if (acct) this.startAccount(acct);
     else this.stopAccount(accountId);
   }

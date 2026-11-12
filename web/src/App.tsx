@@ -8,6 +8,7 @@ import { useToasts } from './toast.ts';
 import { useRouter, navigate, FOLDER_ROLE, FOLDER_TITLE, ROLE_FOLDER, type Route } from './router.ts';
 import { getEmailsByIds } from './api/client.ts';
 import Login from './components/Login.tsx';
+import ForcePasswordChange from './components/ForcePasswordChange.tsx';
 import Sidebar from './components/Sidebar.tsx';
 import SaveViewDialog from './components/SaveViewDialog.tsx';
 import { useViews } from './state/views.ts';
@@ -140,6 +141,7 @@ export default function App() {
   const init = useSession((s) => s.init);
   const appName = useSession((s) => s.settings.appName) || 'Seamless';
   const mfaEnrollRequired = useSession((s) => s.mfaEnrollRequired);
+  const mustChangePassword = useSession((s) => s.mustChangePassword);
   const route = useRouter((s) => s.route);
   const helpOpen = useUi((s) => s.helpOpen);
   const shortcutsOpen = useUi((s) => s.shortcutsOpen);
@@ -151,16 +153,16 @@ export default function App() {
   const layout = useSession((s) => s.settings.layout);
   const toasts = useToasts((s) => s.toasts);
   const dismiss = useToasts((s) => s.dismiss);
-  const wsConnected = useWebSocket(status === 'ready');
+  const wsConnected = useWebSocket(status === 'ready' && !mustChangePassword);
 
   useEffect(() => { void init(); }, [init]);
 
   useEffect(() => {
-    if (status === 'ready') {
+    if (status === 'ready' && !mustChangePassword) {
       void useMail.getState().boot();
       void useCompose.getState().loadIdentities();
     }
-  }, [status]);
+  }, [status, mustChangePassword]);
 
   useRouteSync(status === 'ready');
 
@@ -189,6 +191,7 @@ export default function App() {
 
   if (status === 'loading') return null;
   if (status !== 'ready') return <Login />;
+  if (mustChangePassword) return <ForcePasswordChange />;
 
   const addLabel = () => { sessionStorage.setItem('seamless-new-label', '1'); navigate({ page: 'settings', tab: 'labels' }); };
   const isMail = route.page === 'mail' && route.folder !== 'templates';

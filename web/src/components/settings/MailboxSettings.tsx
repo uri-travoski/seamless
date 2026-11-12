@@ -42,7 +42,7 @@ function detectPreset(email: string): Preset | null {
 // ---- wizard ----
 
 interface Form {
-  id?: number; kind?: string; enabled: boolean; outboundTransportId?: number | null;
+  id?: number; forUserId?: number; kind?: string; enabled: boolean; outboundTransportId?: number | null;
   inboundKind: 'imap' | 'pop3';
   pop3Host: string; pop3Port: number; pop3Secure: boolean; pop3User: string; pop3Pass: string;
   pop3IntervalMin: number; pop3LeaveOnServer: boolean; pop3DeleteAfterDays: number | '';
@@ -54,7 +54,7 @@ interface Form {
 
 const COLORS = ['#2f7ed8', '#7a5fd0', '#d05f8e', '#d0755f', '#c9a13a', '#4d9e53', '#3a9e9e', '#5b6570', '#a85d24', '#151f2e'];
 
-const BLANK: Form = {
+export const BLANK: Form = {
   enabled: true, name: '', email: '', color: COLORS[0], inboundKind: 'imap',
   pop3Host: '', pop3Port: 995, pop3Secure: true, pop3User: '', pop3Pass: '', pop3IntervalMin: 5, pop3LeaveOnServer: true, pop3DeleteAfterDays: '',
   imapHost: '', imapPort: 993, imapSecure: true, imapUser: '', imapPass: '',
@@ -88,7 +88,7 @@ function TestResult({ steps, busy }: { steps: TestStep[] | null; busy: boolean }
   );
 }
 
-function Wizard({ initial, categories, onDone }: { initial: Form; categories: ApiCategory[]; onDone: (saved: boolean) => void }) {
+export function Wizard({ initial, categories, onDone }: { initial: Form; categories: ApiCategory[]; onDone: (saved: boolean) => void }) {
   const [f, setF] = useState<Form>(initial);
   const [step, setStep] = useState(initial.id ? 2 : 0);
   const [busy, setBusy] = useState(false);

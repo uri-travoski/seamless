@@ -4,7 +4,7 @@ Seamless is a self-hosted, AI-native webmail app. It unifies all your email acco
 
 ## First run
 
-The very first account you create becomes the **admin**. Pick an email and password on the login screen and you are in. Admins can add more users under **Settings > Users**; each user has their own accounts, labels, filters, AI configuration, and mail — nothing is shared between users.
+The very first account you create becomes the **admin**. Pick an email and password on the login screen and you are in. Admins can add more users under **Settings > Users** (reset passwords, disable people, set storage limits: see [Administrator tools](29-administrator.md)); each user has their own accounts, labels, filters, AI configuration, and mail — nothing is shared between users.
 
 ## Connect your first account
 

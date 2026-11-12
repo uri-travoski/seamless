@@ -76,7 +76,7 @@ export const TAB_HELP: Record<string, string> = {
   rules: '06-ai-automation', automation: '06-ai-automation', filters: '26-stopping-unwanted-senders', ai: '06-ai-automation',
   integrations: '20-integrations', leads: '21-leads', contacts: '08-devices-contacts', devices: '08-devices-contacts',
   health: '15-health', logs: '10-troubleshooting', audit: '22-audit-log', storage: '17-storage', backup: '11-backup-restore',
-  users: '01-getting-started', newsletters: '02-reading-organizing',
+  users: '29-administrator', newsletters: '02-reading-organizing',
 };
 
 export default function Settings({ tab }: { tab: string }) {

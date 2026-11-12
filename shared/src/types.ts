@@ -488,7 +488,8 @@ export type EventType =
   | 'export.created' | 'export.imported'
   | 'disposable.received' | 'disposable.leak' | 'lead.captured' | 'view.match' | 'assignment.changed' | 'comment.mention'
   | 'security.login' | 'security.2fa_changed'
-  | 'webhook.failed';
+  | 'webhook.failed'
+  | 'quota.warning' | 'quota.full';
 
 /** UI filter groups on the notifications page (each maps to one or more event types). */
 export const NOTIFICATION_GROUPS: { id: string; name: string; types: EventType[] }[] = [
@@ -504,6 +505,7 @@ export const NOTIFICATION_GROUPS: { id: string; name: string; types: EventType[]
   { id: 'leads', name: 'Leads', types: ['lead.captured'] },
   { id: 'integrations', name: 'Integrations', types: ['webhook.failed'] },
   { id: 'views', name: 'Smart views', types: ['view.match'] },
+  { id: 'quota', name: 'Mailbox space', types: ['quota.warning', 'quota.full'] },
   { id: 'assignments', name: 'Assignments', types: ['assignment.changed', 'comment.mention'] },
 ];
 

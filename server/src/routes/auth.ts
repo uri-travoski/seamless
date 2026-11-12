@@ -33,14 +33,15 @@ export function register(app: FastifyInstance): void {
     const anyUser = await one('SELECT 1 FROM users LIMIT 1');
     const su = (req as any).sessionUser as SessionUser | null;
     if (!su) return { needsSetup: !anyUser, loggedIn: false, settings: {} };
-    const user = await one<{ id: number; email: string; name: string; role: string; settings_json: string }>(
-      'SELECT id, email, name, role, settings_json FROM users WHERE id = ?', [su.userId]);
+    const user = await one<{ id: number; email: string; name: string; role: string; settings_json: string; must_change_password: boolean }>(
+      'SELECT id, email, name, role, settings_json, must_change_password FROM users WHERE id = ?', [su.userId]);
     return {
       needsSetup: false,
       loggedIn: true,
       user: user ? { id: user.id, email: user.email, name: user.name, role: user.role } : null,
       settings: JSON.parse(user?.settings_json ?? '{}'),
       // admin switched on "require 2FA" and this user has none yet: the UI forces enrolment
+      mustChangePassword: !!user?.must_change_password,
       mfaEnrollRequired: (await mfaRequiredForAll()) && !(await hasMfa(su.userId)),
     };
   });
@@ -62,12 +63,16 @@ export function register(app: FastifyInstance): void {
     const { email, password } = req.body as { email: string; password: string };
     const lc = (email ?? '').toLowerCase();
     if (alreadyBlocked(req, lc)) return reply.code(429).send({ error: 'too many attempts, try later' });
-    const user = await one<{ id: number; password_hash: string }>(
-      'SELECT id, password_hash FROM users WHERE email = ?', [lc]);
+    const user = await one<{ id: number; password_hash: string; disabled: boolean }>(
+      'SELECT id, password_hash, disabled FROM users WHERE email = ?', [lc]);
     if (!user || !verifyPassword(password ?? '', user.password_hash)) {
       await audit(req, 'login.failed', { type: 'user', id: user?.id ?? null }, { email: lc, reason: 'password' }, { userId: user?.id ?? null });
       if (throttled(req, lc)) return reply.code(429).send({ error: 'too many attempts, try later' });
       return reply.code(401).send({ error: 'wrong email or password' });
+    }
+    if (user.disabled) {
+      await audit(req, 'login.failed', { type: 'user', id: user.id }, { email: lc, reason: 'disabled' }, { userId: user.id });
+      return reply.code(403).send({ error: 'This account has been disabled. Ask your administrator.' });
     }
     if (await hasMfa(user.id)) {
       // password ok, second factor outstanding: no session until /api/login/mfa succeeds

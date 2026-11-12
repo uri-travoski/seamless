@@ -59,7 +59,7 @@ export async function authenticate(header: string | undefined, now = Date.now())
   const m = /^Bearer\s+(sk_sl_[a-z0-9]{8}_[a-z0-9]{32})\s*$/.exec(header ?? '');
   if (!m) throw new ApiError(401, 'missing or malformed bearer token');
   const r = await one<Row & { role: 'admin' | 'member' }>(
-    'SELECT t.*, u.role FROM api_tokens t JOIN users u ON u.id = t.user_id WHERE t.token_hash = ?', [sha256(m[1])]);
+    'SELECT t.*, u.role FROM api_tokens t JOIN users u ON u.id = t.user_id WHERE u.disabled = false AND t.token_hash = ?', [sha256(m[1])]);
   if (!r || r.revoked_at != null) throw new ApiError(401, 'invalid or revoked token');
   if (r.expires_at != null && Number(r.expires_at) <= now) throw new ApiError(401, 'token expired');
   if (!apiLimiter.hit(`t${r.id}`, now)) throw new ApiError(429, 'rate limit: 600 requests per minute per token');

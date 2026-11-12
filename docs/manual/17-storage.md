@@ -1,5 +1,7 @@
 # Storage
 
+Every user sees **Your mailbox space** here: how much of their storage limit is used. Limits are set by the administrator ([details](29-administrator.md)) and only warn.
+
 **Settings → Storage** is where administrators choose the buckets Seamless uses. At the bottom, **Trash & retention** is for every user (see [Trash & retention](27-trash-retention.md)). There are three roles:
 
 | Role | What it holds |

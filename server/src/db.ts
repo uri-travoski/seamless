@@ -1323,6 +1323,23 @@ CREATE TRIGGER audit_log_no_truncate BEFORE TRUNCATE ON audit_log
 CREATE INDEX msg_sort_expr ON messages ((COALESCE(sort_date, date)) DESC, id DESC);
 `,
   },
+  {
+    id: 41,
+    // T8.1: admin tools. must_change_password = temporary password set by an admin; disabled = cannot sign in, sync off;
+    // storage_quota_bytes NULL = unlimited. quota_alerts remembers which threshold already raised a notification.
+    sql: `
+ALTER TABLE users ADD COLUMN must_change_password BOOLEAN NOT NULL DEFAULT false;
+ALTER TABLE users ADD COLUMN disabled BOOLEAN NOT NULL DEFAULT false;
+ALTER TABLE users ADD COLUMN last_login_at BIGINT;
+ALTER TABLE users ADD COLUMN storage_quota_bytes BIGINT;
+CREATE TABLE quota_alerts (
+  user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  level TEXT NOT NULL CHECK (level IN ('warning','full')),
+  raised_at BIGINT NOT NULL,
+  PRIMARY KEY (user_id, level)
+);
+`,
+  },
 ];
 
 /** Run `fn` in one transaction. Events emitted through the client are only turned into

@@ -16,7 +16,7 @@ export const httpsInstance = config.publicUrl.startsWith('https://');
 /** `__Host-` requires Secure + Path=/ + no Domain, which is exactly what we set on HTTPS. */
 export const SESSION_COOKIE = httpsInstance ? '__Host-smsession' : 'smsession';
 
-export interface SessionUser { userId: number; role: 'admin' | 'member'; token: string }
+export interface SessionUser { userId: number; role: 'admin' | 'member'; token: string; mustChangePassword?: boolean }
 
 export function sessionToken(req: FastifyRequest): string | undefined {
   return (req as any).cookies?.[SESSION_COOKIE];
@@ -25,9 +25,9 @@ export function sessionToken(req: FastifyRequest): string | undefined {
 /** Resolve a token to its user, enforcing expiry and sliding the idle window forward. */
 export async function sessionUser(token: string | undefined, now = Date.now()): Promise<SessionUser | null> {
   if (!token) return null;
-  const row = await one<{ user_id: number; role: 'admin' | 'member'; created_at: number; last_seen_at: number | null; expires_at: number | null }>(
-    `SELECT s.user_id, u.role, s.created_at, s.last_seen_at, s.expires_at
-     FROM sessions s JOIN users u ON u.id = s.user_id WHERE s.token = ?`, [token]);
+  const row = await one<{ user_id: number; role: 'admin' | 'member'; must_change_password: boolean; created_at: number; last_seen_at: number | null; expires_at: number | null }>(
+    `SELECT s.user_id, u.role, u.must_change_password, s.created_at, s.last_seen_at, s.expires_at
+     FROM sessions s JOIN users u ON u.id = s.user_id WHERE s.token = ? AND u.disabled = false`, [token]);
   if (!row) return null;
   const expires = row.expires_at ?? row.created_at + IDLE_MS;
   if (now >= expires || now >= row.created_at + ABSOLUTE_MS) {
@@ -38,7 +38,7 @@ export async function sessionUser(token: string | undefined, now = Date.now()): 
     await run('UPDATE sessions SET last_seen_at = ?, expires_at = ? WHERE token = ?',
       [now, Math.min(row.created_at + ABSOLUTE_MS, now + IDLE_MS), token]);
   }
-  return { userId: row.user_id, role: row.role, token };
+  return { userId: row.user_id, role: row.role, token, mustChangePassword: row.must_change_password };
 }
 
 export async function createSession(userId: number, meta: { ip?: string; userAgent?: string } = {}, now = Date.now()): Promise<string> {
@@ -64,6 +64,7 @@ export function clearSessionCookie(reply: FastifyReply): void {
 
 export async function makeSession(req: FastifyRequest, reply: FastifyReply, userId: number): Promise<void> {
   const token = await createSession(userId, { ip: req.ip, userAgent: String(req.headers['user-agent'] ?? '') });
+  await run('UPDATE users SET last_login_at = ? WHERE id = ?', [Date.now(), userId]);
   setSessionCookie(reply, token);
 }
 

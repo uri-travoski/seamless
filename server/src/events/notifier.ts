@@ -48,6 +48,8 @@ export const DEFAULT_PREFS: Record<EventType, { inApp: boolean; push: boolean }>
   'security.login': { inApp: false, push: false },     // opt-in: one per sign-in is noisy
   'security.2fa_changed': { inApp: true, push: false },
   'webhook.failed': { inApp: true, push: false },
+  'quota.warning': { inApp: true, push: true },
+  'quota.full': { inApp: true, push: true },
 };
 
 export const ALL_EVENT_TYPES = Object.keys(DEFAULT_PREFS) as EventType[];
@@ -156,6 +158,16 @@ export function render(ev: EventRow): Rendered {
       return { title: `${p.repeat ? 'Repeat enquiry' : 'New lead'}: ${String(p.name || p.email || p.phone || 'unknown').slice(0, 80)}`, body: [p.service, p.suburb, p.businessName || p.source].filter(Boolean).join(' · '), link: `/leads?lead=${p.leadId}`, groupKey: null, accountId };
     case 'webhook.failed':
       return { title: `Webhook "${String(p.name ?? 'webhook').slice(0, 60)}" is failing`, body: `Gave up delivering ${p.eventType ?? 'an event'}: ${String(p.error ?? '').slice(0, 200)}`, link: '/settings/integrations', groupKey: `webhook:${p.webhookId}`, accountId: null };
+    case 'quota.warning':
+    case 'quota.full': {
+      const full = ev.type === 'quota.full';
+      const gb = (n: unknown) => `${Math.round((Number(n) / 1024 ** 3) * 10) / 10} GB`;
+      const use = `${gb(p.usedBytes)} of ${gb(p.quotaBytes)}`;
+      if (p.own) {
+        return { title: full ? 'Your mailbox space is full' : `Your mailbox space is ${p.percent}% used`, body: full ? `${use}. Mail keeps arriving and nothing is deleted, but ask your administrator for more space.` : use, link: '/settings/storage', groupKey: null, accountId: null };
+      }
+      return { title: `${p.email ?? 'A user'} ${full ? 'has used all of their mailbox space' : `is ${p.percent}% full`}`, body: `${use}. Nothing is refused or deleted.`, link: '/settings/users', groupKey: null, accountId: null };
+    }
     case 'reminder.due':
     case 'followup.due':
     case 'snooze.woke':

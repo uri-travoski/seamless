@@ -109,6 +109,10 @@ export function registerRoutes(app: FastifyInstance): void {
     if (!su) {
       return reply.code(401).send({ error: 'unauthorized' });
     }
+    // an admin set a temporary password: nothing works until the user chooses their own
+    if (su.mustChangePassword && !/^\/api\/(logout|users\/password|ws)(\?.*)?$/.test(req.url)) {
+      return reply.code(403).send({ error: 'You must choose a new password before continuing.', mustChangePassword: true });
+    }
   });
 
   auth(app);

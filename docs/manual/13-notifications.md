@@ -23,6 +23,8 @@ Choose 25, 50 or 100 per page. Tick notifications to mark them read, unread, or 
 - **Quiet hours** — push is held between the times you set (Perth time); the bell still fills up.
 - **Sound** — a short chime when something new arrives.
 
+The **Mailbox space** rows warn you (and the administrators) at 80 % and 100 % of your storage limit; they never stop mail arriving ([details](29-administrator.md)).
+
 Push needs to be enabled once per device in **Settings > General**. "New sign-in" notifications are off by default; turn them on here if you want one every time someone signs in.
 
 ## VIPs

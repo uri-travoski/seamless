@@ -42,7 +42,7 @@ const ENTRIES: Omit<SettingsEntry, 'tabName'>[] = [
   { label: 'Audit log (who did what), audit retention', tab: 'audit', words: 'security history export csv retention keep days' },
   { label: 'Storage buckets (mail, backups, spool)', tab: 'storage', admin: true, words: 'r2 b2 s3 minio migrate bucket' },
   { label: 'Backups and restore', tab: 'backup', admin: true, words: 'export import restore drill mirror' },
-  { label: 'Users and roles', tab: 'users', admin: true, words: 'invite admin member password' },
+  { label: 'Users and roles', tab: 'users', admin: true, words: 'invite admin member password reset disable quota storage limit mailbox for user sign out everywhere' },
 ];
 
 export default function SettingsSearch({ tabs, isAdmin }: { tabs: { id: string; name: string; group?: string; admin?: boolean }[]; isAdmin: boolean }) {

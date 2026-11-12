@@ -3,6 +3,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { api } from '../../api/client.ts';
 import { toast } from '../../toast.ts';
 import { formatBytes } from '../Sidebar.tsx';
+import QuotaBar from './QuotaBar.tsx';
 import RetentionPanel from './RetentionPanel.tsx';
 import { useSession } from '../../state/session.ts';
 import StorageMigration from './StorageMigration.tsx';
@@ -118,11 +119,30 @@ function StorageAdmin() {
 }
 
 /** Storage tab: buckets (admins) + Trash & retention (everyone). */
+/** "Your mailbox space" — every user sees their own usage and limit. */
+function MySpace() {
+  const [u, setU] = useState<{ usedBytes: number; quotaBytes: number | null; percent: number | null } | null>(null);
+  useEffect(() => { void api.get<typeof u>('/api/usage/mine').then(setU).catch(() => {}); }, []);
+  if (!u) return null;
+  return (
+    <div style={{ marginBottom: 22 }}>
+      <h3 style={{ fontSize: 14, margin: '4px 0 6px' }}>Your mailbox space</h3>
+      <QuotaBar usedBytes={u.usedBytes} quotaBytes={u.quotaBytes} percent={u.percent} wide />
+      <p className="settings-desc" style={{ marginTop: 6 }}>
+        {u.quotaBytes
+          ? 'This is all the mail in your own mailboxes. At 80 % and 100 % you and the administrators get a notification. It is a warning only: new mail still arrives and nothing is ever deleted for you.'
+          : 'Your administrator has not set a limit for you.'}
+      </p>
+    </div>
+  );
+}
+
 export default function StorageSettings() {
   const isAdmin = useSession((s) => s.user?.role === 'admin');
   return (
     <div>
       {isAdmin ? <StorageAdmin /> : <h2>Storage</h2>}
+      <MySpace />
       <RetentionPanel />
     </div>
   );

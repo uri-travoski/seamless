@@ -77,6 +77,8 @@ interface SessionState {
   login: (email: string, password: string) => Promise<{ mfaToken?: string }>;
   loginMfa: (mfaToken: string, code: string) => Promise<{ usedRecoveryCode: boolean }>;
   mfaEnrollRequired: boolean;
+  /** An administrator set a temporary password: the app shows only the choose-a-password screen. */
+  mustChangePassword: boolean;
   setup: (email: string, name: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
   saveSettings: (patch: Partial<ClientSettings>) => void;
@@ -123,7 +125,7 @@ export const useSession = create<SessionState>((set, get) => ({
 
   init: async () => {
     try {
-      const me = await api.get<{ needsSetup: boolean; loggedIn: boolean; user?: ApiUser | null; settings: Partial<ClientSettings>; mfaEnrollRequired?: boolean }>('/api/me');
+      const me = await api.get<{ needsSetup: boolean; loggedIn: boolean; user?: ApiUser | null; settings: Partial<ClientSettings>; mfaEnrollRequired?: boolean; mustChangePassword?: boolean }>('/api/me');
       const settings = { ...DEFAULTS, ...me.settings };
       applyAppearance(settings);
       set({
@@ -131,6 +133,7 @@ export const useSession = create<SessionState>((set, get) => ({
         user: me.user ?? null,
         settings,
         mfaEnrollRequired: !!me.mfaEnrollRequired,
+        mustChangePassword: !!me.mustChangePassword,
       });
     } catch {
       set({ status: 'login' });
@@ -150,6 +153,7 @@ export const useSession = create<SessionState>((set, get) => ({
     return { usedRecoveryCode: !!r.usedRecoveryCode };
   },
   mfaEnrollRequired: false,
+  mustChangePassword: false,
 
   setup: async (email, name, password) => {
     await api.post('/api/setup', { email, name, password });
