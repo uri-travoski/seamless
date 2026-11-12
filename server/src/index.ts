@@ -78,6 +78,12 @@ if (fs.existsSync(webDist)) {
   app.setNotFoundHandler((req, reply) => {
     const isApi = req.url.startsWith('/api') || req.url.startsWith('/jmap') || req.url.startsWith('/t/');
     const looksLikeFile = /\.[a-z0-9]+(\?|$)/i.test(req.url);
+    // files are read from disk per request so a rebuild never leaves the server pointing at stale asset names
+    if (req.method === 'GET' && looksLikeFile && !isApi) {
+      const rel = decodeURIComponent(req.url.split('?')[0]).replace(/^\/+/, '');
+      const abs = path.resolve(webDist, rel);
+      if (abs.startsWith(webDist + path.sep) && fs.existsSync(abs) && fs.statSync(abs).isFile()) return reply.sendFile(rel);
+    }
     if (req.method === 'GET' && !isApi && !looksLikeFile) {
       return reply.type('text/html').send(fs.readFileSync(path.join(webDist, 'index.html')));
     }
