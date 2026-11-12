@@ -2,6 +2,7 @@
  * Search query language:
  *   from:foo to:bar subject:"quote request" label:Work in:inbox is:unread is:starred has:attachment category:work assigned:me|none status:open|pending|done business:"Name"
  *   opened:yes|no replied:yes|no older_than:7d|2w|3m|1y newer_than:2d size>5mb size<100kb is:waiting is:snoozed is:vip
+ *   attachment:"invoice 1234" (text inside attachments) filename:quote*.pdf (attachment file name, * and ? wildcards)
  *   before:2026-01-31 after:2026-01-01 "quoted phrase" free words
  * Everything unprefixed becomes a Postgres tsquery over subject/body/from/to.
  */
@@ -16,6 +17,8 @@ export interface ParsedSearch {
   unread: boolean | null;
   starred: boolean | null;
   hasAttachment: boolean | null;
+  attachment: string | null;  // T6.2: attachment:"invoice 1234" → tsquery over extracted attachment text
+  filename: string | null;    // T6.2: filename:quote*.pdf → glob on attachment file names
   disposable: 'any' | number | null; // T3 F-25: is:disposable / disposable:<id>
   business: string | null;    // T4 F-30: business:"Name"
   assigned: 'me' | 'none' | null;            // T4 F-32: assigned:me / assigned:none
@@ -72,7 +75,7 @@ const yesNo = (v: string): boolean | null => (/^(yes|true|y)$/i.test(v) ? true :
 export function parseSearch(query: string): ParsedSearch {
   const out: ParsedSearch = {
     fts: null, from: null, to: null, subject: null, label: null, category: null, inRole: null,
-    unread: null, starred: null, hasAttachment: null, disposable: null, business: null, assigned: null, status: null, risk: null,
+    unread: null, starred: null, hasAttachment: null, attachment: null, filename: null, disposable: null, business: null, assigned: null, status: null, risk: null,
     opened: null, replied: null, olderThanMs: null, newerThanMs: null, sizeMin: null, sizeMax: null, waiting: null, snoozed: null, vip: null, before: null, after: null,
   };
   const ftsTerms: string[] = [];
@@ -108,6 +111,8 @@ export function parseSearch(query: string): ParsedSearch {
         case 'has':
           if (val === 'attachment') out.hasAttachment = true;
           continue;
+        case 'attachment': { const esc = ftsEscape(val); if (esc) out.attachment = esc; continue; }
+        case 'filename': out.filename = val; continue;
         case 'disposable': if (/^\d+$/.test(val)) out.disposable = Number(val); continue;
         case 'assigned': { const v = val.toLowerCase(); if (v === 'me' || v === 'none') out.assigned = v; continue; }
         case 'status': { const v = val.toLowerCase(); if (v === 'open' || v === 'pending' || v === 'done') out.status = v; continue; }

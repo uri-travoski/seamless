@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import type { ApiEmail } from '@seamless/shared';
+import { AttachmentMatch } from './AttachmentMatch.tsx';
 import { AssigneeChip } from './SharedThread.tsx';
 import { useMail, PAGE } from '../state/mail.ts';
 import { actions, runBulk } from '../state/actions.ts';
@@ -191,6 +192,7 @@ function Row({ email, selected, onMenu }: { email: ApiEmail; selected: boolean; 
               <span className="snippet">{email.preview ? ` — ${email.preview}` : ''}</span>
             </span>
           </div>
+          <AttachmentMatch email={email} />
           {chips.length > 0 && (
             <div className="chips">
               {chips.map((l) => <span key={l!.id} className="chip" style={{ background: l!.color, color: readableTextOn(l!.color), ['--chip' as any]: l!.color }}>{l!.name}</span>)}
@@ -224,6 +226,7 @@ function TableRow({ email, selected, onMenu }: { email: ApiEmail; selected: bool
         {chips.map((l) => <span key={l!.id} className="chip" style={{ background: l!.color, color: readableTextOn(l!.color), ['--chip' as any]: l!.color }}>{l!.name}</span>)}
         <span className="tbl-subject">{email.subject || '(no subject)'}</span>
         {email.preview && <span className="tbl-snippet"> — {email.preview}</span>}
+        <AttachmentMatch email={email} />
       </span>
       <span className="tbl-metas">
         <VipBadge email={email} />

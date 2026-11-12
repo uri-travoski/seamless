@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { disposeWithUndo } from './settings/DisposableSettings.tsx';
 import type { ApiEmail, ApiEmailBody } from '@seamless/shared';
 import { useMail } from '../state/mail.ts';
+import { AttachmentMatch } from './AttachmentMatch.tsx';
 import { useSession } from '../state/session.ts';
 import { useCompose } from '../state/compose.ts';
 import { useTemplates } from '../state/templates.ts';
@@ -641,6 +642,7 @@ export default function ReadingPane() {
             </span>
           ))}
         </h1>
+        <div style={{ padding: '0 16px' }}><AttachmentMatch email={selected} /></div>
         {summary && (
           <div className="summary-card">
             <div className="head"><span><SparkleIcon size={15} /> AI thread summary</span> <button className="icon-btn" onClick={() => setSummary(null)}><CloseIcon /></button></div>

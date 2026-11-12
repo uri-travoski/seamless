@@ -93,6 +93,7 @@ export async function healthReport(userId: number, isAdmin: boolean, now = Date.
   const ai = { providers: Number((await one<{ c: string }>('SELECT COUNT(*) AS c FROM ai_providers WHERE user_id = ?', [userId]))?.c ?? 0) };
 
   const report: any = { generatedAt: now, isAdmin, mailboxes, sending, jobs, ai: { ...ai, status: ai.providers ? 'ok' : 'warn', note: ai.providers ? 'Press Test in Settings → AI to check a provider is reachable.' : 'No AI provider is set up.' } };
+  report.attachmentIndex = isAdmin ? await (await import('../mail/attachmentText.ts')).backfillStatus(userId) : null;
   report.overall = worst(...mailboxes.filter((m) => !m.ignored).map((m) => m.status), sending.status, jobs.status);
 
   if (isAdmin) {

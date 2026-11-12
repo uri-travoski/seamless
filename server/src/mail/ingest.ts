@@ -11,6 +11,7 @@ import { assessAndStore } from './risk.ts';
 import { recordBounce } from './dsn.ts';
 import { applyOnIngest } from './disposable.ts';
 import { ingestInvites } from './invites.ts';
+import { queueAttachmentIndex } from './attachmentText.ts';
 import { evaluateFilters, loadFilters, type FilterableMessage } from './filters.ts';
 
 export function addressList(obj: AddressObject | AddressObject[] | undefined): ApiAddress[] {
@@ -170,6 +171,7 @@ export async function ingestMessage(args: IngestArgs): Promise<IngestResult | nu
   }
 
   if (isInboxLive) await import('../leads/leads.ts').then((m) => m.captureLead(userId, rowId, parsed)).catch((err) => console.error('[leads] capture failed:', err?.message ?? err));   // lazy import: leads → store → sync → ingest would be a cycle; never blocks ingest
+  if (atts.some((a) => !a.inline)) await queueAttachmentIndex(userId, rowId).catch((err) => console.error('[attachments] queue failed:', err?.message ?? err));   // text extraction runs as a job; never blocks ingest
   await ingestInvites(userId, args.accountId, rowId, parsed);
   await assessAndStore(userId, rowId, parsed, mailbox.role).catch((err) => console.error('[risk] assess failed:', err?.message ?? err));  // never breaks ingest
   if (isInboxLive) await recordBounce(userId, parsed).catch((err) => console.error('[dsn] bounce handling failed:', err?.message ?? err));

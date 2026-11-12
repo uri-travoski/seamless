@@ -143,6 +143,8 @@ export interface ApiEmail {
   followupId: number | null;   // T2 F-19: a live reminder on this sent message
   followupDueAt: string | null;
   followupStatus: 'waiting' | 'due' | null;
+  /** T6.2: set client-side from the query response ('Matched in invoice.pdf: …'). */
+  attachmentMatch?: { filename: string; snippet: string } | null;
   bounced: { recipient: string; status: string; diagnostic: string }[] | null; // T3 F-22: delivery failed for these
   disposable: { id: number; address: string; label: string; status: 'active' | 'paused' | 'disposed' } | null; // T3 F-25
 }
@@ -226,6 +228,8 @@ export interface EmailQueryRequest {
 
 export interface EmailQueryResponse {
   ids: string[];
+  /** T6.2: for a text search, where an attachment (not the body) matched: email id → file + highlighted snippet. */
+  attachmentMatches?: Record<string, { filename: string; snippet: string }>;
   total: number;
   position: number;
   queryState: string;

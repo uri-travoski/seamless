@@ -47,6 +47,12 @@ export async function fetchMailboxes(scope?: string): Promise<ApiMailbox[]> {
   return r.a.list;
 }
 
+/** T6.2: attach "Matched in file.pdf: …" from the query response to each email. */
+function withMatches(list: ApiEmail[], q: EmailQueryResponse): ApiEmail[] {
+  const m = q.attachmentMatches;
+  return m ? list.map((e) => (m[e.id] ? { ...e, attachmentMatch: m[e.id] } : e)) : list;
+}
+
 export async function queryEmailPage(filter: EmailQueryFilter, position: number, limit = 120): Promise<{ query: EmailQueryResponse; emails: ApiEmail[] }> {
   const r = await jmap([
     ['Email/query', { filter, position, limit }, 'q'],
@@ -55,9 +61,9 @@ export async function queryEmailPage(filter: EmailQueryFilter, position: number,
   // server subset doesn't do back-references; fall back to explicit second call
   if (!r.g || !Array.isArray(r.g.list) || (r.q.ids.length > 0 && r.g.list.length === 0)) {
     const r2 = await jmap([['Email/get', { ids: r.q.ids }, 'g']]);
-    return { query: r.q, emails: r2.g.list };
+    return { query: r.q, emails: withMatches(r2.g.list, r.q) };
   }
-  return { query: r.q, emails: r.g.list };
+  return { query: r.q, emails: withMatches(r.g.list, r.q) };
 }
 
 export async function getEmailsByIds(ids: string[]): Promise<ApiEmail[]> {

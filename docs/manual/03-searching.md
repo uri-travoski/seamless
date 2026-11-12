@@ -21,6 +21,8 @@ Plain words match the subject, body, and participants (full-text). Combine them 
 - `replied:yes` / `replied:no` — has been answered: marked as answered, or someone else wrote later in the same conversation.
 - `older_than:7d` / `newer_than:2w` — by age. Units: `h` hours, `d` days, `w` weeks, `m` months (30 days), `y` years (365 days), e.g. `older_than:3m`.
 - `size>5mb` / `size<100kb` — by message size (`b`, `kb`, `mb`, `gb`).
+- `attachment:"invoice 1234"` — text **inside** attachments (PDF, Word `.docx`, Excel `.xlsx`/CSV, PowerPoint `.pptx`, plain text, Markdown, HTML).
+- `filename:quote*.pdf` — attachment file name; `*` matches any characters and `?` one character. Works for every attachment, including images.
 - `is:vip` — mail from one of your VIP senders (see "VIPs" in Notifications).
 - `is:waiting` — sent mail with a live "remind me if no reply" follow-up (see "Follow-ups").
 - `is:snoozed` — mail that is snoozed right now.
@@ -53,3 +55,12 @@ A **smart view** is a saved search that lives in the sidebar under **Smart views
 
 ## Shared inbox operators
 `assigned:me` · `assigned:none` · `status:open|pending|done` — see *Shared mailboxes*.
+
+## Searching inside attachments
+
+Plain search words also look inside attachments, so searching `plumbing` finds the email whose `invoice-1234.pdf` mentions plumbing. Messages that match in the body are listed first; messages that match only in an attachment follow, with a line such as **Matched in invoice-1234.pdf: …the plumbing services…** under the subject and in the reading pane.
+
+- New mail is indexed in the background a moment after it arrives.
+- Supported: PDF, Word (`.docx`), Excel (`.xlsx`), CSV, PowerPoint (`.pptx`), text, Markdown and HTML. Up to 200 KB of text is kept per attachment, and files over 20 MB are skipped. Password-protected or damaged files are skipped quietly.
+- **Scanned documents and photos are not searchable** (no OCR). You can still find them by file name with `filename:`.
+- **Existing mail**: an admin opens **Settings → Health → Attachment search** and presses **Index attachments of existing mail**. It works through 100 messages at a time, can be interrupted and carries on where it stopped, and shows its progress on that page.

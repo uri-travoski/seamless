@@ -249,8 +249,15 @@ export async function queryEmails(userId: number, req: EmailQueryRequest): Promi
   if (f.text) {
     const p = parseSearch(f.text);
     if (p.fts) {
-      where.push("m.id IN (SELECT message_id FROM message_fts WHERE tsv @@ to_tsquery('simple', ?))");
-      params.push(p.fts);
+      // body OR attachment text (T6.2); body matches sort first below
+      where.push("(m.id IN (SELECT message_id FROM message_fts WHERE tsv @@ to_tsquery('simple', ?)) OR m.id IN (SELECT message_id FROM attachment_text WHERE tsv @@ to_tsquery('simple', ?)))");
+      params.push(p.fts, p.fts);
+    }
+    if (p.attachment) { where.push("m.id IN (SELECT message_id FROM attachment_text WHERE tsv @@ to_tsquery('simple', ?))"); params.push(p.attachment); }
+    if (p.filename) {
+      const like = p.filename.replace(/[\\%_]/g, '\\$&').replace(/\*/g, '%').replace(/\?/g, '_');
+      where.push("EXISTS (SELECT 1 FROM jsonb_array_elements(m.attachments_json::jsonb) a WHERE a->>'filename' ILIKE ?)");
+      params.push(like);
     }
     if (p.from) { where.push('(m.from_addr ILIKE ? OR m.from_name ILIKE ?)'); params.push(`%${p.from}%`, `%${p.from}%`); }
     if (p.subject) { where.push('m.subject ILIKE ?'); params.push(`%${p.subject.replace(/[\\%_]/g, '\\$&')}%`); }
@@ -316,16 +323,36 @@ export async function queryEmails(userId: number, req: EmailQueryRequest): Promi
   const whereSql = 'WHERE ' + where.join(' AND ');
   const totalRow = await one<{ c: number }>(
     `SELECT COUNT(*) AS c FROM messages m JOIN mailboxes mb ON mb.id = m.mailbox_id ${whereSql}`, params);
+  const ftsQ = f.text ? parseSearch(f.text).fts : null;
+  const bodyFirst = ftsQ ? "(CASE WHEN m.id IN (SELECT message_id FROM message_fts WHERE tsv @@ to_tsquery('simple', ?)) THEN 0 ELSE 1 END)," : '';
   const rows = await q<MsgRow>(
-    `${BASE_SELECT} ${whereSql} ORDER BY ${f.snoozed ? 'm.snoozed_until ASC' : 'COALESCE(m.sort_date, m.date) DESC'}, m.id DESC LIMIT ? OFFSET ?`,
-    [...params, req.limit, req.position]);
+    `${BASE_SELECT} ${whereSql} ORDER BY ${bodyFirst} ${f.snoozed ? 'm.snoozed_until ASC' : 'COALESCE(m.sort_date, m.date) DESC'}, m.id DESC LIMIT ? OFFSET ?`,
+    [...params, ...(ftsQ ? [ftsQ] : []), req.limit, req.position]);
+  const attachmentMatches = rows.length ? await attachmentMatchSnippets(f.text, rows.map((r) => r.id)) : undefined;
 
   return {
     ids: rows.map((r) => `m${r.id}`),
     total: totalRow?.c ?? 0,
     position: req.position,
+    ...(attachmentMatches && Object.keys(attachmentMatches).length ? { attachmentMatches } : {}),
     queryState: await currentState(),
   };
+}
+
+/** "Matched in invoice-1234.pdf: …snippet…" for the rows on this page whose attachment text matches the search. */
+async function attachmentMatchSnippets(text: string | undefined, rowIds: number[]): Promise<Record<string, { filename: string; snippet: string }> | undefined> {
+  if (!text) return undefined;
+  const p = parseSearch(text);
+  const tsq = [p.fts, p.attachment].filter(Boolean).join(' & ');
+  if (!tsq) return undefined;
+  const hits = await q<{ message_id: number; filename: string; snippet: string }>(`
+    SELECT DISTINCT ON (message_id) message_id, filename,
+           ts_headline('simple', text, to_tsquery('simple', ?), 'MaxFragments=1, MaxWords=18, MinWords=6, StartSel=<<, StopSel=>>') AS snippet
+    FROM attachment_text WHERE message_id = ANY(?::int[]) AND tsv @@ to_tsquery('simple', ?)
+    ORDER BY message_id, id`, [tsq, rowIds, tsq]);
+  const out: Record<string, { filename: string; snippet: string }> = {};
+  for (const h of hits) out[`m${h.message_id}`] = { filename: h.filename, snippet: h.snippet.replace(/\s+/g, ' ').trim() };
+  return out;
 }
 
 export async function getThreadEmailIds(userId: number, threadId: string): Promise<string[]> {

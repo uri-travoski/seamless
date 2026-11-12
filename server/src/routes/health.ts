@@ -4,6 +4,7 @@ import { healthReport, mailboxHealth, liveness, storageProbe } from '../health/s
 import { syncManager } from '../imap/sync.ts';
 import { broadcast } from '../ws.ts';
 import { uid, isAdmin } from './util.ts';
+import { startBackfill, backfillStatus } from '../mail/attachmentText.ts';
 
 export function register(app: FastifyInstance): void {
   app.get('/api/health', async (req) => healthReport(uid(req), isAdmin(req)));
@@ -24,6 +25,13 @@ export function register(app: FastifyInstance): void {
   app.post('/api/health/storage-check', async (req, reply) => {
     if (!isAdmin(req)) return reply.code(403).send({ error: 'admins only' });
     return storageProbe(Date.now(), true);
+  });
+
+  // T6.2: "Index attachments of existing mail" — resumable backfill of the signed-in admin's mail
+  app.post('/api/health/attachment-index', async (req, reply) => {
+    if (!isAdmin(req)) return reply.code(403).send({ error: 'admins only' });
+    await startBackfill(uid(req), !!(req.body as any)?.restart);
+    return backfillStatus(uid(req));
   });
 
   app.post('/api/accounts/:id/health-ignore', async (req, reply) => {

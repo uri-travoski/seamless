@@ -13,6 +13,7 @@ interface Report {
   ai: { providers: number; status: Light; note: string };
   storage?: { reachable: boolean; latencyMs: number; error: string; checkedAt: number; bytes: number; messages: number; spool?: boolean; status: Light };
   backups?: { enabled: boolean; lastAt: number | null; lastStatus: string | null; lastError: string; nextDueAt: number | null; status: Light; note: string };
+  attachmentIndex?: { state: string; processed: number; total: number } | null;
   system?: { version: string; uptimeSec: number; dbBytes: number; rssBytes: number; freeBytes: number | null; status: Light };
 }
 
@@ -101,6 +102,20 @@ export default function HealthSettings() {
             </div>
           ))}
         </Card>
+
+        {r.isAdmin && r.attachmentIndex && (
+          <Card title="Attachment search" status="ok">
+            <p>{r.attachmentIndex.state === 'running'
+              ? `Indexing attachments of existing mail… ${r.attachmentIndex.processed} of ${r.attachmentIndex.total} messages.`
+              : r.attachmentIndex.state === 'done'
+                ? `Existing mail is indexed (${r.attachmentIndex.total} messages with attachments).`
+                : 'New mail is indexed as it arrives. Existing mail is not searchable by attachment content until you index it.'}</p>
+            <button className="btn small" disabled={r.attachmentIndex.state === 'running'}
+              onClick={async () => { try { await api.post('/api/health/attachment-index', {}); toast('Indexing started'); load(); } catch { toast('Could not start indexing', 'error'); } }}>
+              Index attachments of existing mail
+            </button>
+          </Card>
+        )}
 
         <Card title="AI" status={r.ai.status}>
           <p>{r.ai.providers} provider{r.ai.providers === 1 ? '' : 's'} set up. <span className="dim">{r.ai.note}</span></p>

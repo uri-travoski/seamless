@@ -1193,6 +1193,26 @@ CREATE INDEX leads_user_created ON leads(user_id, created_at DESC);
 CREATE INDEX leads_user_email ON leads(user_id, lower(email));
 `,
   },
+  {
+    id: 35,
+    sql: `
+-- T6.2 F-41: text extracted from attachments, searched together with the body
+CREATE TABLE attachment_text (
+  id SERIAL PRIMARY KEY,
+  user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  message_id INTEGER NOT NULL REFERENCES messages(id) ON DELETE CASCADE,
+  part_id TEXT NOT NULL,
+  filename TEXT NOT NULL DEFAULT '',
+  mime TEXT NOT NULL DEFAULT '',
+  text TEXT NOT NULL DEFAULT '',
+  tsv tsvector GENERATED ALWAYS AS (to_tsvector('simple', left(coalesce(filename,'') || ' ' || coalesce(text,''), 500000))) STORED,
+  created_at BIGINT NOT NULL,
+  UNIQUE (message_id, part_id)
+);
+CREATE INDEX attachment_text_tsv ON attachment_text USING GIN (tsv);
+CREATE INDEX attachment_text_user ON attachment_text(user_id);
+`,
+  },
 ];
 
 /** Run `fn` in one transaction. Events emitted through the client are only turned into
