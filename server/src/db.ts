@@ -1377,6 +1377,47 @@ CREATE TABLE mailbox_rr_members (
 ALTER TABLE messages ADD COLUMN snoozed_by INTEGER;
 `,
   },
+  {
+    id: 44,
+    // T8.4: archive old mail. items.message_id has no FK on purpose: in move mode the message row is deleted after the copy is verified.
+    sql: `
+CREATE TABLE mail_archives (
+  id SERIAL PRIMARY KEY,
+  user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  name TEXT NOT NULL,
+  older_than_days INTEGER NOT NULL,
+  scope TEXT NOT NULL DEFAULT 'all',
+  mode TEXT NOT NULL CHECK (mode IN ('copy','move')),
+  target_id INTEGER REFERENCES storage_targets(id) ON DELETE SET NULL,
+  status TEXT NOT NULL DEFAULT 'planned' CHECK (status IN ('planned','running','verifying','done','failed','restoring')),
+  message_count INTEGER NOT NULL DEFAULT 0,
+  byte_count BIGINT NOT NULL DEFAULT 0,
+  options JSONB NOT NULL DEFAULT '{}',
+  index_files JSONB NOT NULL DEFAULT '[]',
+  restore_result JSONB,
+  cutoff BIGINT NOT NULL,
+  created_at BIGINT NOT NULL,
+  started_at BIGINT,
+  finished_at BIGINT,
+  error TEXT,
+  manifest_key TEXT
+);
+CREATE INDEX mail_archives_user ON mail_archives(user_id, id DESC);
+CREATE TABLE mail_archive_items (
+  archive_id INTEGER NOT NULL REFERENCES mail_archives(id) ON DELETE CASCADE,
+  message_id INTEGER NOT NULL,
+  account_id INTEGER NOT NULL,
+  mailbox_path TEXT NOT NULL,
+  uid BIGINT NOT NULL,
+  s3_key TEXT NOT NULL,
+  sha256 TEXT,
+  state TEXT NOT NULL DEFAULT 'pending' CHECK (state IN ('pending','copied','verified','removed','failed')),
+  error TEXT,
+  PRIMARY KEY (archive_id, message_id)
+);
+CREATE INDEX mail_archive_items_state ON mail_archive_items(archive_id, state);
+`,
+  },
 ];
 
 /** Run `fn` in one transaction. Events emitted through the client are only turned into

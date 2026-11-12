@@ -91,3 +91,12 @@ Scheduled (send-later) mail is not delayed. More: [Composing & sending](04-compo
 2. Read later items skip the Inbox (there is no sidebar entry for Read later at the moment).
 3. **Settings → Newsletters** controls archiving after reading, how long Read later items are kept,
    and where unsubscribed senders' mail goes. See [Trash & retention](27-trash-retention.md).
+
+## Archive mail older than N years
+
+1. In Settings > Storage, add a **backup** storage target (a different bucket from your mail).
+2. Ask for a preview of what N years would archive (`GET /api/archives/preview?olderThan=3y`) and a dry run (`POST /api/archives` with `"dryRun": true`).
+3. Create the archive with mode **copy** first (`POST /api/archives` with `olderThanYears`, `targetId`, `mode`). Check the result and try a search (`GET /api/archives/<id>/search?q=…`).
+4. When you are happy, run the same rule with mode **move** to free space in the app. Restore anything later with `POST /api/archives/<id>/restore`.
+
+See [Backup and restore](11-backup-restore.md) for what is included and what is left out.

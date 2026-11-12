@@ -51,6 +51,7 @@ import { register as webhooks } from './webhooks.ts';
 import { register as apiv1 } from './apiv1.ts';
 import { register as leads } from './leads.ts';
 import { register as auditRoutes } from './audit.ts';
+import { register as archives } from './archives.ts';
 import { audit } from '../audit/log.ts';
 import { AUDITED_ROUTES } from '../audit/routeMap.ts';
 import { sessionToken } from '../auth/sessions.ts';
@@ -166,4 +167,5 @@ export function registerRoutes(app: FastifyInstance): void {
   apiv1(app);
   leads(app);
   auditRoutes(app);
+  archives(app);
 }

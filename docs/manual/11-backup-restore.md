@@ -208,6 +208,28 @@ Check that **Back up automatically** is actually ticked, and remember the hour i
 **Nothing is being backed up at all.**
 Backups do not include the `.eml` files by design — only the database. If you want copies of the raw mail as well, that is your object storage provider's job (R2 and S3 both offer versioning and lifecycle rules).
 
+## Archive old mail
+
+A backup protects the whole app. An **archive** is different: it copies your *older* mail to a backup storage target so you can keep the app small, and it can later bring that mail back or let you search it without restoring.
+
+**What goes into an archive.** Mail older than the age you pick (1 to 10 years, or any number of days) in the mailboxes you own. By default these stay in the app: starred mail, mail from VIP senders, Drafts, Scheduled and Snoozed mail, mail with an open follow-up, and Spam and Bin. Each can be switched on for a run. Shared mailboxes are archived only by their owner.
+
+**Copy or move.**
+- *Copy* leaves everything where it is.
+- *Move* copies each message, reads it back and checks its checksum, and only then removes it from the app. The copy on your mail server is **not** touched unless you also choose to move it to the server's Bin. A message that fails the check is kept and listed as failed.
+
+**Where it goes.** Always a *backup* storage target (Settings > Storage), never the mail bucket. Each archive is a folder `archive/<number>/` holding the `.eml` files, a `manifest.json`, search index files (`index-1.jsonl.gz`, …) and a `config.json` with your labels, rules, filters, saved views, templates, contacts, businesses and identities. It never contains passwords, tokens or keys. The folder is self-describing, so another copy of the app can read it later.
+
+**Before you run it.** *Preview* shows the number of messages, their total size and the oldest and newest dates. *Dry run* also lists the first few subjects, and changes nothing.
+
+**Getting mail back.** *Search archive* looks through the index by subject, sender and date without restoring. *Download one message* gives you the `.eml`. *Restore* puts mail (all of it, a date range or a sender search) back in its original mailbox with its original date, read/starred state and labels. Mail already in the app is skipped, and a restore does not run filters, AI or notifications.
+
+**Deleting an archive** removes its files from the storage target and needs you to type its name.
+
+Every plan, run, completion, restore and deletion is written to the audit log.
+
+> The screens for this arrive with the next release step; until then the archive is available through the API (`/api/archives`).
+
 ## Reference
 
 **Environment**
