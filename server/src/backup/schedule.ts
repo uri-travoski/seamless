@@ -1,3 +1,4 @@
+import { isViewing } from '../mode.ts';
 import { one, getSetting, setSetting } from '../db.ts';
 import { config } from '../config.ts';
 import { plog } from '../classify/settings.ts';
@@ -175,6 +176,7 @@ export function isDue(lastAt: number | null, cfg: BackupConfig, now: number): bo
 }
 
 async function alert(subject: string, body: string, cfg: BackupConfig): Promise<void> {
+  if (isViewing()) return;   // Viewing mode sends no mail; the log and banner still carry the news
   const recipients = alertRecipients(cfg.alertEmail);
   if (!recipients.length) return;
   const acct = await one<AccountRow>('SELECT * FROM accounts WHERE enabled = true ORDER BY id LIMIT 1');

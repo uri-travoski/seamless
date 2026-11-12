@@ -60,6 +60,8 @@ export default function GeneralSettings() {
         {settings.appName !== 'Seamless' && <button className="btn" onClick={() => { setAppName('Seamless'); save({ appName: 'Seamless' }); }}>Reset</button>}
       </div>
 
+      <ModeSection />
+
       <h3>Privacy</h3>
       <label className="checkbox-line">
         <input type="checkbox" checked={settings.allowRemoteImages} onChange={(e) => save({ allowRemoteImages: e.target.checked })} />
@@ -114,5 +116,63 @@ export default function GeneralSettings() {
         {pushState === 'on' ? '✓ Push enabled' : pushState === 'busy' ? 'Enabling…' : 'Enable push on this device'}
       </button>
     </div>
+  );
+}
+
+interface ModeInfo { mode: 'live' | 'viewing'; locked: boolean; stale: { scheduledSends: number; ops: number; undoSends: number } }
+
+/** Settings → General → Mode (administrators). Live fetches and sends mail; Viewing only is a reference copy. */
+function ModeSection() {
+  const isAdmin = useSession((s) => s.user?.role === 'admin');
+  const setMode = useSession((s) => s.setMode);
+  const [info, setInfo] = useState<ModeInfo | null>(null);
+  const [typed, setTyped] = useState('');
+  const [discard, setDiscard] = useState(true);
+  const [confirming, setConfirming] = useState<null | 'live' | 'viewing'>(null);
+  useEffect(() => { api.get<ModeInfo>('/api/mode').then(setInfo).catch(() => {}); }, []);
+  if (!info) return null;
+  const queued = info.stale.scheduledSends + info.stale.ops + info.stale.undoSends;
+  const apply = async (to: 'live' | 'viewing') => {
+    try {
+      const r = await api.put<ModeInfo>('/api/mode', { mode: to, confirm: to === 'live' ? typed : undefined, stale: discard ? 'discard' : 'keep' });
+      setInfo(r); setMode(r.mode, r.locked); setConfirming(null); setTyped('');
+      toast(to === 'live' ? 'Live mode: mail is fetched and sent again' : 'Viewing mode: mail is neither sent nor received');
+    } catch (e: any) { toast(e?.message ?? 'Could not switch', 'error'); }
+  };
+  return (
+    <>
+      <h3>Mode</h3>
+      <p className="settings-desc">
+        <b>Live</b> is the normal app: it fetches new mail and sends yours. <b>Viewing only</b> is a reference copy: nothing is fetched or sent,
+        but you can read, search, label, filter and export everything. Use it for an instance that holds old mail.
+      </p>
+      {info.locked && <p className="settings-desc"><b>Set by the server configuration</b> (SEAMLESS_MODE). It cannot be changed here.</p>}
+      <div className="field-row">
+        <label className="checkbox-line"><input type="radio" name="app-mode" checked={info.mode === 'live'} disabled={!isAdmin || info.locked || info.mode === 'live'} onChange={() => setConfirming('live')} /> Live</label>
+        <label className="checkbox-line"><input type="radio" name="app-mode" checked={info.mode === 'viewing'} disabled={!isAdmin || info.locked || info.mode === 'viewing'} onChange={() => setConfirming('viewing')} /> Viewing only</label>
+      </div>
+      {!isAdmin && <p className="settings-desc">Only an administrator can change the mode.</p>}
+      {confirming === 'viewing' && (
+        <div className="settings-card">
+          <p>Switch to Viewing only? Mail will stop being fetched and sent on this instance.</p>
+          <button className="btn primary" onClick={() => apply('viewing')}>Switch to Viewing only</button>{' '}
+          <button className="btn" onClick={() => setConfirming(null)}>Cancel</button>
+        </div>
+      )}
+      {confirming === 'live' && (
+        <div className="settings-card">
+          <p><b>This instance will start fetching and sending mail for its connected mailboxes.</b></p>
+          {queued > 0 && (
+            <label className="checkbox-line">
+              <input type="checkbox" checked={discard} onChange={(e) => setDiscard(e.target.checked)} />
+              Discard mail queued earlier ({info.stale.scheduledSends} scheduled, {info.stale.undoSends} waiting to send, {info.stale.ops} pending server changes) so it is never sent by surprise
+            </label>
+          )}
+          <div className="field"><input className="text-input" placeholder="Type LIVE to confirm" value={typed} onChange={(e) => setTyped(e.target.value)} aria-label="Type LIVE to confirm" /></div>
+          <button className="btn primary" disabled={typed !== 'LIVE'} onClick={() => apply('live')}>Switch to Live</button>{' '}
+          <button className="btn" onClick={() => { setConfirming(null); setTyped(''); }}>Cancel</button>
+        </div>
+      )}
+    </>
   );
 }

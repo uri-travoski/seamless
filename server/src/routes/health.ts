@@ -1,3 +1,4 @@
+import { currentMode } from '../mode.ts';
 import type { FastifyInstance } from 'fastify';
 import { one, run } from '../db.ts';
 import { healthReport, mailboxHealth, liveness, storageProbe } from '../health/status.ts';
@@ -19,7 +20,7 @@ export function register(app: FastifyInstance): void {
   /** Public, for an uptime monitor: only "is it up". */
   app.get('/healthz', async (_req, reply) => {
     const r = await liveness();
-    return reply.code(r.ok ? 200 : 503).send(r);
+    return reply.code(r.ok ? 200 : 503).send({ ...r, mode: currentMode() });
   });
 
   app.post('/api/health/storage-check', async (req, reply) => {

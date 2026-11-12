@@ -1,3 +1,4 @@
+import { isViewing } from '../mode.ts';
 import { q, one, run, bumpState } from '../db.ts';
 import { getBlob, putBlob } from '../s3.ts';
 import { sha256 } from '../crypto.ts';
@@ -76,6 +77,7 @@ async function reportScheduledFailure(row: SchedRow, error: string): Promise<voi
 
 /** Deliver every scheduled send whose time has passed. Exported for the scheduler loop and tests. */
 export async function processDueSends(now = Date.now()): Promise<number> {
+  if (isViewing()) return 0;   // Viewing mode: nothing is sent, queued items wait (they are listed when switching to Live)
   const due = await q<SchedRow>('SELECT * FROM scheduled_sends WHERE send_at <= ? ORDER BY send_at', [now]);
   if (due.length === 0) return 0;
   let sent = 0;

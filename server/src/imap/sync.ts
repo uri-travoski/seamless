@@ -1,3 +1,4 @@
+import { isViewing } from '../mode.ts';
 import { ImapFlow } from 'imapflow';
 import { EventEmitter } from 'node:events';
 import { q, one, run, bumpState } from '../db.ts';
@@ -374,12 +375,14 @@ class SyncManager extends EventEmitter {
   setStatus(accountId: number, st: SyncStatus): void { this.external.set(accountId, st); }
 
   async startAll(): Promise<void> {
+    if (isViewing()) return;   // Viewing mode: nothing connects to any mail server
     const accounts = await q<AccountRow>('SELECT a.* FROM accounts a JOIN users u ON u.id = a.user_id WHERE a.enabled = true AND u.disabled = false');
     for (const acct of accounts) this.startAccount(acct);
   }
 
   startAccount(acct: AccountRow): void {
     this.stopAccount(acct.id);
+    if (isViewing()) return;
     if (acct.inbound_kind && acct.inbound_kind !== 'imap') {
       this.drivers.get(acct.inbound_kind)?.start(acct); // POP3 has its own poller; push has none
       return;
@@ -398,6 +401,12 @@ class SyncManager extends EventEmitter {
     this.syncers.delete(accountId);
     for (const d of this.drivers.values()) d.stop(accountId);
     this.external.delete(accountId);
+  }
+
+  /** Stop every poller and IMAP connection (switching to Viewing mode). */
+  stopAll(): void {
+    for (const id of [...this.syncers.keys()]) this.stopAccount(id);
+    for (const id of [...this.external.keys()]) this.stopAccount(id);
   }
 
   async restartAccount(accountId: number): Promise<void> {

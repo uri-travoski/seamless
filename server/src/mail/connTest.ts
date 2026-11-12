@@ -1,3 +1,4 @@
+import { assertLive } from '../mode.ts';
 /**
  * Step-by-step mailbox connection tests (T1 F-09): DNS → TCP → TLS → auth → folders
  * (incoming) or → send-to-self (outgoing). Each step reports {step, ok, ms, detail} and
@@ -88,6 +89,7 @@ async function network(spec: ServerSpec, steps: TestStep[]): Promise<boolean> {
 }
 
 export async function testIncoming(spec: ServerSpec): Promise<{ ok: boolean; steps: TestStep[] }> {
+  assertLive('connection tests');
   const steps: TestStep[] = [];
   if (!(await network(spec, steps))) return { ok: false, steps };
   const client = new ImapFlow({
@@ -107,6 +109,7 @@ export async function testIncoming(spec: ServerSpec): Promise<{ ok: boolean; ste
 }
 
 export async function testOutgoing(spec: ServerSpec, opts: { sendTo?: string; from?: string } = {}): Promise<{ ok: boolean; steps: TestStep[] }> {
+  assertLive('connection tests');
   const steps: TestStep[] = [];
   if (!(await network(spec, steps))) return { ok: false, steps };
   const transport = nodemailer.createTransport({
@@ -130,6 +133,7 @@ export async function testOutgoing(spec: ServerSpec, opts: { sendTo?: string; fr
 }
 
 export async function testPop3Incoming(spec: ServerSpec): Promise<{ ok: boolean; steps: TestStep[] }> {
+  assertLive('connection tests');
   const steps: TestStep[] = [];
   if (!(await network(spec, steps))) return { ok: false, steps };
   const client = new Pop3Client({ host: spec.host, port: spec.port, secure: spec.secure, starttls: !spec.secure, timeoutMs: TIMEOUT });

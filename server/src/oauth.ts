@@ -1,3 +1,4 @@
+import { assertLive } from './mode.ts';
 import { syncAccountIdentities } from './business/identities.ts';
 import { q, one, run, insertId } from './db.ts';
 import { encrypt, decrypt, randomToken } from './crypto.ts';
@@ -138,6 +139,7 @@ export async function handleCallback(provider: 'google' | 'microsoft', code: str
 
 /** Fresh access token for an OAuth account, refreshing when near expiry. */
 export async function freshAccessToken(accountId: number): Promise<string> {
+  assertLive('signing in to mail servers');
   const acct = await one<any>('SELECT * FROM accounts WHERE id = ?', [accountId]);
   if (!acct?.oauth_refresh_enc) throw new Error('not an OAuth account');
   if (acct.oauth_access_enc && acct.oauth_expires_at && acct.oauth_expires_at > Date.now()) {

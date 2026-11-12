@@ -1,3 +1,4 @@
+import { assertLive } from '../../mode.ts';
 /**
  * Push inbound (F-24): a Cloudflare Email Worker POSTs each raw message, signed with a per-inbox
  * secret. Signature = sha256 HMAC over `timestamp + "." + body`.
@@ -52,6 +53,7 @@ export type IngestOutcome = { status: 202; id: number } | { status: 200; dropped
 
 /** Store one pushed message (already authenticated). Duplicate = same Message-ID + same bytes. */
 export async function ingestPush(inbox: PushInboxRow, raw: Buffer, rcpt: string | null): Promise<IngestOutcome> {
+  assertLive('receiving mail');   // nothing is stored in Viewing mode
   // disposable addresses: a disposed one is dropped (and counted) before anything is stored
   const candidates = [rcpt];
   if (!rcpt) {

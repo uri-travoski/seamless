@@ -3,6 +3,7 @@
  * goes through the normal sendEmail(), so tracking, the Sent copy and events behave as before.
  * Uploaded attachments stay on disk until sendEmail removes them, so undo can hand them back.
  */
+import { assertLive } from '../mode.ts';
 import type { ComposePayload } from '@seamless/shared';
 import { one, q } from '../db.ts';
 import { getUserSetting } from '../classify/settings.ts';
@@ -18,6 +19,7 @@ export type QueueResult =
   | { queued: true; jobId: number; releaseAt: number };
 
 export async function queueSend(userId: number, payload: ComposePayload): Promise<QueueResult> {
+  assertLive('sending mail');
   const secs = Number(await getUserSetting(userId, 'undo_send_seconds') || '10');
   if (!secs || payload.pgpPassphrase) return { queued: false, sent: await sendEmail(userId, payload) };
 

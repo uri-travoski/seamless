@@ -39,7 +39,7 @@ In Settings, the **?** at the top right of each tab opens the matching page.
 - [Encryption](23-encryption.md)
 - [Audit log](22-audit-log.md)
 - [Administrator tools & storage limits](29-administrator.md) — users, password reset, mailbox for a user, quotas
-- [Viewing old mail](30-viewing-old-mail.md) — attach a bucket of archives and import old mail to browse and search it
+- [Viewing old mail](30-viewing-old-mail.md) — attach a bucket of archives, import old mail, Viewing mode and a second view-only copy
 - [Backup and restore](11-backup-restore.md)
 - [Storage](17-storage.md)
 - [Health](15-health.md)

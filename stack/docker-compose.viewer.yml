@@ -1,0 +1,47 @@
+# A second, view-only copy of Seamless for reading old archived mail.
+#
+#   cp stack/viewer.env.example .env.viewer      # then edit it
+#   docker compose -f stack/docker-compose.viewer.yml up -d
+#
+# It has its own Postgres (port 5461) and its own data folder, and SEAMLESS_MODE=viewing keeps it from
+# ever fetching or sending mail. Attach the bucket that holds your archives from inside the app
+# (Settings → Archives). Full recipe: docs/manual/30-viewing-old-mail.md
+
+name: seamless-viewer
+
+services:
+  postgres:
+    image: pgvector/pgvector:pg17
+    restart: unless-stopped
+    ports:
+      - "5461:5432"
+    environment:
+      POSTGRES_USER: seamless
+      POSTGRES_PASSWORD: seamless
+      POSTGRES_DB: seamless_viewer
+    volumes:
+      - viewer-pg:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U seamless"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  app:
+    image: ghcr.io/uri-travoski/seamless:latest
+    restart: unless-stopped
+    network_mode: host            # the ports come from .env.viewer (PORT=4902, FACADE_*)
+    env_file:
+      - ../.env.viewer
+    environment:
+      # this compose file has its own Postgres on 5461; override what the env file says
+      DATABASE_URL: postgres://seamless:seamless@localhost:5461/seamless_viewer
+      SEAMLESS_MODE: viewing
+    volumes:
+      - ../data-viewer:/app/data
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+volumes:
+  viewer-pg:

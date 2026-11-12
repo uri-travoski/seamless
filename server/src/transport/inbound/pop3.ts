@@ -1,3 +1,4 @@
+import { assertLive } from '../../mode.ts';
 /**
  * POP3 polling (F-23). `pollPop3(accountId)`: UIDL → fetch only unseen → ingestLocal(inbox, live)
  * → remember in pop3_seen. Deletion on the server only ever happens for messages we have
@@ -30,6 +31,7 @@ export function pop3ClientFor(acct: AccountRow, timeoutMs?: number): Pop3Client 
 }
 
 export async function pollPop3(accountId: number): Promise<PollResult> {
+  assertLive('receiving mail');
   const acct = await one<AccountRow>("SELECT * FROM accounts WHERE id = ? AND inbound_kind = 'pop3'", [accountId]);
   if (!acct) return { fetched: 0, deleted: 0, error: 'not a POP3 account' };
   if (running.has(accountId)) return { fetched: 0, deleted: 0, error: null };

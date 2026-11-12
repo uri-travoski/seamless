@@ -59,6 +59,7 @@ export default function Sidebar({ open, onNavigate, onAddLabel }: { open: boolea
   const overview = useMail((s) => s.overview);
   const route = useRouter((s) => s.route);
   const openBlank = useCompose((s) => s.openBlank);
+  const viewingMode = useSession((s) => s.mode === 'viewing');
   const settings = useSession((s) => s.settings);
   const saveSettings = useSession((s) => s.saveSettings);
   const [moreOpen, setMoreOpen] = useState(false);
@@ -154,7 +155,9 @@ export default function Sidebar({ open, onNavigate, onAddLabel }: { open: boolea
     <nav className={`sidebar ${open ? 'open' : ''} ${settings.sidebarCollapsed ? 'collapsed' : ''}`} aria-label="Folders">
       <div className="side-brand mobile-only"><MailLogo size="1.4em" /><span className="app-name">{settings.appName || 'Seamless'}</span></div>
       <div className="compose-actions">
-        <button className="btn primary compose-btn" onClick={openBlank} title="Compose (c)"><ComposeIcon /> <span className="compose-label">Compose</span></button>
+        {viewingMode
+          ? <button className="btn compose-btn" disabled title="Viewing mode: mail cannot be sent from this copy"><ComposeIcon /> <span className="compose-label">Compose</span></button>
+          : <button className="btn primary compose-btn" onClick={openBlank} title="Compose (c)"><ComposeIcon /> <span className="compose-label">Compose</span></button>}
       </div>
 
       <div className="side-section">

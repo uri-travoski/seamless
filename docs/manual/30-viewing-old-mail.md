@@ -1,6 +1,6 @@
 # Viewing old mail (open an archive in another copy of the app)
 
-You can keep years of old mail out of your everyday app (see [Archive old mail](11-backup-restore.md)) and still read and search it later, in this app or in a second copy of it. This page explains the idea and the **import** step. (The step-by-step recipe for setting up a dedicated second copy is added with *Viewing mode*.)
+You can keep years of old mail out of your everyday app (see [Archive old mail](11-backup-restore.md)) and still read and search it later, in this app or in a second copy of it. This page explains the idea, the **import** step, **Viewing mode**, and a step-by-step recipe for a dedicated second copy.
 
 ## Two ways to bring old mail into an app
 
@@ -42,3 +42,60 @@ If you downloaded an archive folder, **Upload a .zip** of it (a zip of the folde
 - Archives contain no passwords, tokens, API keys or private keys. Business logos up to 256 KB are included.
 - The bucket's read-only key is stored encrypted, like every other storage key, and is never shown again.
 - Large uploaded `.zip` files are read into memory; for a very large archive prefer attaching the bucket.
+
+## Viewing mode (Live vs Viewing only)
+
+An app is either in **Live mode** (the normal app) or **Viewing mode** (a reference copy).
+
+| | Live | Viewing only |
+|---|---|---|
+| Fetch new mail (IMAP, POP3, push) | yes | **no** — nothing connects to any mail server |
+| Send mail (compose, reply, scheduled, forwarding, API, mail apps) | yes | **no** |
+| Read, search, labels, filters and rules (including **Run on existing mail**), saved views, templates, contacts, notes, stars, moves, delete, exports, backups, settings, users, shared mailboxes | yes | **yes — exactly the same** |
+| Drafts | saved on the server | saved in this app only |
+
+In Viewing mode the screen shows a bar, **"Viewing mode — reference copy. Mail cannot be sent or received."**, the browser tab starts with `[Viewing]`, the Compose button is greyed, and the Send button is disabled. The refusal is enforced by the server too: a send attempt (even from the API or a mail app) is answered with *"Viewing mode: sending mail is turned off"*, and nothing is stored from a push-inbound address.
+
+### Switching (administrators)
+**Settings → General → Mode.**
+- **Live → Viewing only**: confirm, and every connection to mail servers is closed.
+- **Viewing only → Live**: you are warned that *"This instance will start fetching and sending mail for its connected mailboxes"* and must type **LIVE**. Mail that was queued earlier (scheduled sends, messages waiting to send, pending changes to mail servers — for example because a backup was restored here) is counted and, by default, **discarded**, so old queued mail is never sent by surprise. Untick the box to keep it.
+- If the server was started with `SEAMLESS_MODE=viewing` (or `live`), the switch shows **"Set by the server configuration"** and cannot be changed in the app.
+
+Restoring a backup into a Viewing instance never connects to a mail server, even though the restored mailboxes still carry passwords.
+
+The mode is also shown on **Settings → Health** and in `/healthz` (`"mode":"viewing"`).
+
+## Recipe: a second copy that only views old mail
+
+This keeps old mail away from your everyday app: a second copy of the app that cannot send or receive, with its own database and bucket.
+
+**(a) What you need**
+- A second copy of the app (the same image or source as your live one) on any machine, ideally not exposed to the internet.
+- Its **own database** (for example `seamless_viewer`) and **own bucket** for what it stores. Do not share the live app's.
+- The archives themselves (a bucket you can read, or a downloaded folder or `.zip`).
+
+**(b) Configure it.** Copy `stack/viewer.env.example` to `.env.viewer`. The important lines:
+
+```
+SEAMLESS_MODE=viewing
+SEAMLESS_SECRET=<a long random string, its own>
+PORT=4902
+PUBLIC_URL=http://localhost:4902
+DATABASE_URL=postgres://seamless:seamless@localhost:5461/seamless_viewer
+S3_BUCKET=seamless-viewer
+FACADE_IMAP_PORT=1144
+FACADE_SMTP_PORT=1588
+```
+
+If you use Docker, `stack/docker-compose.viewer.yml` starts the app and its own Postgres from that file: `docker compose -f stack/docker-compose.viewer.yml up -d`.
+
+**(c) First login.** Open `http://localhost:4902`. It is a brand-new app, so it asks you to create the first administrator. Choose any email and password (they do not have to match your live app). You will see the Viewing mode bar straight away.
+
+**(d) Bring the archives in.** **Settings → Archives → Attach a bucket**, fill in the bucket that holds your archives (a read-only key is enough), **Test and attach**, tick the archives and press **Import**. Or upload a `.zip`. See [Settings → Archives](#settings--archives-administrators-only) above.
+
+**(e) Browse and search.** Each archived mailbox appears as "Archive — name@example.com (2012–2020)". Search with the normal search box and every operator (`from:`, `before:`, `attachment:`…). Labels, saved views and templates that came with the archive are ready to use.
+
+**(f) Add more later.** When your live app archives another batch, come back to **Settings → Archives**, press **Find archives** and import the new ones. Mail already imported is skipped, so nothing is duplicated.
+
+**(g) What you cannot do.** Send or reply to mail, receive new mail, test mailbox connections, or add mailboxes that connect to a server. Everything else works, including exports and backups of the viewer itself. To use the copy as a live app instead, switch it to Live (only possible when `SEAMLESS_MODE` is not set) and read the warning first.

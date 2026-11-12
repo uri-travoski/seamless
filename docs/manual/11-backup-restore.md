@@ -276,3 +276,5 @@ The **Archives** list under the card shows each run: date, rule, number of messa
 ## Reading an archive in another copy of the app
 
 An archive can be opened (read-only) in this app or in a second copy: **Settings → Archives**. See [Viewing old mail](30-viewing-old-mail.md).
+
+To read an archive in a separate, view-only copy of the app, see [Viewing old mail](30-viewing-old-mail.md#recipe-a-second-copy-that-only-views-old-mail).

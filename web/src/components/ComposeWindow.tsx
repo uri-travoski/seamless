@@ -1,3 +1,4 @@
+import { useSession } from '../state/session.ts';
 import { Fragment, useCallback, useEffect, useRef, useState } from 'react';
 import { createDisposableAddress } from './settings/DisposableSettings.tsx';
 import type { ReactNode } from 'react';
@@ -78,6 +79,7 @@ export default function ComposeWindow({ draft }: { draft: Draft }) {
   const identities = useCompose((s) => s.identities);
   const businesses = useCompose((s) => s.businesses);
   const [showCcBcc, setShowCcBcc] = useState(draft.cc.length > 0 || draft.bcc.length > 0);
+  const viewingMode = useSession((s) => s.mode === 'viewing');
   const [sending, setSending] = useState(false);
   const [aiBusy, setAiBusy] = useState(false);
   const [scheduleOpen, setScheduleOpen] = useState(false);
@@ -504,10 +506,11 @@ export default function ComposeWindow({ draft }: { draft: Draft }) {
           </div>
         )}
 
+        {viewingMode && <div className="viewing-compose-note">Viewing mode — this copy cannot send mail. You can still save a draft.</div>}
         <div className="compose-foot">
           <div className="send-split">
-            <button className="btn primary" disabled={sending} onClick={doSend}>{sending ? 'Sending…' : 'Send'}</button>
-            <button className="btn primary split-caret" disabled={sending} title="Send later" onClick={() => setScheduleOpen((v) => !v)}><CaretDownIcon /></button>
+            <button className="btn primary" disabled={sending || viewingMode} title={viewingMode ? 'Viewing mode: mail cannot be sent' : undefined} onClick={doSend}>{sending ? 'Sending…' : 'Send'}</button>
+            <button className="btn primary split-caret" disabled={sending || viewingMode} title="Send later" onClick={() => setScheduleOpen((v) => !v)}><CaretDownIcon /></button>
             {scheduleOpen && (
               <div className="schedule-menu">
                 <div className="schedule-head"><ScheduledIcon /> Send later</div>

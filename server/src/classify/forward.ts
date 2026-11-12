@@ -1,3 +1,4 @@
+import { isViewing } from '../mode.ts';
 import { q, one, run } from '../db.ts';
 import { getBlob } from '../s3.ts';
 import { smtpTransport } from '../mail/send.ts';
@@ -13,6 +14,7 @@ const MAX_PER_RUN = 40; // quota guard (sheet: "Forward: max per run")
  * account. The raw message is re-sent unchanged with a new envelope.
  */
 export async function sweepForwarding(now = Date.now()): Promise<number> {
+  if (isViewing()) return 0;   // forwarding is sending
   const routes = await q<any>(`
     SELECT r.*, l.name AS label_name FROM routes r
     JOIN labels l ON l.id = r.label_id

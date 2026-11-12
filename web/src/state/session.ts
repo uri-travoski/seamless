@@ -76,6 +76,11 @@ interface SessionState {
   /** Resolves to an MFA token when a second factor is required (no session yet). */
   login: (email: string, password: string) => Promise<{ mfaToken?: string }>;
   loginMfa: (mfaToken: string, code: string) => Promise<{ usedRecoveryCode: boolean }>;
+  /** Live mode (normal) or Viewing mode (reference copy: mail is neither sent nor received). */
+  mode: 'live' | 'viewing';
+  /** SEAMLESS_MODE is set on the server, so the switch is locked. */
+  modeLocked: boolean;
+  setMode: (mode: 'live' | 'viewing', locked?: boolean) => void;
   mfaEnrollRequired: boolean;
   /** An administrator set a temporary password: the app shows only the choose-a-password screen. */
   mustChangePassword: boolean;
@@ -125,7 +130,7 @@ export const useSession = create<SessionState>((set, get) => ({
 
   init: async () => {
     try {
-      const me = await api.get<{ needsSetup: boolean; loggedIn: boolean; user?: ApiUser | null; settings: Partial<ClientSettings>; mfaEnrollRequired?: boolean; mustChangePassword?: boolean }>('/api/me');
+      const me = await api.get<{ needsSetup: boolean; loggedIn: boolean; user?: ApiUser | null; settings: Partial<ClientSettings>; mfaEnrollRequired?: boolean; mustChangePassword?: boolean; mode?: 'live' | 'viewing'; modeLocked?: boolean }>('/api/me');
       const settings = { ...DEFAULTS, ...me.settings };
       applyAppearance(settings);
       set({
@@ -134,6 +139,8 @@ export const useSession = create<SessionState>((set, get) => ({
         settings,
         mfaEnrollRequired: !!me.mfaEnrollRequired,
         mustChangePassword: !!me.mustChangePassword,
+        mode: me.mode === 'viewing' ? 'viewing' : 'live',
+        modeLocked: !!me.modeLocked,
       });
     } catch {
       set({ status: 'login' });
@@ -154,6 +161,9 @@ export const useSession = create<SessionState>((set, get) => ({
   },
   mfaEnrollRequired: false,
   mustChangePassword: false,
+  mode: 'live',
+  modeLocked: false,
+  setMode: (mode, locked) => set((s) => ({ mode, modeLocked: locked ?? s.modeLocked })),
 
   setup: async (email, name, password) => {
     await api.post('/api/setup', { email, name, password });

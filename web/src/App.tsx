@@ -185,9 +185,11 @@ export default function App() {
 
   // unread badge in the tab title
   const unread = useMail((s) => s.mailboxes.find((m) => m.id === 'u:inbox')?.unreadEmails ?? 0);
+  const viewingMode = useSession((s) => s.mode === 'viewing');
   useEffect(() => {
-    document.title = unread > 0 ? `Inbox (${unread}) - ${appName}` : appName;
-  }, [unread, appName]);
+    const base = unread > 0 ? `Inbox (${unread}) - ${appName}` : appName;
+    document.title = viewingMode ? `[Viewing] ${base}` : base;
+  }, [unread, appName, viewingMode]);
 
   if (status === 'loading') return null;
   if (status !== 'ready') return <Login />;
@@ -200,6 +202,7 @@ export default function App() {
     <div className="app">
       <SaveViewDialog />
       <AppHeader onMenu={() => setSidebarOpen(!sidebarOpen)} connected={wsConnected} />
+      {viewingMode && <div className="viewing-bar" role="status">Viewing mode — reference copy. Mail cannot be sent or received.</div>}
       <div className={`main ${isMail && layout === 'table' ? 'table-mode' : ''} ${isMail && selectedId ? 'reading' : ''} ${isMail ? '' : 'page-mode'}`}>
         <Sidebar open={sidebarOpen} onNavigate={() => setSidebarOpen(false)} onAddLabel={addLabel} />
         {sidebarOpen && <div className="sidebar-scrim mobile-only" onClick={() => setSidebarOpen(false)} />}

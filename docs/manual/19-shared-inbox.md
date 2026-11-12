@@ -89,3 +89,6 @@ Settings → Mailboxes → **Share with…** → **Team settings** (owner or a m
 ## Read and unread are shared
 There is one read state per message. When one person marks a shared message read, everyone with access sees it as read; when
 someone marks it unread again, it is unread for everyone. (Starring works the same way.) Notes and personal labels stay private.
+
+## Shared mailboxes on a viewing copy
+On a copy in [Viewing mode](30-viewing-old-mail.md) shared mailboxes, shared labels and team settings work as usual; only sending and receiving are switched off.

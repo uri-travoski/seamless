@@ -16,6 +16,7 @@ interface Report {
   backups?: { enabled: boolean; lastAt: number | null; lastStatus: string | null; lastError: string; nextDueAt: number | null; status: Light; note: string };
   archives?: { id: number; name: string; status: string; mode: string; messages: number }[];
   attachmentIndex?: { state: string; processed: number; total: number } | null;
+  mode?: 'live' | 'viewing';
   system?: { version: string; uptimeSec: number; dbBytes: number; rssBytes: number; freeBytes: number | null; status: Light };
 }
 
@@ -158,6 +159,7 @@ export default function HealthSettings() {
           <Card title="Server" status={r.system.status}>
             <ul className="health-list">
               <li>Version {r.system.version} · up {dur(r.system.uptimeSec)}</li>
+              <li>Mode: {r.mode === 'viewing' ? 'Viewing only (mail is not sent or received)' : 'Live'}</li>
               <li>Database {formatBytes(r.system.dbBytes)} · memory {formatBytes(r.system.rssBytes)}</li>
               {r.system.freeBytes !== null && <li>Free disk space {formatBytes(r.system.freeBytes)}</li>}
             </ul>

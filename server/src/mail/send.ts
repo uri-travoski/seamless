@@ -1,3 +1,4 @@
+import { assertLive } from '../mode.ts';
 import MailComposer from 'nodemailer/lib/mail-composer/index.js';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -185,6 +186,7 @@ export async function buildRaw(payload: ComposePayload, acct: AccountRow, extraF
 }
 
 export async function sendEmail(userId: number, original: ComposePayload): Promise<{ trackingToken: string | null }> {
+  assertLive('sending mail');
   userId = await actingUser(userId, original.accountId);
   const acct = await getAccount(userId, original.accountId);
   const ident = await resolveSendIdentity(userId, original);
@@ -265,6 +267,7 @@ export async function saveDraft(userId: number, original: ComposePayload): Promi
  * shows in the unified Scheduled view. A scheduled_sends row drives the actual SMTP send later.
  */
 export async function scheduleEmail(userId: number, original: ComposePayload, sendAt: number): Promise<{ id: number; sendAt: number }> {
+  assertLive('sending mail');
   if (!Number.isFinite(sendAt) || sendAt <= Date.now()) throw new Error('Scheduled time must be in the future');
   userId = await actingUser(userId, original.accountId);
   const acct = await getAccount(userId, original.accountId);

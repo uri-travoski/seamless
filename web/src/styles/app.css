@@ -1547,3 +1547,7 @@ mark[data-ai-pending], mark[data-unknown-var] { outline: 1px dashed var(--md-bor
 [data-theme="rolltop"] .sidebar .compose-btn { background: #C46B44; border-color: #C46B44; color: #fff; }
 [data-theme="rolltop"] .sidebar .compose-btn svg { color: #fff; }
 [data-theme="rolltop"] .sidebar .compose-btn:hover { background: color-mix(in srgb, #C46B44 88%, #000); border-color: color-mix(in srgb, #C46B44 88%, #000); }
+
+/* Viewing mode (T8.7): a reference copy that cannot send or receive */
+.viewing-bar { padding: 4px 12px; text-align: center; font-size: 12.5px; font-weight: 600; background: var(--color-ink); color: var(--color-ink-text); }
+.viewing-compose-note { margin: 0 12px 6px; padding: 6px 10px; font-size: 12.5px; border-radius: var(--radius-sm); background: var(--color-ink); color: var(--color-ink-text); }

@@ -1,3 +1,4 @@
+import { assertLive } from '../mode.ts';
 import { SMTPServer } from 'smtp-server';
 import { simpleParser } from 'mailparser';
 import { q, one, run } from '../db.ts';
@@ -42,6 +43,7 @@ export function startSmtpFacade(port = config.facade.smtpPort): SMTPServer | nul
       stream.on('data', (c) => chunks.push(c));
       stream.on('end', () => {
         void (async () => {
+          assertLive('sending mail');
           const userId = (session.user as any).userId as number;
           const raw = Buffer.concat(chunks);
           const parsed = await simpleParser(raw);

@@ -1,4 +1,5 @@
 import { one } from '../db.ts';
+import { assertLive } from '../mode.ts';
 import { decrypt } from '../crypto.ts';
 import { emitEvent } from '../events/emit.ts';
 import type { AccountRow } from '../imap/sync.ts';
@@ -58,6 +59,7 @@ export async function sendWithFallback(
   userId: number, t: ResolvedTransport, raw: Buffer, env: { from: string; to: string[] },
   ctx: { subject: string; accountId: number | null } = { subject: '', accountId: null },
 ): Promise<{ providerMessageId?: string; fallbackUsed: boolean }> {
+  assertLive('sending mail');
   try {
     return { ...(await t.transport.send(raw, env)), fallbackUsed: false };
   } catch (err: any) {

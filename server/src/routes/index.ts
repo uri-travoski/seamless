@@ -52,6 +52,8 @@ import { register as apiv1 } from './apiv1.ts';
 import { register as leads } from './leads.ts';
 import { register as auditRoutes } from './audit.ts';
 import { register as archives } from './archives.ts';
+import { register as modeRoutes } from './mode.ts';
+import { ViewingModeError, viewingBody, isViewing } from '../mode.ts';
 import { audit } from '../audit/log.ts';
 import { AUDITED_ROUTES } from '../audit/routeMap.ts';
 import { sessionToken } from '../auth/sessions.ts';
@@ -62,6 +64,22 @@ export { sessionUser, type SessionUser } from './util.ts';
 // /api/setup/{backups,restore} are public on purpose: after a total loss the database
 // is empty, so there is no account to authenticate with. Both refuse once a user exists.
 const PUBLIC_PATHS = [/^\/t\//, /^\/api\/(login|login\/mfa|setup|me)$/, /^\/api\/import(\?.*)?$/, /^\/api\/setup\/(backups|restore|storage-test)$/, /^\/api\/ingest\/[A-Za-z0-9_-]+(\/disposed)?(\?.*)?$/, /^\/api\/hooks\/blob\/[A-Za-z0-9_.-]+(\?.*)?$/, /^\/(?!api|jmap)/];
+
+/** Routes that send or fetch mail, refused with 409 in Viewing mode. */
+const VIEWING_BLOCKED: Record<string, string> = {
+  'POST /api/send': 'sending mail',
+  'POST /api/schedule': 'sending mail',
+  'POST /api/v1/send': 'sending mail',
+  'POST /api/invites/:id/rsvp': 'sending mail',
+  'POST /api/ingest/:token': 'receiving mail',
+  'POST /api/accounts/test': 'connection tests',
+  'POST /api/accounts/test/incoming': 'connection tests',
+  'POST /api/accounts/test/pop3': 'connection tests',
+  'POST /api/accounts/test/outgoing': 'connection tests',
+  'POST /api/accounts/:id/pop3/poll': 'receiving mail',
+  'POST /api/transports/:id/test': 'connection tests',
+  'POST /api/push-inboxes/:token/test': 'receiving mail',
+};
 
 export function registerRoutes(app: FastifyInstance): void {
   // REST v1: bearer tokens only. Cookies are ignored here on purpose (no CSRF surface); the OpenAPI document is public.
@@ -117,6 +135,22 @@ export function registerRoutes(app: FastifyInstance): void {
     }
   });
 
+  // Viewing mode (T8.7): the server refuses every way of sending or fetching mail. The functions that actually talk to a
+  // mail server check again (assertLive), so a worker or a route missing from this list is still stopped.
+  app.addHook('preHandler', async (req, reply) => {
+    if (!isViewing()) return;
+    const pattern = `${req.method} ${req.routeOptions?.url ?? req.url}`;
+    const what = VIEWING_BLOCKED[pattern];
+    if (what) return reply.code(409).send({ error: 'viewing_mode', message: `Viewing mode: ${what} is turned off` });
+    if (pattern === 'POST /api/sync') return reply.send({ ok: true, accounts: 0, viewing: true, message: 'Viewing mode — nothing to fetch' });
+  });
+  app.setErrorHandler((err: any, _req, reply) => {
+    if (err instanceof ViewingModeError) return reply.code(409).send(viewingBody(err));
+    // everything else: Fastify's own default answer
+    const status = Number((err as any).statusCode) >= 400 ? Number((err as any).statusCode) : 500;
+    return reply.code(status).send({ statusCode: status, error: (err as any).code ?? err.name, message: err.message });
+  });
+
   auth(app);
   users(app);
   accounts(app);
@@ -168,4 +202,5 @@ export function registerRoutes(app: FastifyInstance): void {
   leads(app);
   auditRoutes(app);
   archives(app);
+  modeRoutes(app);
 }

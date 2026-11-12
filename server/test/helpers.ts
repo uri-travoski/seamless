@@ -69,6 +69,8 @@ export async function resetDb(): Promise<void> {
   await run('TRUNCATE users RESTART IDENTITY CASCADE');
   await run('TRUNCATE tracking_opens, op_queue, scheduled_sends, jobs, mail_archive_imports, archive_imports, mail_archive_items, mail_archives, archive_schedules, storage_targets, storage_migrations, storage_migration_items RESTART IDENTITY');
   await run("DELETE FROM settings WHERE key = 'state' OR key LIKE 'alert:%'");
+  await run("DELETE FROM settings WHERE key = 'app_mode'");
+  await (await import("../src/mode.ts")).loadMode();
   TEST_USER = await insertId('INSERT INTO users(email, name, password_hash, role, created_at) VALUES (?,?,?,?,?)',
     ['test@local', 'Test User', hashPassword('password123'), 'admin', Date.now()]);
 }

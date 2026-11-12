@@ -7,6 +7,7 @@ import path from 'node:path';
 import fs from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { config } from './config.ts';
+import { loadMode, currentMode } from './mode.ts';
 import { migrate, currentState, one } from './db.ts';
 import { ensureBucket } from './s3.ts';
 import { registerRoutes, sessionUser } from './routes/index.ts';
@@ -46,6 +47,7 @@ import { registerSecurityHeaders } from './security/headers.ts';
 const pkg = JSON.parse(fs.readFileSync(new URL('../../package.json', import.meta.url), 'utf8')) as { version: string };
 
 await migrate();
+await loadMode();
 
 const app = Fastify({ logger: false, bodyLimit: 60 * 1024 * 1024, trustProxy: true });
 
@@ -167,4 +169,5 @@ startSmtpFacade();
 await syncManager.startAll();
 
 await app.listen({ port: config.port, host: '0.0.0.0' });
+if (currentMode() === 'viewing') console.log('VIEWING MODE: mail is neither received nor sent');
 console.log(`Seamless server on ${config.publicUrl} (port ${config.port})`);

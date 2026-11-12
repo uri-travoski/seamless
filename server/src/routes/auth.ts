@@ -1,3 +1,4 @@
+import { currentMode, modeLocked } from '../mode.ts';
 /** Session auth: who am I, first-run setup, login (+ second factor), logout, sessions, 2FA enrolment. */
 import type { FastifyInstance, FastifyRequest } from 'fastify';
 import { one, run, insertId, setSetting } from '../db.ts';
@@ -32,12 +33,14 @@ export function register(app: FastifyInstance): void {
   app.get('/api/me', async (req) => {
     const anyUser = await one('SELECT 1 FROM users LIMIT 1');
     const su = (req as any).sessionUser as SessionUser | null;
-    if (!su) return { needsSetup: !anyUser, loggedIn: false, settings: {} };
+    const mode = { mode: currentMode(), modeLocked: modeLocked() };
+    if (!su) return { needsSetup: !anyUser, loggedIn: false, settings: {}, ...mode };
     const user = await one<{ id: number; email: string; name: string; role: string; settings_json: string; must_change_password: boolean }>(
       'SELECT id, email, name, role, settings_json, must_change_password FROM users WHERE id = ?', [su.userId]);
     return {
       needsSetup: false,
       loggedIn: true,
+      ...mode,
       user: user ? { id: user.id, email: user.email, name: user.name, role: user.role } : null,
       settings: JSON.parse(user?.settings_json ?? '{}'),
       // admin switched on "require 2FA" and this user has none yet: the UI forces enrolment
