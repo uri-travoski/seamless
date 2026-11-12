@@ -1484,3 +1484,8 @@ mark[data-ai-pending], mark[data-unknown-var] { outline: 1px dashed var(--md-bor
 .quick-strip .strip-sep { flex: 0 0 1px; align-self: stretch; background: var(--color-border); margin: 2px 2px; }
 :root[data-theme="seamless"] .quick-strip .quick-pill, :root[data-theme="simply"] .quick-strip .quick-pill { background: #e6ebf2; border-color: #d5dde8; }
 :root[data-theme="seamless"] .quick-strip .quick-pill.on, :root[data-theme="simply"] .quick-strip .quick-pill.on { background: var(--color-accent); color: #fff; }
+
+/* grouped settings menu */
+.settings-nav-group { font-size: 11px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--color-text-faint, var(--color-text-soft)); padding: 14px 12px 4px; }
+.settings-nav .back-to-mail + .settings-nav-group { padding-top: 6px; }
+@media (max-width: 900px) { .settings-nav-group { display: none; } }

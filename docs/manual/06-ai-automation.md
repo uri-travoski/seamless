@@ -26,7 +26,7 @@ Every classified message gets a **disposition** and, if it is to be deleted, a *
 - The classifier can set dynamic lengths (a 2-year warranty keeps for 2 years; statements longer).
 - A nightly sweep moves due mail to **Trash** (a grace window), then purges. Protected labels are never touched, and mail you have manually marked unread is left alone.
 - **Countdown badges** (`Nd`) show on mail that is scheduled to go; open it and keep it to cancel.
-- **Dry run** (default on) logs what the sweep *would* do without deleting anything, until you switch it live in **Settings > Import & Retention**.
+- **Dry run** (default on) logs what the sweep *would* do without deleting anything, until you switch it live in **Settings → Storage → Trash & retention**.
 
 ## Review lane
 
@@ -39,5 +39,5 @@ When the AI is unsure, mail appears under **Review** with one-tap keep / label /
 
 ## Import config & logs
 
-- **Import & Retention** imports (and exports) a rules spreadsheet — labels arrive with their retention, rules start classifying immediately.
+- **Import** (Settings → Import) imports (and exports) a rules spreadsheet — labels arrive with their retention, rules start classifying immediately.
 - **Logs** shows every classification and retention action, filterable, with auto-clear settings.

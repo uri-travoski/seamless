@@ -21,13 +21,12 @@ export default function NewsletterSettings() {
   if (!cfg) return null;
   return (
     <div className="settings-section">
-      <h3>Newsletters</h3>
       <p className="hint">Newsletters you send to <strong>Read later</strong> skip the Inbox and wait in the Read later folder with their reading time.</p>
       <label className="check-row"><input type="checkbox" checked={cfg.archiveAfterRead} onChange={(e) => void save({ archiveAfterRead: e.target.checked })} /> Archive a Read later item once I have read it</label>
       <label className="check-row"><input type="checkbox" checked={cfg.retentionOn} onChange={(e) => void save({ retentionOn: e.target.checked })} />
         Delete Read later items after
         <input className="text-input" type="number" min={1} style={{ width: 70, margin: '0 6px' }} value={cfg.retentionDays}
-          onChange={(e) => void save({ retentionDays: Number(e.target.value) || 30 })} /> days unless starred (follows the dry-run switch above)</label>
+          onChange={(e) => void save({ retentionDays: Number(e.target.value) || 30 })} /> days unless starred (follows the Dry run switch in Settings → Storage → Trash &amp; retention)</label>
       <div className="field"><label>After unsubscribing, move the sender’s future mail to</label>
         <select className="text-input" value={cfg.unsubAction} onChange={(e) => void save({ unsubAction: e.target.value as Cfg['unsubAction'] })}>
           <option value="trash">Bin</option><option value="archive">Archive</option>

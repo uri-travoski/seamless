@@ -23,11 +23,13 @@ const ENTRIES: Omit<SettingsEntry, 'tabName'>[] = [
   { label: 'Two-factor authentication, sessions, password', tab: 'security', words: '2fa totp passkey sign out sessions' },
   { label: 'PGP and S/MIME keys', tab: 'encryption', words: 'encrypt sign certificate p12 openpgp gpg' },
   { label: 'Rules', tab: 'rules', words: 'automation ai classify' },
-  { label: 'Trash retention (Trash days)', tab: 'automation', words: 'delete purge empty bin auto delete older than days' },
-  { label: 'Dry run (retention only logs)', tab: 'automation', words: 'retention sweep test mode' },
-  { label: 'Newsletters: Read later, unsubscribe', tab: 'automation', words: 'unsubscribe read later archive after read' },
-  { label: 'Log retention', tab: 'automation', words: 'logs keep days' },
-  { label: 'Filters / block a sender or company', tab: 'filters', words: 'block spam junk domain move delete stop' },
+  { label: 'Trash retention (empty Trash after N days)', tab: 'storage', words: 'trash deleted recycle bin recycle-bin bin retention delete deleted mail purge empty auto delete older than days keep' },
+  { label: 'Dry run (retention only logs, deletes nothing)', tab: 'storage', words: 'trash deleted recycle bin retention sweep test mode' },
+  { label: 'Run the retention sweep now', tab: 'storage', words: 'trash deleted recycle bin retention purge clean up' },
+  { label: 'Read later: archive after reading, delete after N days', tab: 'newsletters', words: 'unsubscribe newsletter archive after read retention deleted' },
+  { label: 'Log retention (auto-clear logs after N days)', tab: 'storage', words: 'logs keep days retention clean up' },
+  { label: 'Import a rules spreadsheet', tab: 'automation', words: 'xlsx excel config seed labels rules' },
+  { label: 'Filters / block a sender or company', tab: 'filters', words: 'block spam junk domain move delete deleted trash bin stop' },
   { label: 'AI provider and model', tab: 'ai', words: 'openai anthropic ollama key classify' },
   { label: 'Webhooks', tab: 'integrations', words: 'http post events signature' },
   { label: 'API tokens', tab: 'integrations', words: 'rest api v1 bearer' },
@@ -37,13 +39,13 @@ const ENTRIES: Omit<SettingsEntry, 'tabName'>[] = [
   { label: 'App passwords, IMAP/SMTP/CardDAV for phones', tab: 'devices', words: 'thunderbird apple mail android' },
   { label: 'Health checks and alerts', tab: 'health', words: 'status monitor ignore mailbox' },
   { label: 'Logs', tab: 'logs', words: 'errors debug activity' },
-  { label: 'Audit log (who did what)', tab: 'audit', words: 'security history export csv audit retention' },
+  { label: 'Audit log (who did what), audit retention', tab: 'audit', words: 'security history export csv retention keep days' },
   { label: 'Storage buckets (mail, backups, spool)', tab: 'storage', admin: true, words: 'r2 b2 s3 minio migrate bucket' },
   { label: 'Backups and restore', tab: 'backup', admin: true, words: 'export import restore drill mirror' },
   { label: 'Users and roles', tab: 'users', admin: true, words: 'invite admin member password' },
 ];
 
-export default function SettingsSearch({ tabs, isAdmin }: { tabs: { id: string; name: string; admin?: boolean }[]; isAdmin: boolean }) {
+export default function SettingsSearch({ tabs, isAdmin }: { tabs: { id: string; name: string; group?: string; admin?: boolean }[]; isAdmin: boolean }) {
   const [q, setQ] = useState('');
   const names = useMemo(() => Object.fromEntries(tabs.map((t) => [t.id, t.name])), [tabs]);
   const hits = useMemo(() => {

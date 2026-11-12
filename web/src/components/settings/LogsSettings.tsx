@@ -24,7 +24,7 @@ export default function LogsSettings() {
       <h2>Processing logs</h2>
       <p className="settings-desc">
         Everything the classifier and retention sweep did (or would do, in dry-run). Logs auto-clear after the
-        period set in Import &amp; Retention.
+        period set in Storage → Trash &amp; retention.
       </p>
       <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 10 }}>
         <select className="text-input" style={{ width: 160 }} value={kind} onChange={(e) => setKind(e.target.value)}>

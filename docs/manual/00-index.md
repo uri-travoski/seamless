@@ -52,3 +52,17 @@ In Settings, the **?** at the top right of each tab opens the matching page.
 - It does not send **email digests** (summary emails of your notifications or newsletters) and has no **thread mute**.
 - It cannot read text inside scanned images or photos (no OCR).
 - It cannot stop a message reaching your provider; it files it after it arrives ([details](26-stopping-unwanted-senders.md)).
+
+## Where things are in Settings
+The Settings menu is grouped. Use the **Search settings…** box at the top to jump to anything ("trash", "deleted", "recycle bin", "undo send", "api token"…).
+
+| Group | Tabs |
+|---|---|
+| Mail | General, Mailboxes, Sending, Disposable |
+| Business | Businesses, Leads, Integrations |
+| Organise | Labels, Filters, Rules, Templates, Newsletters, AI |
+| Alerts & look | Notifications, Appearance |
+| Security | Security, Encryption, Audit log |
+| Data | Storage (buckets, **Trash & retention**), Backup, Import |
+| Devices | Contacts, Devices |
+| System | Health, Logs, Users |

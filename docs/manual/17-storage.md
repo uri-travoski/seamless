@@ -1,6 +1,6 @@
 # Storage
 
-**Settings → Storage** (admins only) is where you choose the buckets Seamless uses. There are three roles:
+**Settings → Storage** is where administrators choose the buckets Seamless uses. At the bottom, **Trash & retention** is for every user (see [Trash & retention](27-trash-retention.md)). There are three roles:
 
 | Role | What it holds |
 |---|---|

@@ -26,7 +26,7 @@ Remote images are blocked by default for privacy. Click **Load images** on a mes
 
 ## Mail is being deleted / not deleted as expected
 
-- Retention starts in **dry run** — nothing is actually deleted until you switch it live in **Settings > Import & Retention**. The Logs show what the sweep *would* do.
+- Retention starts in **dry run** — nothing is actually deleted until you switch it live in **Settings → Storage → Trash & retention**. The Logs show what the sweep *would* do.
 - Deletions go to **Trash** first; open Trash and **Restore**.
 - Protected labels and manually-unread mail are never swept.
 

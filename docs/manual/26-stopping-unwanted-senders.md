@@ -38,7 +38,7 @@ other addresses at the same company — use a domain filter for that.
    it, otherwise it sends the unsubscribe email for you from the address the newsletter was delivered to. If the sender only
    offers a web page, Seamless gives you the link to finish in your browser.
 3. Seamless adds a filter called *Unsubscribed: sender* and the bar changes to "You unsubscribed from …". Future mail
-   from that sender goes to the **Bin** — or to **Archive** if you change **Settings → Import & Retention → Newsletters → After
+   from that sender goes to the **Bin** — or to **Archive** if you change **Settings → Newsletters → After
    unsubscribing, move the sender's future mail to**.
 
 Only genuine newsletters (mail with a list-unsubscribe header) show the bar. Unsubscribing from a sender that ignores

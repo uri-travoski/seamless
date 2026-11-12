@@ -89,5 +89,5 @@ Scheduled (send-later) mail is not delayed. More: [Composing & sending](04-compo
 ## Newsletters and Read later
 1. Open a newsletter. In the bar above it press **Keep in Inbox**, **Read later** or **Unsubscribe**.
 2. Read later items wait in **Read later** in the sidebar.
-3. **Settings → Import & Retention → Newsletters** controls archiving after reading, how long Read later items are kept,
+3. **Settings → Newsletters** controls archiving after reading, how long Read later items are kept,
    and where unsubscribed senders' mail goes. See [Trash & retention](27-trash-retention.md).

@@ -3,6 +3,8 @@ import { useCallback, useEffect, useState } from 'react';
 import { api } from '../../api/client.ts';
 import { toast } from '../../toast.ts';
 import { formatBytes } from '../Sidebar.tsx';
+import RetentionPanel from './RetentionPanel.tsx';
+import { useSession } from '../../state/session.ts';
 import StorageMigration from './StorageMigration.tsx';
 import StorageForm, { TestSteps, emptyForm, PROVIDERS, type FormValue, type Role, type TestResult } from './StorageForm.tsx';
 
@@ -15,7 +17,7 @@ interface Listing { targets: Target[]; envOverride: { mail: boolean; backup: boo
 const ROLE_NAME: Record<Role, string> = { mail: 'Mail', backup: 'Backups', spool: 'Inbound spool (optional)' };
 const when = (t: number | null) => (t ? new Date(t).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' }) : 'never');
 
-export default function StorageSettings() {
+function StorageAdmin() {
   const [data, setData] = useState<Listing | null>(null);
   const [usage, setUsage] = useState<{ objects: number; bytes: number } | null>(null);
   const [adding, setAdding] = useState<Role | null>(null);
@@ -111,6 +113,17 @@ export default function StorageSettings() {
           <button className="btn ghost" onClick={() => { setAdding(null); setEditing(null); }}>Cancel</button>
         </section>
       )}
+    </div>
+  );
+}
+
+/** Storage tab: buckets (admins) + Trash & retention (everyone). */
+export default function StorageSettings() {
+  const isAdmin = useSession((s) => s.user?.role === 'admin');
+  return (
+    <div>
+      {isAdmin ? <StorageAdmin /> : <h2>Storage</h2>}
+      <RetentionPanel />
     </div>
   );
 }

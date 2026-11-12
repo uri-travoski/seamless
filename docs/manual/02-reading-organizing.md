@@ -136,7 +136,7 @@ Mail from a **VIP** sender and mail you have **snoozed** is never moved by this 
 to finish. Afterwards a filter called *Unsubscribed: sender* moves that sender's future mail to the Bin (or Archive – your choice)
 and the sender is remembered as *Unsubscribed*. Delete the filter to undo it.
 
-**Settings** (Settings → Import & Retention → Newsletters):
+**Settings** (Settings → Newsletters):
 
 - *Archive a Read later item once I have read it* (off by default).
 - *Delete Read later items after N days unless starred* – on by default, 30 days. It moves items to the Bin, follows the

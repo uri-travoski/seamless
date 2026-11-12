@@ -1,5 +1,5 @@
 /** Settings shell (AD-6): left nav + content, one URL per page (/settings/<tab>). */
-import type { ComponentType } from 'react';
+import { Fragment, type ComponentType } from 'react';
 import GeneralSettings from './GeneralSettings.tsx';
 import AppearanceSettings from './AppearanceSettings.tsx';
 import MailboxSettings from './MailboxSettings.tsx';
@@ -29,49 +29,54 @@ import { useMail, scopeToSlug } from '../../state/mail.ts';
 import { navigate } from '../../router.ts';
 import {
   SettingsIcon, MailboxIcon, TagIcon, FilterIcon, SparkleIcon, UsersIcon, LogoutIcon, BackIcon, RulesIcon, ImportIcon,
-  LogsIcon, DevicesIcon, ContactsIcon, SentIcon, BackupIcon, PaletteIcon, TemplateIcon, BellIcon, LockIcon, HelpIcon, KeyboardIcon, HealthIcon, TimerIcon, CloudIcon, KeyIcon, AuditIcon,
+  LogsIcon, DevicesIcon, ContactsIcon, SentIcon, BackupIcon, PaletteIcon, TemplateIcon, BellIcon, LockIcon, HelpIcon, KeyboardIcon, HealthIcon, TimerIcon, CloudIcon, KeyIcon, AuditIcon, ReadLaterIcon,
 } from '../../icons.tsx';
 import LeadSettings from './LeadSettings.tsx';
+import NewsletterSettings from './NewsletterSettings.tsx';
 import SettingsSearch from './SettingsSearch.tsx';
 import { useUi } from '../../state/ui.ts';
 
-const TABS: { id: string; name: string; Icon: ComponentType<{ className?: string }>; C: ComponentType; admin?: boolean }[] = [
-  { id: 'general', name: 'General', Icon: SettingsIcon, C: GeneralSettings },
-  { id: 'appearance', name: 'Appearance', Icon: PaletteIcon, C: AppearanceSettings },
-  { id: 'mailboxes', name: 'Mailboxes', Icon: MailboxIcon, C: MailboxSettings },
-  { id: 'businesses', name: 'Businesses', Icon: ContactsIcon, C: BusinessSettings },
-  { id: 'disposable', name: 'Disposable', Icon: TimerIcon, C: DisposableSettings },
-  { id: 'sending', name: 'Sending', Icon: SentIcon, C: SendingSettings },
-  { id: 'labels', name: 'Labels', Icon: TagIcon, C: LabelSettings },
-  { id: 'templates', name: 'Templates', Icon: TemplateIcon, C: () => <><h2>Templates</h2><TemplatesView embedded /></> },
-  { id: 'notifications', name: 'Notifications', Icon: BellIcon, C: NotificationSettings },
-  { id: 'security', name: 'Security', Icon: LockIcon, C: SecuritySettings },
-  { id: 'encryption', name: 'Encryption', Icon: KeyIcon, C: EncryptionSettings },
-  { id: 'rules', name: 'Rules', Icon: RulesIcon, C: RulesSettings },
-  { id: 'automation', name: 'Import & Retention', Icon: ImportIcon, C: AutomationSettings },
-  { id: 'filters', name: 'Filters', Icon: FilterIcon, C: FilterSettings },
-  { id: 'ai', name: 'AI', Icon: SparkleIcon, C: AiSettings },
-  { id: 'integrations', name: 'Integrations', Icon: CloudIcon, C: IntegrationsSettings },
-  { id: 'leads', name: 'Leads', Icon: ContactsIcon, C: LeadSettings },
-  { id: 'contacts', name: 'Contacts', Icon: ContactsIcon, C: ContactsSettings },
-  { id: 'devices', name: 'Devices', Icon: DevicesIcon, C: DevicesSettings },
-  { id: 'health', name: 'Health', Icon: HealthIcon, C: HealthSettings },
-  { id: 'logs', name: 'Logs', Icon: LogsIcon, C: LogsSettings },
-  { id: 'audit', name: 'Audit log', Icon: AuditIcon, C: AuditSettings },
-  { id: 'storage', name: 'Storage', Icon: CloudIcon, C: StorageSettings, admin: true },
-  { id: 'backup', name: 'Backup', Icon: BackupIcon, C: BackupSettings, admin: true },
-  { id: 'users', name: 'Users', Icon: UsersIcon, C: UserSettings, admin: true },
+type Tab = { id: string; name: string; group: string; Icon: ComponentType<{ className?: string }>; C: ComponentType; admin?: boolean };
+/** Order here = order in the menu; `group` makes the section headings. */
+const TABS: Tab[] = [
+  { id: 'general', name: 'General', group: 'Mail', Icon: SettingsIcon, C: GeneralSettings },
+  { id: 'mailboxes', name: 'Mailboxes', group: 'Mail', Icon: MailboxIcon, C: MailboxSettings },
+  { id: 'sending', name: 'Sending', group: 'Mail', Icon: SentIcon, C: SendingSettings },
+  { id: 'disposable', name: 'Disposable', group: 'Mail', Icon: TimerIcon, C: DisposableSettings },
+  { id: 'businesses', name: 'Businesses', group: 'Business', Icon: ContactsIcon, C: BusinessSettings },
+  { id: 'leads', name: 'Leads', group: 'Business', Icon: ContactsIcon, C: LeadSettings },
+  { id: 'integrations', name: 'Integrations', group: 'Business', Icon: CloudIcon, C: IntegrationsSettings },
+  { id: 'labels', name: 'Labels', group: 'Organise', Icon: TagIcon, C: LabelSettings },
+  { id: 'filters', name: 'Filters', group: 'Organise', Icon: FilterIcon, C: FilterSettings },
+  { id: 'rules', name: 'Rules', group: 'Organise', Icon: RulesIcon, C: RulesSettings },
+  { id: 'templates', name: 'Templates', group: 'Organise', Icon: TemplateIcon, C: () => <><h2>Templates</h2><TemplatesView embedded /></> },
+  { id: 'newsletters', name: 'Newsletters', group: 'Organise', Icon: ReadLaterIcon, C: () => <><h2>Newsletters</h2><NewsletterSettings /></> },
+  { id: 'ai', name: 'AI', group: 'Organise', Icon: SparkleIcon, C: AiSettings },
+  { id: 'notifications', name: 'Notifications', group: 'Alerts & look', Icon: BellIcon, C: NotificationSettings },
+  { id: 'appearance', name: 'Appearance', group: 'Alerts & look', Icon: PaletteIcon, C: AppearanceSettings },
+  { id: 'security', name: 'Security', group: 'Security', Icon: LockIcon, C: SecuritySettings },
+  { id: 'encryption', name: 'Encryption', group: 'Security', Icon: KeyIcon, C: EncryptionSettings },
+  { id: 'audit', name: 'Audit log', group: 'Security', Icon: AuditIcon, C: AuditSettings },
+  { id: 'storage', name: 'Storage', group: 'Data', Icon: CloudIcon, C: StorageSettings },
+  { id: 'backup', name: 'Backup', group: 'Data', Icon: BackupIcon, C: BackupSettings, admin: true },
+  { id: 'automation', name: 'Import', group: 'Data', Icon: ImportIcon, C: AutomationSettings },
+  { id: 'contacts', name: 'Contacts', group: 'Devices', Icon: ContactsIcon, C: ContactsSettings },
+  { id: 'devices', name: 'Devices', group: 'Devices', Icon: DevicesIcon, C: DevicesSettings },
+  { id: 'health', name: 'Health', group: 'System', Icon: HealthIcon, C: HealthSettings },
+  { id: 'logs', name: 'Logs', group: 'System', Icon: LogsIcon, C: LogsSettings },
+  { id: 'users', name: 'Users', group: 'System', Icon: UsersIcon, C: UserSettings, admin: true },
 ];
+export const SETTINGS_TABS = TABS.map((t) => ({ id: t.id, name: t.name, group: t.group, admin: t.admin }));
 
 /** Manual page that explains each Settings tab (opened by the ? beside the tab title). */
 export const TAB_HELP: Record<string, string> = {
   general: '01-getting-started', appearance: '01-getting-started', mailboxes: '05-accounts-providers',
   businesses: '18-businesses', disposable: '16-disposable', sending: '25-sending-receiving', labels: '02-reading-organizing',
   templates: '04-composing', notifications: '13-notifications', security: '12-security', encryption: '23-encryption',
-  rules: '06-ai-automation', automation: '27-trash-retention', filters: '26-stopping-unwanted-senders', ai: '06-ai-automation',
+  rules: '06-ai-automation', automation: '06-ai-automation', filters: '26-stopping-unwanted-senders', ai: '06-ai-automation',
   integrations: '20-integrations', leads: '21-leads', contacts: '08-devices-contacts', devices: '08-devices-contacts',
   health: '15-health', logs: '10-troubleshooting', audit: '22-audit-log', storage: '17-storage', backup: '11-backup-restore',
-  users: '01-getting-started',
+  users: '01-getting-started', newsletters: '02-reading-organizing',
 };
 
 export default function Settings({ tab }: { tab: string }) {
@@ -87,11 +92,14 @@ export default function Settings({ tab }: { tab: string }) {
       <nav className="settings-nav" aria-label="Settings">
         <SettingsSearch tabs={tabs} isAdmin={isAdmin} />
         <button className="side-item back-to-mail" onClick={back}><BackIcon className="glyph" /><span className="name">Back to mail</span></button>
-        {tabs.map((t) => (
-          <button key={t.id} className={`side-item ${current.id === t.id ? 'active' : ''}`} onClick={() => navigate({ page: 'settings', tab: t.id })}>
-            <t.Icon className="glyph" />
-            <span className="name">{t.name}</span>
-          </button>
+        {tabs.map((t, i) => (
+          <Fragment key={t.id}>
+            {(i === 0 || tabs[i - 1]!.group !== t.group) && <div className="settings-nav-group">{t.group}</div>}
+            <button className={`side-item ${current.id === t.id ? 'active' : ''}`} onClick={() => navigate({ page: 'settings', tab: t.id })}>
+              <t.Icon className="glyph" />
+              <span className="name">{t.name}</span>
+            </button>
+          </Fragment>
         ))}
         <div className="settings-nav-foot">
           <button className="side-item" onClick={() => void logout()}><LogoutIcon className="glyph" /><span className="name">Log out</span></button>

@@ -75,7 +75,7 @@ export default function RulesSettings() {
       <p className="settings-desc">
         Deterministic rules run first on every incoming message, in order — free and instant. A rule set to
         <b> AI</b> hands the message to the AI classifier instead of a fixed label. Import your spreadsheet
-        (Import &amp; Retention tab) to seed these.
+        (Import tab) to seed these.
       </p>
       <button className="btn primary" disabled={busy} onClick={() => void runNow()}>Re-run rules on existing mail</button>
 

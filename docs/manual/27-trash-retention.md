@@ -3,7 +3,7 @@
 Seamless can clear out mail you never needed, but it is cautious by design. This page explains exactly what is deleted,
 when, and the **Dry run** switch that keeps it all safe while you learn.
 
-Everything here lives in **Settings → Import & Retention**, under **Retention sweep**.
+Everything here lives in **Settings → Storage**, in the **Trash & retention** section at the bottom of the page. Every user sees it, not only administrators. (Search the settings for "trash", "deleted", "recycle bin", "bin" or "retention" to find it.)
 
 ## How the sweep works
 
@@ -25,7 +25,7 @@ sweep really moves mail to the Bin and purges old swept Bin items.
 
 ## Set it up
 
-1. **Settings → Import & Retention**, scroll to **Retention sweep**.
+1. **Settings → Storage**, scroll to **Trash & retention**.
 2. Leave **Dry run** ticked and check **Settings → Logs** after the next hour.
 3. When you're happy, untick **Dry run — only log what would be deleted**.
 4. Set **Trash grace (days before purge)** — default 30. Mail the sweep trashed is permanently removed after this many
@@ -46,7 +46,7 @@ sweep really moves mail to the Bin and purges old swept Bin items.
 ## Read later
 
 Mail you move to **Read later** (newsletters) is trashed after **30 days** unless it is starred, snoozed or from a VIP.
-Change or turn this off in **Settings → Import & Retention → Newsletters** (retention tick-box and days). Read later items are
+Change or turn this off in **Settings → Newsletters** (retention tick-box and days). Read later items are
 also covered by Dry run: with Dry run on they are logged, not trashed.
 
 ## Audit log
