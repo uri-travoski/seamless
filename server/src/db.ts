@@ -1315,6 +1315,14 @@ CREATE TRIGGER audit_log_no_truncate BEFORE TRUNCATE ON audit_log
   FOR EACH STATEMENT EXECUTE FUNCTION audit_log_guard();
 `,
   },
+  {
+    id: 40,
+    // Mail lists sort by COALESCE(sort_date, date): give that exact expression an index so opening the Inbox of a
+    // huge mailbox walks the newest rows instead of sorting every matching one.
+    sql: `
+CREATE INDEX msg_sort_expr ON messages ((COALESCE(sort_date, date)) DESC, id DESC);
+`,
+  },
 ];
 
 /** Run `fn` in one transaction. Events emitted through the client are only turned into

@@ -214,12 +214,30 @@ export async function getMsgRow(userId: number, emailId: string, need: 'read' | 
   return row;
 }
 
+/** Counting millions of matching rows is the slow part of opening a big list, so a count is reused while nothing in the
+ *  mailbox has changed (the state token moves on every change) and for at most 30 s. */
+const countCache = new Map<string, { at: number; c: number }>();
+async function countMatches(state: string, whereSql: string, params: unknown[]): Promise<number> {
+  // timestamps in the filter ("snoozed until now") change every millisecond: key them by the minute
+  const key = `${state}|${whereSql}|${JSON.stringify(params.map((v) => (typeof v === 'number' && v > 1.5e12 ? Math.floor(v / 60_000) : v)))}`;
+  const hit = countCache.get(key);
+  if (hit && Date.now() - hit.at < 30_000) return hit.c;
+  const row = await one<{ c: number }>(`SELECT COUNT(*) AS c FROM messages m JOIN mailboxes mb ON mb.id = m.mailbox_id ${whereSql}`, params);
+  const c = Number(row?.c ?? 0);
+  if (c >= 20_000) {                       // only the expensive big counts are worth remembering; small lists stay exact
+    if (countCache.size > 500) countCache.clear();
+    countCache.set(key, { at: Date.now(), c });
+  }
+  return c;
+}
+
 export async function queryEmails(userId: number, req: EmailQueryRequest): Promise<EmailQueryResponse> {
   const f = req.filter ?? {};
   // access: own accounts + accounts shared with me (scope narrows further; unified = everything accessible)
   const accessIds = (await accessibleAccountIds(userId)).map((a) => a.id);
   const where: string[] = ['m.account_id = ANY(?::int[])'];
   const params: unknown[] = [accessIds];
+  let ftsInAttachments = false;
 
   const scoped = await scopeAccountIds(userId, f.scope);
   if (scoped !== null) { where.push('m.account_id = ANY(?::int[])'); params.push(scoped); }
@@ -258,9 +276,17 @@ export async function queryEmails(userId: number, req: EmailQueryRequest): Promi
   if (f.text) {
     const p = parseSearch(f.text);
     if (p.fts) {
-      // body OR attachment text (T6.2); body matches sort first below
-      where.push("(m.id IN (SELECT message_id FROM message_fts WHERE tsv @@ to_tsquery('simple', ?)) OR m.id IN (SELECT message_id FROM attachment_text WHERE tsv @@ to_tsquery('simple', ?)))");
-      params.push(p.fts, p.fts);
+      // body OR attachment text (T6.2); body matches sort first below. Almost no word is found in attachments, so check
+      // that first (one index probe): without attachment hits the query is a plain body match, which is much cheaper.
+      ftsInAttachments = !!(await one('SELECT 1 FROM attachment_text WHERE tsv @@ to_tsquery(\'simple\', ?) LIMIT 1', [p.fts]));
+      if (ftsInAttachments) {
+        // one set (UNION), not "IN (…) OR IN (…)": the OR form falls off a cliff on millions of rows
+        where.push("m.id IN (SELECT message_id FROM message_fts WHERE tsv @@ to_tsquery('simple', ?) UNION SELECT message_id FROM attachment_text WHERE tsv @@ to_tsquery('simple', ?))");
+        params.push(p.fts, p.fts);
+      } else {
+        where.push("m.id IN (SELECT message_id FROM message_fts WHERE tsv @@ to_tsquery('simple', ?))");
+        params.push(p.fts);
+      }
     }
     if (p.attachment) { where.push("m.id IN (SELECT message_id FROM attachment_text WHERE tsv @@ to_tsquery('simple', ?))"); params.push(p.attachment); }
     if (p.filename) {
@@ -330,21 +356,21 @@ export async function queryEmails(userId: number, req: EmailQueryRequest): Promi
   }
 
   const whereSql = 'WHERE ' + where.join(' AND ');
-  const totalRow = await one<{ c: number }>(
-    `SELECT COUNT(*) AS c FROM messages m JOIN mailboxes mb ON mb.id = m.mailbox_id ${whereSql}`, params);
+  const state = await currentState();
+  const total = await countMatches(state, whereSql, params);
   const ftsQ = f.text ? parseSearch(f.text).fts : null;
-  const bodyFirst = ftsQ ? "(CASE WHEN m.id IN (SELECT message_id FROM message_fts WHERE tsv @@ to_tsquery('simple', ?)) THEN 0 ELSE 1 END)," : '';
+  const bodyFirst = ftsQ && ftsInAttachments ? "(CASE WHEN m.id IN (SELECT message_id FROM message_fts WHERE tsv @@ to_tsquery('simple', ?)) THEN 0 ELSE 1 END)," : '';
   const rows = await q<MsgRow>(
     `${BASE_SELECT} ${whereSql} ORDER BY ${bodyFirst} ${f.snoozed ? 'm.snoozed_until ASC' : f.readLater ? 'm.read_later_at DESC' : 'COALESCE(m.sort_date, m.date) DESC'}, m.id DESC LIMIT ? OFFSET ?`,
-    [...params, ...(ftsQ ? [ftsQ] : []), req.limit, req.position]);
+    [...params, ...(ftsQ && ftsInAttachments ? [ftsQ] : []), req.limit, req.position]);
   const attachmentMatches = rows.length ? await attachmentMatchSnippets(f.text, rows.map((r) => r.id)) : undefined;
 
   return {
     ids: rows.map((r) => `m${r.id}`),
-    total: totalRow?.c ?? 0,
+    total,
     position: req.position,
     ...(attachmentMatches && Object.keys(attachmentMatches).length ? { attachmentMatches } : {}),
-    queryState: await currentState(),
+    queryState: state,
   };
 }
 
