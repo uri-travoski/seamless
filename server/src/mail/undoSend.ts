@@ -11,7 +11,7 @@ import { sendEmail, actingUser } from './send.ts';
 import { emitEvent } from '../events/emit.ts';
 import { broadcast } from '../ws.ts';
 
-export const UNDO_CHOICES = ['0', '5', '10', '20', '30'];
+export const UNDO_CHOICES = ['0', '5', '10', '20', '30', '45', '60'];
 
 export type QueueResult =
   | { queued: false; sent: { trackingToken: string | null } }

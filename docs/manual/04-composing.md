@@ -27,7 +27,7 @@ After you press **Send**, the message is held for a few seconds (10 by default) 
 **Sending in 10s… Undo**. Press **Undo** and the compose window comes back with everything as you left it —
 recipients, text and attachments. Once the time is up the message goes out and can't be recalled.
 
-Change the delay (Off, 5, 10, 20 or 30 seconds) in **Settings > General > Sending and snoozing**. Scheduled
+Change the delay (Off, 5, 10, 20, 30, 45 or 60 seconds) in **Settings > General > Sending and snoozing**. Scheduled
 (send-later) messages aren't delayed. If the server restarts while a message is being held, it is still sent once.
 
 ## Follow-up reminders

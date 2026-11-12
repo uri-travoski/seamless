@@ -93,7 +93,7 @@ export default function GeneralSettings() {
         <select className="text-input compact" style={{ maxWidth: 220 }} disabled={!srv} value={srv?.undoSendSeconds ?? 10}
           onChange={(e) => void saveSrv({ undoSendSeconds: Number(e.target.value) })}>
           <option value={0}>Off — send immediately</option>
-          {[5, 10, 20, 30].map((n) => <option key={n} value={n}>Hold for {n} seconds</option>)}
+          {[5, 10, 20, 30, 45, 60].map((n) => <option key={n} value={n}>Hold for {n} seconds</option>)}
         </select>
         <span className="hint">After you press Send the message waits this long so you can take it back. Scheduled sends are not delayed.</span>
       </div>
