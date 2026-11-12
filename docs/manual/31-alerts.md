@@ -30,6 +30,7 @@ its settings, it has to be tested again.
 | Backups failing or overdue | The last backup failed, or none has completed for too long (administrators) |
 | Storage almost full | A user reaches 95 % of their storage limit (that user and the administrators) |
 | Cloudflare inbox silent | A push inbox that normally receives mail has had nothing for 48 hours |
+| AI backlog stuck | Mail has waited for the AI for over 30 minutes while the AI provider keeps failing (see Health → AI) |
 
 The numbers can be changed (by an administrator) in **Settings > Alerts > When to alert**. Mailboxes you set to "ignore" in Health never alert.
 Alerts about a **shared mailbox** go to its owner and its managers; a channel an administrator marks "for the whole team" also hears about

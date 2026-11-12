@@ -485,36 +485,13 @@ async function recordCorrection(userId: number, row: MsgRow, before: number[], a
   const added = after.filter((id) => !before.includes(id));
   const removed = before.filter((id) => !after.includes(id));
   if (added.length === 0 && removed.length === 0) return;
-  const fromDomain = row.from_addr.split('@')[1]?.toLowerCase() ?? '';
-
-  await run('INSERT INTO corrections(user_id, email_id, from_domain, from_label_id, to_label_id, kind, created_at) VALUES (?,?,?,?,?,?,?)',
-    [userId, row.id, fromDomain, removed[0] ?? null, added[0] ?? null, 'relabel', Date.now()]);
-
   // recompute disposition under the new labels; correcting a label = user opinion
   const { recomputeDisposition } = await import('../classify/engine.ts');
   await recomputeDisposition(row.id);
 
-  if (added.length > 0) {
-    // the embedding memory follows the user's correction immediately
-    await run('UPDATE email_vectors SET label_id = ? WHERE message_id = ?', [added[0], row.id]);
-
-    if (fromDomain) {
-      const evidence = await one<{ c: number }>(`
-        SELECT COUNT(*) AS c FROM corrections
-        WHERE user_id = ? AND from_domain = ? AND to_label_id = ? AND created_at > ?
-      `, [userId, fromDomain, added[0], Date.now() - 90 * 86_400_000]);
-      const hasRule = await one('SELECT 1 FROM rules WHERE user_id = ? AND match_field = ? AND lower(match_value) = ? AND label_id = ?',
-        [userId, 'from_domain', fromDomain, added[0]]);
-      if ((evidence?.c ?? 0) >= 3 && !hasRule) {
-        await run(`
-          INSERT INTO rule_suggestions(user_id, match_field, match_value, label_id, evidence, status, created_at)
-          VALUES (?,?,?,?,?,'pending',?)
-          ON CONFLICT (user_id, match_field, match_value, label_id)
-          DO UPDATE SET evidence = excluded.evidence, status = CASE WHEN rule_suggestions.status = 'dismissed' THEN 'dismissed' ELSE 'pending' END
-        `, [userId, 'from_domain', fromDomain, added[0], evidence!.c, Date.now()]);
-      }
-    }
-  }
+  // T8.10: a hand relabel is a correction too — decision row + heavy vector + the "3 similar -> make a rule" offer
+  const { recordHandCorrection } = await import('../classify/memory.ts');
+  await recordHandCorrection(userId, row, added, removed, 'relabel').catch(() => {});
 }
 
 /** Move to a mailbox ("mb:<id>" same-account, or "u:<role>" resolved per account). */
@@ -546,6 +523,11 @@ export async function moveEmail(userId: number, emailId: string, target: string)
   }
   if (realUid > 0) {
     await enqueueOp(row.account_id, 'move', { mailboxId: row.mailbox_id, uid: realUid, targetMailboxId });
+  }
+  // T8.10: moving mail the AI/rules filed is a correction (same storage, no prompt)
+  if (row.user_id === userId) {
+    const { recordHandCorrection } = await import('../classify/memory.ts');
+    await recordHandCorrection(userId, row, [], [], 'move', targetRoleRow?.role ?? 'folder').catch(() => {});
   }
   await bumpState();
 }

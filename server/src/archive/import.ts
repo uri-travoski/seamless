@@ -15,11 +15,12 @@ import { ArchiveError } from './select.ts';
 import type { IndexEntry } from './restore.ts';
 import { sourceStore, readManifestIn, rebaser, type ImportSourceRef } from './source.ts';
 import { SECRET_KEY } from './config.ts';
+import { importAiSettings, importAiMessages, hasAiMemory } from './aimemory.ts';
 
 const BUDGET_MS = 40_000;
 const MAX_ATTEMPTS = 5;
 
-export const CATEGORIES = ['labels', 'rules', 'filters', 'views', 'templates', 'contacts', 'businesses', 'senders', 'notes', 'appearance'] as const;
+export const CATEGORIES = ['labels', 'rules', 'filters', 'views', 'templates', 'contacts', 'businesses', 'senders', 'notes', 'appearance', 'ai'] as const;
 export type Category = (typeof CATEGORIES)[number];
 export interface ImportOptions { accounts: 'all' | string[]; categories: Record<Category, boolean> }
 
@@ -343,6 +344,7 @@ export async function runImportSlice(importId: number, opts: { budgetMs?: number
       if (cats.senders) result.senders = await importSenders(imp, cfg);
       if (cats.appearance) result.appearance = await importAppearance(imp, cfg);
     }
+    if (cats.ai && hasAiMemory(m)) result.ai = await importAiSettings(imp.user_id, store, rb, m, maps.labels, { rules: cats.rules });
     await run('UPDATE archive_imports SET config_result = ?::jsonb WHERE id = ?', [JSON.stringify({ ...result, hasConfig: !!cfg }), imp.id]);
   }
 
@@ -402,6 +404,10 @@ export async function runImportSlice(importId: number, opts: { budgetMs?: number
   if (cfg && cats.notes && !(imp.config_result as any)?.notes) {
     const notes = await importNotes(imp, cfg);
     await run('UPDATE archive_imports SET config_result = COALESCE(config_result, ?::jsonb) || ?::jsonb WHERE id = ?', ['{}', JSON.stringify({ notes }), imp.id]);
+  }
+  if (cats.ai && hasAiMemory(m) && !(imp.config_result as any)?.aiMessages) {
+    const aiMessages = await importAiMessages(imp.user_id, store, rb, m, imp.id, maps.labels);
+    await run('UPDATE archive_imports SET config_result = COALESCE(config_result, ?::jsonb) || ?::jsonb WHERE id = ?', ['{}', JSON.stringify({ aiMessages }), imp.id]);
   }
   await nameAccounts(Object.values(Object.fromEntries(accountMap)));
   const fin = (await byId(imp.id))!;

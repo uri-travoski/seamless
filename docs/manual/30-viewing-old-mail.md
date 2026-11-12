@@ -43,6 +43,13 @@ If you downloaded an archive folder, **Upload a .zip** of it (a zip of the folde
 - The bucket's read-only key is stored encrypted, like every other storage key, and is never shown again.
 - Large uploaded `.zip` files are read into memory; for a very large archive prefer attaching the bucket.
 
+## AI memory in imported archives
+
+When the archive has an `ai/` folder, the import (category **AI memory**, on by default) merges it: guidance, rules, label retention and newsletter
+choices are added next to yours (nothing of yours is overwritten; duplicates are skipped), and each archived message keeps its decisions and learned
+examples. In **Viewing mode** the labels and the *why?* explanation of old mail are shown, but the AI never runs: no AI calls are made and nothing
+is re-filed.
+
 ## Viewing mode (Live vs Viewing only)
 
 An app is either in **Live mode** (the normal app) or **Viewing mode** (a reference copy).

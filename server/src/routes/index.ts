@@ -12,6 +12,7 @@ import { register as ai } from './ai.ts';
 import { register as rules } from './rules.ts';
 import { register as preferences } from './preferences.ts';
 import { register as classify } from './classify.ts';
+import { register as aiMemory } from './aimemory.ts';
 import { register as oauth } from './oauth.ts';
 import { register as gmailLearn } from './gmailLearn.ts';
 import { register as devices } from './devices.ts';
@@ -163,6 +164,7 @@ export function registerRoutes(app: FastifyInstance): void {
   rules(app);
   preferences(app);
   classify(app);
+  aiMemory(app);
   oauth(app);
   gmailLearn(app);
   devices(app);

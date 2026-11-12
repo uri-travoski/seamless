@@ -52,21 +52,27 @@ export function embeddingInput(msg: { from_addr: string; subject: string; snippe
 
 const vecLiteral = (v: number[]) => '[' + v.map((x) => Number.isFinite(x) ? x.toFixed(6) : '0').join(',') + ']';
 
-export interface EmbeddingMatch { labelId: number; confidence: number; neighbors: number }
+export interface EmbeddingMatch { labelId: number; confidence: number; neighbors: number; similarId?: number | null; corrected?: boolean }
 
-/** kNN against the user's labelled history; confident only when the top neighbours agree. */
+/**
+ * kNN against the user's labelled history; confident only when the top neighbours agree.
+ * T8.10: an example the user corrected by hand (weight > 1) is trusted on its own — one close, corrected
+ * neighbour is enough, and it outranks older AI-made neighbours that disagree.
+ */
 export async function embeddingMatch(userId: number, vec: number[], threshold: number): Promise<EmbeddingMatch | null> {
-  const rows = await q<{ label_id: number; sim: number }>(`
-    SELECT label_id, 1 - (embedding <=> ?::vector) AS sim
+  const rows = await q<{ message_id: number; label_id: number; sim: number; weight: number; corrected: boolean }>(`
+    SELECT message_id, label_id, 1 - (embedding <=> ?::vector) AS sim, weight, corrected
     FROM email_vectors WHERE user_id = ? AND dim = ?
     ORDER BY embedding <=> ?::vector LIMIT 10
   `, [vecLiteral(vec), userId, vec.length, vecLiteral(vec)]);
+  const fix = rows.find((r) => r.corrected && r.sim >= threshold);
+  if (fix) return { labelId: fix.label_id, confidence: fix.sim, neighbors: 1, similarId: fix.message_id, corrected: true };
   if (rows.length < 3) return null;
   const top = rows[0];
   if (top.sim < threshold) return null;
   const agree = rows.slice(0, 5).filter((r) => r.label_id === top.label_id).length;
   if (agree < 3) return null;
-  return { labelId: top.label_id, confidence: top.sim, neighbors: agree };
+  return { labelId: top.label_id, confidence: top.sim, neighbors: agree, similarId: top.message_id };
 }
 
 export interface TeachMatch {
@@ -88,12 +94,14 @@ export async function matchTeachNote(userId: number, vec: number[], threshold: n
   return { id: top.id, note: top.note, summary: top.summary, labelId: top.label_id, autoRead: top.auto_read, retentionDays: top.retention_days, sim: top.sim };
 }
 
-export async function upsertVector(userId: number, messageId: number, labelId: number, vec: number[]): Promise<void> {
+export async function upsertVector(userId: number, messageId: number, labelId: number, vec: number[], opts: { weight?: number; model?: string; corrected?: boolean } = {}): Promise<void> {
   await q(`
-    INSERT INTO email_vectors(message_id, user_id, label_id, dim, embedding, created_at)
-    VALUES (?,?,?,?,?::vector,?)
-    ON CONFLICT (message_id) DO UPDATE SET label_id = excluded.label_id, dim = excluded.dim, embedding = excluded.embedding
-  `, [messageId, userId, labelId, vec.length, vecLiteral(vec), Date.now()]);
+    INSERT INTO email_vectors(message_id, user_id, label_id, dim, embedding, created_at, weight, model, corrected)
+    VALUES (?,?,?,?,?::vector,?,?,?,?)
+    ON CONFLICT (message_id) DO UPDATE SET label_id = excluded.label_id, dim = excluded.dim, embedding = excluded.embedding,
+      weight = GREATEST(email_vectors.weight, excluded.weight), model = excluded.model,
+      corrected = email_vectors.corrected OR excluded.corrected
+  `, [messageId, userId, labelId, vec.length, vecLiteral(vec), Date.now(), opts.weight ?? 1, opts.model ?? '', !!opts.corrected]);
 }
 
 // ---------- LLM tier (3c) ----------
@@ -125,9 +133,18 @@ export async function llmClassify(ctx: LlmContext): Promise<{ verdict: AiVerdict
 
   const body = await bodyText(ctx.rowId);
   const cacheKey = sha256(`${ctx.fromAddr}|${normalizeSubject(ctx.subject)}|${sha256(body.slice(0, 2000))}`);
-  const cached = await one<{ output: string; model: string }>(
-    "SELECT output, model FROM ai_decisions WHERE user_id = ? AND cache_key = ? AND tier = 'llm' ORDER BY id DESC LIMIT 1",
+  const curPrefVersion = (await one<{ v: number }>('SELECT COALESCE(SUM(version),0)::int AS v FROM preferences WHERE user_id = ? AND active = true AND enabled = true', [ctx.userId]))?.v ?? 0;
+  let cached = await one<{ output: string; model: string; created_at: number; preference_version: number | null }>(
+    "SELECT output, model, created_at, preference_version FROM ai_decisions WHERE user_id = ? AND cache_key = ? AND tier = 'llm' ORDER BY id DESC LIMIT 1",
     [ctx.userId, cacheKey]);
+  // T8.10: a correction for this sender (or any change of the Teach-the-AI guidance) invalidates older verdicts
+  if (cached) {
+    const dom = ctx.fromAddr.split('@')[1]?.toLowerCase() ?? '';
+    const fixed = dom && await one(
+      'SELECT 1 FROM corrections WHERE user_id = ? AND from_domain = ? AND undone = false AND remembered = true AND created_at > ? LIMIT 1',
+      [ctx.userId, dom, Number(cached.created_at)]);
+    if (fixed || (cached.preference_version ?? 0) !== curPrefVersion) cached = undefined;
+  }
   if (cached) {
     const v = JSON.parse(cached.output);
     if (verdictValid(v)) return { verdict: v, cached: true, model: cached.model };
@@ -174,7 +191,7 @@ ${body}${attText}`;
   if (!verdictValid(v)) return null;
   v.confidence = Math.max(0, Math.min(1, v.confidence));
 
-  const prefVersion = (await one<{ v: number }>('SELECT COALESCE(MAX(version),0) AS v FROM preferences WHERE user_id = ?', [ctx.userId]))?.v ?? 0;
+  const prefVersion = curPrefVersion;
   await insertId(`
     INSERT INTO ai_decisions(user_id, email_id, tier, model, output, confidence, reason, cache_key, preference_version, latency_ms, created_at)
     VALUES (?,?,?,?,?,?,?,?,?,?,?)
@@ -184,9 +201,14 @@ ${body}${attText}`;
 }
 
 export async function recordEmbeddingDecision(userId: number, rowId: number, match: EmbeddingMatch, labelName: string): Promise<void> {
+  let similar: { subject: string; from: string } | null = null;
+  if (match.similarId) {
+    const m = await one<{ subject: string; from_addr: string }>('SELECT subject, from_addr FROM messages WHERE id = ?', [match.similarId]);
+    if (m) similar = { subject: m.subject, from: m.from_addr };
+  }
   await insertId(`
     INSERT INTO ai_decisions(user_id, email_id, tier, model, output, confidence, reason, created_at)
     VALUES (?,?,?,?,?,?,?,?)
-  `, [userId, rowId, 'embedding', '', JSON.stringify({ label: labelName, neighbors: match.neighbors }), match.confidence,
-      `similar to ${match.neighbors} labelled messages`, Date.now()]);
+  `, [userId, rowId, 'embedding', '', JSON.stringify({ label: labelName, neighbors: match.neighbors, similarId: match.similarId ?? null, similar, corrected: !!match.corrected }), match.confidence,
+      match.corrected ? 'similar to a message you corrected' : `similar to ${match.neighbors} labelled messages`, Date.now()]);
 }

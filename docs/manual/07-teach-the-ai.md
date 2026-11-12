@@ -28,3 +28,24 @@ Retention rides on the **label**: if you said "keep 1 year", the label is create
 ## Managing what you have taught
 
 Each thing you teach is remembered as an instruction tied to the example. It applies until you remove it. Re-teaching on a similar email updates the instruction rather than duplicating it.
+
+## Why is this here?
+
+Open a message the AI or a rule filed. Under the sender line you will see a quiet link such as **Filed by AI · 92 % · why?**
+(or *Filed by a rule*, *Filed by similar mail*, *Fixed by you*). Click it to see the reason, the rule or the similar example that matched,
+the model and the date. Nothing appears on list rows, and nothing appears for mail that is still waiting for the AI or that you filed by hand.
+
+## Fix a wrong decision
+
+In the same box press **Wrong? Fix it**:
+
+1. Choose the right label (or *No label*), and optionally *Keep* or *Delete after N days*.
+2. Leave **Remember this for similar mail** ticked (the default). The corrected message becomes a labelled example the AI trusts more than its own
+   older guesses, so the next similar message follows your choice. Untick it for a one-off fix.
+3. Optionally write **why**. It is saved as a line of guidance (Settings → Rules → Teach the AI) and changes how the AI treats that sender.
+
+A toast offers **Undo**. After you have fixed mail from the same sender to the same label three times, the app offers **Make this a rule**.
+Moving or labelling a message by hand counts as a correction as well (no prompt). Settings → Rules → **Corrections** lists everything you have
+corrected; **Remove** undoes one.
+
+A message you fixed is marked as handled by you: the AI will not touch it again. If you chose *Delete after N days*, it is still swept after N days.

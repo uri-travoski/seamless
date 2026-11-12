@@ -11,6 +11,7 @@ import type { TrackingInfo } from '@seamless/shared';
 import { cache } from '../api/cache.ts';
 import { toast } from '../toast.ts';
 import SnoozeButton from './SnoozeMenu.tsx';
+import { WhyLine } from './WhyLine.tsx';
 import { NewsletterPrompt } from './NewsletterPrompt.tsx';
 import PgpBar from './PgpBar.tsx';
 import { FollowupBanner } from './FollowupMenu.tsx';
@@ -263,28 +264,6 @@ function TeachPanel({ email, onClose }: { email: ApiEmail; onClose: () => void }
   );
 }
 
-/** "Why this label?" — the stored cascade decision for this message. */
-function WhyLine({ email }: { email: ApiEmail }) {
-  const [why, setWhy] = useState<string | null>(null);
-  const [loaded, setLoaded] = useState(false);
-  const load = async () => {
-    setLoaded(true);
-    try {
-      const decisions = await api.get<any[]>(`/api/message/${email.id}/decisions`);
-      if (decisions.length === 0) { setWhy('matched by your rules (no AI involved)'); return; }
-      const d = decisions[0];
-      setWhy(`${d.tier === 'llm' ? `AI (${d.model})` : 'similarity to your labelled mail'} · ${Math.round(d.confidence * 100)}% · ${d.reason || d.output?.reason || ''}`);
-    } catch { setWhy(null); }
-  };
-  if (email.labelIds.length === 0 && email.disposition !== 'delete') return null;
-  return (
-    <span className="why-line">
-      {!loaded
-        ? <button className="details-toggle" style={{ fontSize: 11.5 }} onClick={(e) => { e.stopPropagation(); void load(); }}>why?</button>
-        : <span style={{ fontSize: 11.5, color: 'var(--md-text-faint)' }}>{why ?? ''}</span>}
-    </span>
-  );
-}
 
 function MessageCard({ email, expanded, onToggle }: { email: ApiEmail; expanded: boolean; onToggle: () => void }) {
   const settings = useSession((s) => s.settings);

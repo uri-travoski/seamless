@@ -94,10 +94,11 @@ export async function healthReport(userId: number, isAdmin: boolean, now = Date.
   const ai = { providers: Number((await one<{ c: string }>('SELECT COUNT(*) AS c FROM ai_providers WHERE user_id = ?', [userId]))?.c ?? 0) };
 
   const report: any = { generatedAt: now, isAdmin, mode: currentMode(), mailboxes, sending, jobs, ai: { ...ai, status: ai.providers ? 'ok' : 'warn', note: ai.providers ? 'Press Test in Settings → AI to check a provider is reachable.' : 'No AI provider is set up.' } };
+  report.aiQueue = await (await import('../classify/memory.ts')).aiHealth(userId, now);
   report.attachmentIndex = isAdmin ? await (await import('../mail/attachmentText.ts')).backfillStatus(userId) : null;
   report.archives = (await q<any>("SELECT id, name, status, mode, message_count FROM mail_archives WHERE user_id = ? AND status IN ('planned','running','verifying','restoring') ORDER BY id", [userId]))
     .map((a) => ({ id: a.id, name: a.name, status: a.status, mode: a.mode, messages: a.message_count }));
-  report.overall = worst(...mailboxes.filter((m) => !m.ignored).map((m) => m.status), sending.status, jobs.status);
+  report.overall = worst(...mailboxes.filter((m) => !m.ignored).map((m) => m.status), sending.status, jobs.status, report.aiQueue.status === 'red' ? 'red' : 'ok');
 
   if (isAdmin) {
     const p = await storageProbe(now);

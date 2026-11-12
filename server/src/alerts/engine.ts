@@ -264,6 +264,21 @@ async function checkSending(now: number, cfg: AlertSettings): Promise<void> {
   }
 }
 
+async function checkAiBacklog(now: number): Promise<void> {
+  const { aiHealth } = await import('../classify/memory.ts');
+  const bad = new Set<number>();
+  for (const u of await q<{ user_id: number }>("SELECT DISTINCT user_id FROM messages WHERE classify_state = 'pending' AND created_at < ?", [now - 30 * 60_000])) {
+    const h = await aiHealth(u.user_id, now);
+    if (!h.stuck) continue;
+    bad.add(u.user_id);
+    await raiseAlert(u.user_id, 'ai.backlog', { type: 'user', id: u.user_id, link: '/settings/health' }, 'AI backlog stuck',
+      `${h.waiting} messages have been waiting for the AI for over 30 minutes and the AI provider is failing: ${oneLine(h.lastError?.message ?? 'unknown error', 160)}. Check Settings → AI, then press Retry now on the Health page.`, now);
+  }
+  for (const o of await q<{ source_id: string }>(`SELECT DISTINCT source_id FROM alerts WHERE state = 'open' AND kind = 'ai.backlog'`)) {
+    if (!bad.has(Number(o.source_id))) await resolveAlerts('ai.backlog', { type: 'user', id: o.source_id }, now);
+  }
+}
+
 async function checkInstance(now: number): Promise<void> {
   const admins = await adminIds();
   const p = await storageProbe(now);
@@ -332,6 +347,7 @@ export async function runAlertChecks(now = Date.now()): Promise<void> {
       // a Viewing-mode copy fetches and sends nothing, so there is nothing to be "down"
       await checkMailboxes(now, cfg).catch(logErr('mailboxes'));
       await checkSending(now, cfg).catch(logErr('sending'));
+      if (!isViewing()) await checkAiBacklog(now).catch(logErr('ai'));
       await checkPushSilent(now, cfg).catch(logErr('push'));
     }
     await checkInstance(now).catch(logErr('instance'));

@@ -13,6 +13,7 @@ interface Report {
   sending: { failed24h: number; failed7d: number; scheduled: number; holding: number; status: Light };
   jobs: { counts: Record<string, number>; oldestPendingAt: number | null; lateMs: number; failed: { id: number; kind: string; attempts: number; lastError: string; runAt: number }[]; status: Light };
   ai: { providers: number; status: Light; note: string };
+  aiQueue?: { waiting: number; failed: number; lastVerdictAt: number | null; relearning: number; stuck: boolean; configured: boolean; status: Light; lastError: { message: string } | null };
   storage?: { reachable: boolean; latencyMs: number; error: string; checkedAt: number; bytes: number; messages: number; spool?: boolean; status: Light };
   backups?: { enabled: boolean; lastAt: number | null; lastStatus: string | null; lastError: string; nextDueAt: number | null; status: Light; note: string };
   archives?: { id: number; name: string; status: string; mode: string; messages: number }[];
@@ -133,6 +134,14 @@ export default function HealthSettings() {
 
         <Card title="AI" status={r.ai.status}>
           <p>{r.ai.providers} provider{r.ai.providers === 1 ? '' : 's'} set up. <span className="dim">{r.ai.note}</span></p>
+          {r.aiQueue && (
+            <p className={r.aiQueue.status === 'red' ? 'health-note' : ''} style={r.aiQueue.status === 'red' ? { color: 'var(--color-critical, inherit)' } : undefined}>
+              AI: {r.aiQueue.waiting} waiting · {r.aiQueue.failed} failed · last verdict {ago(r.aiQueue.lastVerdictAt)}
+              {r.aiQueue.relearning > 0 && ` · re-learning ${r.aiQueue.relearning}`}
+              {r.aiQueue.stuck && r.aiQueue.lastError && ` — stuck: ${r.aiQueue.lastError.message}`}
+              {' '}<button className="btn small" onClick={async () => { try { await api.post('/api/ai/retry', {}); toast('Retrying'); load(); } catch { toast('Could not retry', 'error'); } }}>Retry now</button>
+            </p>
+          )}
         </Card>
 
         {r.storage && (

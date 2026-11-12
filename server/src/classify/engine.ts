@@ -6,6 +6,8 @@ import { getTaskProvider } from '../ai/client.ts';
 import { embedText, embeddingInput, embeddingMatch, upsertVector, llmClassify, recordEmbeddingDecision, matchTeachNote } from './ai.ts';
 import { enqueueOp } from '../imap/sync.ts';
 import { isVipMessage } from '../mail/vip.ts';
+import { isViewing } from '../mode.ts';
+import { recordDecision, noteAiError, noteEmbedDim, relearnBatch } from './memory.ts';
 
 const TICK_MS = 20_000;
 const BATCH = 200;
@@ -149,7 +151,11 @@ export async function classifyMessage(row: PendingRow, rules: RuleRow[]): Promis
     }
     if (rule.label_id) {
       const label = await applyLabel(row, rule.label_id);
-      if (label) { labelApplied = label; appliedNames.push(label.name); }
+      if (label) {
+        labelApplied = label; appliedNames.push(label.name);
+        await recordDecision(row.user_id, row.id, 'rule', `Rule: ${rule.match_field} ${rule.match_value}`,
+          { ruleId: rule.id, matchField: rule.match_field, matchValue: rule.match_value, label: label.name });
+      }
     }
   }
 
@@ -165,7 +171,10 @@ export async function classifyMessage(row: PendingRow, rules: RuleRow[]): Promis
     if (n.note) guidance.push(n.note);
     if (n.label_id) {
       const label = await applyLabel(row, n.label_id);
-      if (label) { labelApplied = label; appliedNames.push(label.name); }
+      if (label) {
+        labelApplied = label; appliedNames.push(label.name);
+        await recordDecision(row.user_id, row.id, 'note', `Your note for ${n.scope_value}`, { noteId: n.id, scope: n.scope, label: label.name });
+      }
     }
     if (n.auto_read && row.unread) await markRead(row);
   }
@@ -184,6 +193,7 @@ export async function classifyMessage(row: PendingRow, rules: RuleRow[]): Promis
     if (anyTeach && anyTeach.c > 0) {
       try {
         vec = await embedText(embedProvider, embeddingInput(row));
+        await noteEmbedDim(row.user_id, vec.length);
         const teachThreshold = Number(await getUserSetting(row.user_id, 'teach_threshold')) || 0.86;
         const tm = await matchTeachNote(row.user_id, vec, teachThreshold);
         if (tm) {
@@ -191,7 +201,10 @@ export async function classifyMessage(row: PendingRow, rules: RuleRow[]): Promis
           if (tm.summary) guidance.push(tm.summary);
           if (tm.labelId) {
             const label = await applyLabel(row, tm.labelId);
-            if (label) { labelApplied = label; appliedNames.push(label.name); }
+            if (label) {
+              labelApplied = label; appliedNames.push(label.name);
+              await recordDecision(row.user_id, row.id, 'note', 'Similar to a message you taught the AI about', { noteId: tm.id, label: label.name, similarity: tm.sim }, tm.sim);
+            }
           }
           if (tm.autoRead && row.unread) await markRead(row);
           await plog(row.user_id, 'classify', `teach-note #${tm.id} matched (sim ${tm.sim.toFixed(2)})`, { emailId: row.id });
@@ -207,6 +220,7 @@ export async function classifyMessage(row: PendingRow, rules: RuleRow[]): Promis
     if (!aiRouted && !labelApplied && embedProvider) {
       try {
         vec ??= await embedText(embedProvider, embeddingInput(row));
+        await noteEmbedDim(row.user_id, vec.length);
         const threshold = Number(await getUserSetting(row.user_id, 'embed_threshold')) || 0.88;
         const match = await embeddingMatch(row.user_id, vec, threshold);
         if (match) {
@@ -217,6 +231,7 @@ export async function classifyMessage(row: PendingRow, rules: RuleRow[]): Promis
           }
         }
       } catch (err: any) {
+        await noteAiError(row.user_id, `embedding: ${err?.message ?? err}`);
         await plog(row.user_id, 'classify', `embedding tier error: ${err?.message ?? err}`, { emailId: row.id, level: 'warn' });
       }
     }
@@ -230,6 +245,7 @@ export async function classifyMessage(row: PendingRow, rules: RuleRow[]): Promis
           headers, guidance,
         });
         if (res) {
+          await noteAiError(row.user_id, null);
           const threshold = Number(await getUserSetting(row.user_id, 'ai_conf_threshold')) || 0.7;
           if (res.verdict.confidence >= threshold) {
             verdict = res.verdict;
@@ -251,6 +267,7 @@ export async function classifyMessage(row: PendingRow, rules: RuleRow[]): Promis
           reviewReason = 'routed to AI, but no classify provider is configured (Settings > AI)';
         }
       } catch (err: any) {
+        await noteAiError(row.user_id, `classify: ${err?.message ?? err}`);
         await plog(row.user_id, 'classify', `LLM tier error: ${err?.message ?? err}`, { emailId: row.id, level: 'warn' });
         if (aiRouted) { needsReview = true; reviewReason = 'AI classification failed'; }
       }
@@ -275,7 +292,7 @@ export async function classifyMessage(row: PendingRow, rules: RuleRow[]): Promis
   if (labelApplied && embedProvider && !needsReview) {
     try {
       vec ??= await embedText(embedProvider, embeddingInput(row));
-      await upsertVector(row.user_id, row.id, labelApplied.id, vec);
+      await upsertVector(row.user_id, row.id, labelApplied.id, vec, { model: embedProvider.model });
     } catch { /* embedding memory is best-effort */ }
   }
 
@@ -292,6 +309,7 @@ export async function classifyMessage(row: PendingRow, rules: RuleRow[]): Promis
 
 /** Process a batch of pending messages; returns how many were classified. */
 export async function processPending(): Promise<number> {
+  if (isViewing()) return 0;   // Viewing mode (T8.7/T8.10): the classifier never runs — no AI calls, nothing is re-filed
   const rows = await q<PendingRow>(`
     SELECT m.id, m.user_id, m.account_id, m.mailbox_id, m.uid, m.date, m.from_addr, m.from_name,
            m.to_json, m.cc_json, m.delivered_to, m.subject, m.snippet, m.headers_json, m.unread,
@@ -345,6 +363,7 @@ async function loop(): Promise<void> {
   try {
     // drain in batches until nothing is pending
     while ((await processPending()) === BATCH) { /* keep draining */ }
+    if (!isViewing()) await relearnBatch();
   } catch (err: any) {
     console.error('[classify] loop error:', err?.message ?? err);
   } finally {

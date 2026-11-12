@@ -1524,6 +1524,21 @@ CREATE UNIQUE INDEX alerts_one_open ON alerts(user_id, kind, source_type, source
 CREATE INDEX alerts_user ON alerts(user_id, id DESC);
 `,
   },
+  {
+    id: 48,
+    // T8.10: AI transparency + sticky corrections. email_vectors gain a weight (a user-corrected example counts for more)
+    // and the embedding model (so a provider switch can be re-embedded lazily); corrections keep what is needed to undo.
+    sql: `
+ALTER TABLE email_vectors ADD COLUMN weight REAL NOT NULL DEFAULT 1;
+ALTER TABLE email_vectors ADD COLUMN model TEXT NOT NULL DEFAULT '';
+ALTER TABLE email_vectors ADD COLUMN corrected BOOLEAN NOT NULL DEFAULT false;
+ALTER TABLE corrections ADD COLUMN source TEXT NOT NULL DEFAULT 'label';   -- label|fix|move
+ALTER TABLE corrections ADD COLUMN remembered BOOLEAN NOT NULL DEFAULT false;
+ALTER TABLE corrections ADD COLUMN why TEXT NOT NULL DEFAULT '';
+ALTER TABLE corrections ADD COLUMN undo_json TEXT;
+ALTER TABLE corrections ADD COLUMN undone BOOLEAN NOT NULL DEFAULT false;
+`,
+  },
 ];
 
 /** Run `fn` in one transaction. Events emitted through the client are only turned into

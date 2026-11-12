@@ -21,7 +21,7 @@ type Src = { kind: 'bucket'; targetId: number } | { kind: 'zip'; uploadId: strin
 
 const CATS: [string, string][] = [
   ['labels', 'Labels'], ['rules', 'Rules'], ['filters', 'Filters'], ['views', 'Saved views'], ['templates', 'Templates & quick replies'], ['contacts', 'Contacts'],
-  ['businesses', 'Businesses & identities'], ['senders', 'VIP & trusted senders'], ['notes', 'Notes'], ['appearance', 'Appearance'],
+  ['businesses', 'Businesses & identities'], ['senders', 'VIP & trusted senders'], ['notes', 'Notes'], ['appearance', 'Appearance'], ['ai', 'AI memory (decisions, learned examples, guidance)'],
 ];
 const when = (t: number | null) => (t ? new Date(t).toLocaleDateString([], { dateStyle: 'medium' }) : '—');
 const STATUS: Record<string, string> = { queued: 'Waiting to start', running: 'Importing', paused: 'Paused', done: 'Finished', failed: 'Failed' };

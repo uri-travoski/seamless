@@ -22,6 +22,13 @@ Admins also see:
   none has succeeded for more than twice the usual gap.
 - **Server** — version, how long it has been running, database size, memory and free disk space.
 
+## AI line
+
+The AI card shows **AI: 12 waiting · 0 failed · last verdict 2 min ago**. *Waiting* is mail not yet looked at, *failed* is mail the AI could not judge
+(it waits in Review). After a change of AI provider it may add **re-learning N**: your learned examples are kept and quietly re-read with the new
+provider in the background. If mail has waited more than 30 minutes while the provider keeps failing, the line turns red and a critical
+**AI backlog stuck** alert is sent (see Alerts). **Retry now** puts failed mail back in the queue and runs the AI immediately.
+
 ## Alerts
 
 Seamless raises a notification (bell, and push if you allow it) when something turns red: a mailbox can't sync, a mailbox

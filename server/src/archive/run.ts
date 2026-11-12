@@ -11,6 +11,7 @@ import { deleteMessageRow } from '../mail/ingest.ts';
 import { pkgVersion } from '../routes/util.ts';
 import { ArchiveError, DAY_MS, selectionFrom, scopeAccounts, parseOlderThan, previewArchive, sampleArchive, type ArchiveOptions } from './select.ts';
 import { buildConfig } from './config.ts';
+import { writeAiMemory } from './aimemory.ts';
 import { emitEvent } from '../events/emit.ts';
 
 export const BATCH = 200;
@@ -169,6 +170,7 @@ async function writeIndexAndManifest(a: ArchiveRow, store: BlobStore): Promise<v
     files.push(file);
   }
   const failed = (await itemCounts(a.id)).failed ?? 0;
+  const ai = await writeAiMemory(a.user_id, archivePrefix(a.id), store, verifiedIds);
   const manifest = {
     format: 'seamless-archive', version: 1, appVersion: pkgVersion, createdAt: Date.now(), archiveId: a.id, name: a.name,
     rule: { olderThanDays: a.older_than_days, scope: a.scope, mode: a.mode },
@@ -178,6 +180,8 @@ async function writeIndexAndManifest(a: ArchiveRow, store: BlobStore): Promise<v
     })),
     labels: labels.map((l) => ({ key: `L${l.id}`, name: l.name, color: l.color, parentKey: l.parent_id ? `L${l.parent_id}` : null })),
     counts: { messages: n, failed }, bytes, indexFiles: files, config: `${archivePrefix(a.id)}config.json`,
+    ai_memory: true,
+    ai: { prefix: archivePrefix(a.id), decisions: ai.decisions, vectors: ai.vectors, embeddingModel: ai.embeddingModel, files: ai.files },
   };
   await store.put(`${archivePrefix(a.id)}config.json`, Buffer.from(JSON.stringify(await buildConfig(a.user_id, a.id, verifiedIds))), 'application/json');
   const mkey = `${archivePrefix(a.id)}manifest.json`;

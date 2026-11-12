@@ -21,6 +21,7 @@ export default function RulesSettings() {
   const [rules, setRules] = useState<ApiRule[]>([]);
   const [prefs, setPrefs] = useState<ApiPreference[]>([]);
   const [suggestions, setSuggestions] = useState<ApiRuleSuggestion[]>([]);
+  const [corrections, setCorrections] = useState<{ id: number; subject: string; from: string; fromLabel: string | null; toLabel: string | null; source: string; remembered: boolean; createdAt: number }[]>([]);
   const [editing, setEditing] = useState<EditingRule | null>(null);
   const [newPref, setNewPref] = useState('');
   const [busy, setBusy] = useState(false);
@@ -29,6 +30,7 @@ export default function RulesSettings() {
     setRules(await api.get<ApiRule[]>('/api/rules'));
     setPrefs(await api.get<ApiPreference[]>('/api/preferences'));
     setSuggestions(await api.get<ApiRuleSuggestion[]>('/api/suggestions'));
+    setCorrections(await api.get<any[]>('/api/corrections').catch(() => []));
   };
   useEffect(() => { void refresh(); }, []);
 
@@ -92,6 +94,21 @@ export default function RulesSettings() {
             </div>
           ))}
         </div>
+      )}
+
+      {corrections.length > 0 && (
+        <details style={{ marginTop: 14 }}>
+          <summary style={{ fontWeight: 600, fontSize: 13 }}>Corrections ({corrections.length}) — what you have taught the AI by fixing its decisions</summary>
+          {corrections.slice(0, 50).map((c) => (
+            <div key={c.id} className="cond-row" style={{ margin: 0, padding: '4px 0' }}>
+              <span style={{ flex: 1, fontSize: 12.5 }}>
+                {c.source === 'move' ? 'Moved' : <>{c.fromLabel ?? 'no label'} → <b>{c.toLabel ?? 'no label'}</b></>}: “{c.subject || '(no subject)'}” {c.from && <span style={{ color: 'var(--md-text-faint)' }}>from {c.from}</span>}
+                {c.remembered && <span style={{ color: 'var(--md-text-faint)' }}> · remembered</span>}
+              </span>
+              <button className="btn ghost" onClick={async () => { await api.post(`/api/corrections/${c.id}/undo`, {}); await refresh(); toast('Correction removed'); }}>Remove</button>
+            </div>
+          ))}
+        </details>
       )}
 
       <div style={{ marginTop: 14, maxHeight: 340, overflowY: 'auto', border: rules.length ? '1px solid var(--md-border)' : 'none', borderRadius: 8 }}>

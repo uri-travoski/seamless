@@ -208,6 +208,16 @@ Check that **Back up automatically** is actually ticked, and remember the hour i
 **Nothing is being backed up at all.**
 Backups do not include the `.eml` files by design — only the database. If you want copies of the raw mail as well, that is your object storage provider's job (R2 and S3 both offer versioning and lifecycle rules).
 
+## The AI's memory is in the backup
+
+A full backup contains everything the AI has learned: its decisions (`ai_decisions`), the labelled examples (`email_vectors`), your guidance
+(`preferences`), rules and newsletter sender choices. After a restore the numbers are the same. If you restore onto a server with a different AI
+provider, examples made by the old embedding model are not thrown away: they are kept with their size and model and re-read in the background
+(the Health page shows *re-learning N*).
+
+Archives (Settings → Backup → Archive old mail) also carry an `ai/` folder: `ai_decisions.jsonl`, `email_vectors.jsonl` for the archived mail and
+`memory.json` with guidance, rules, label retention and newsletter choices. Provider keys are never included. The manifest says `ai_memory: true`.
+
 ## Archive old mail
 
 A backup protects the whole app. An **archive** is different: it copies your *older* mail to a backup storage target so you can keep the app small, and it can later bring that mail back or let you search it without restoring.
