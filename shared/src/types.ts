@@ -145,6 +145,8 @@ export interface ApiEmail {
   readLater?: boolean;          // T6.3: in the Read later folder
   readMinutes?: number | null;  // T6.3: estimated reading time (words / 230 wpm), newsletters only
   snoozedUntil: string | null; // ISO while snoozed (hidden from the Inbox until then)
+  snoozedBy?: string | null;   // T8.3: name of the teammate who snoozed a shared thread
+  snoozeAllowed?: boolean;     // T8.3: false on a shared mailbox whose team settings keep snoozing off (or for viewers)
   risk: { level: 'medium' | 'high'; reasons: { code: string; severity: 'medium' | 'high'; text: string }[] } | null; // T2 F-20
   followupId: number | null;   // T2 F-19: a live reminder on this sent message
   followupDueAt: string | null;

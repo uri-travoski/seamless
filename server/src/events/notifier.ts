@@ -150,6 +150,7 @@ export function render(ev: EventRow): Rendered {
     case 'security.2fa_changed':
       return { title: p.enabled ? 'Two-factor sign-in turned on' : 'Two-factor sign-in turned off', body: '', link: '/settings/security', groupKey: null, accountId: null };
     case 'assignment.changed':
+      if (p.auto) return { title: `${p.assignee ?? 'Someone'} was assigned a new thread`, body: String(p.subject || '(no subject)'), link: p.messageId ? `/mail/msg/m${p.messageId}` : null, groupKey: null, accountId };
       return { title: `${p.by ?? 'Someone'} assigned you a thread`, body: String(p.subject || '(no subject)'), link: p.messageId ? `/mail/msg/m${p.messageId}` : null, groupKey: null, accountId };
     case 'view.match':
       return { title: `New in ${quote(p.viewName)}`, body: [p.from ? displayName(String(p.from)) : '', p.subject || '(no subject)'].filter(Boolean).join(': '), link: p.messageId ? `/mail/msg/m${p.messageId}` : null, groupKey: null, accountId };

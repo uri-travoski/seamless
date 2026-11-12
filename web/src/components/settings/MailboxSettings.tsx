@@ -11,6 +11,7 @@ import { useMail } from '../../state/mail.ts';
 import { useCompose } from '../../state/compose.ts';
 import PushInboxSetup, { PushPanel } from './PushInboxSetup.tsx';
 import { SharePanel } from './SharePanel.tsx';
+import { AwaySwitch } from './AwaySwitch.tsx';
 import { OauthSection, SafeDeletePanel, GmailLearnPanel } from './AccountSettings.tsx';
 import { CategoryGlyph, CATEGORY_ICON_NAMES } from '../CategoryGlyph.tsx';
 import { CheckIcon, CloseIcon, WarningIcon, PlusSimpleIcon, CaretUpIcon, CaretDownIcon, TrashIcon, PencilIcon, DragIcon } from '../../icons.tsx';
@@ -558,6 +559,7 @@ export default function MailboxSettings() {
               );
             })}
             {accounts.length === 0 && <div className="empty-state"><p>No mailboxes yet.</p></div>}
+            <AwaySwitch />
           </div>
           <button className="btn primary" onClick={() => edit()}><PlusSimpleIcon size={15} /> Add mailbox</button>{' '}
           <button className="btn" onClick={() => setPushSetup(true)}>Own domain (Cloudflare Email Routing)</button>

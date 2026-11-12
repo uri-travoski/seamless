@@ -1357,6 +1357,26 @@ CREATE TABLE shared_label_offers (
 );
 `,
   },
+  {
+    id: 43,
+    // T8.3: per-mailbox team settings. allow_snooze = responders/managers may snooze for everyone; auto_assign = round robin of
+    // NEW live threads over mailbox_rr_members (row = takes part, active = not away). rr_cursor = user id last assigned.
+    sql: `
+CREATE TABLE mailbox_team_settings (
+  account_id INTEGER PRIMARY KEY REFERENCES accounts(id) ON DELETE CASCADE,
+  allow_snooze BOOLEAN NOT NULL DEFAULT false,
+  auto_assign TEXT NOT NULL DEFAULT 'off' CHECK (auto_assign IN ('off','round_robin')),
+  rr_cursor INTEGER
+);
+CREATE TABLE mailbox_rr_members (
+  account_id INTEGER NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
+  user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  active BOOLEAN NOT NULL DEFAULT true,
+  PRIMARY KEY (account_id, user_id)
+);
+ALTER TABLE messages ADD COLUMN snoozed_by INTEGER;
+`,
+  },
 ];
 
 /** Run `fn` in one transaction. Events emitted through the client are only turned into

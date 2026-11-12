@@ -6,6 +6,7 @@ import { toast } from '../../toast.ts';
 interface Share { userId: number; email: string; name: string; role: 'viewer' | 'responder' | 'manager'; labelsShared?: boolean; labelsStatus?: 'none' | 'pending' | 'accepted' | 'rejected'; labelIds?: number[] }
 interface MyLabel { id: number; name: string; color: string; shared?: boolean }
 const LABEL_STATUS = { none: '', pending: 'waiting for their answer', accepted: 'accepted', rejected: 'rejected' } as const;
+interface Team { allowSnooze: boolean; autoAssign: 'off' | 'round_robin'; members: { userId: number; name: string; email: string; role: string; inPool: boolean; away: boolean }[] }
 interface Person { id: number; email: string; name: string }
 
 const ROLE_HELP: Record<Share['role'], string> = {
@@ -22,10 +23,16 @@ export function SharePanel({ account, onClose }: { account: { id: number; email:
   const [shareLabels, setShareLabels] = useState(false);
   const [myLabels, setMyLabels] = useState<MyLabel[]>([]);
   const [picking, setPicking] = useState<number | null>(null);
+  const [team, setTeam] = useState<Team | null>(null);
+  const saveTeam = async (patch: { allowSnooze?: boolean; autoAssign?: string; pool?: number[] }) => {
+    try { setTeam(await api.put<Team>(`/api/accounts/${account.id}/team`, patch)); toast('Team settings saved'); }
+    catch (e: any) { toast(e?.message ?? 'Could not save team settings'); }
+  };
 
   const load = async () => {
     setShares(await api.get<Share[]>(`/api/accounts/${account.id}/shares`));
     setPeople(await api.get<Person[]>('/api/shares/people'));
+    setTeam(await api.get<Team>(`/api/accounts/${account.id}/team`).catch(() => null));
     setMyLabels((await api.get<MyLabel[]>('/api/labels')).filter((l) => !l.shared));
   };
   useEffect(() => { void load().catch(() => {}); }, [account.id]);
@@ -73,6 +80,22 @@ export function SharePanel({ account, onClose }: { account: { id: number; email:
         </div>
       ))}
       {shares.length === 0 && <div className="dim">Not shared with anyone.</div>}
+      {team && (
+        <div style={{ borderTop: '1px solid var(--md-border)', marginTop: 10, paddingTop: 8 }}>
+          <div style={{ fontWeight: 600, fontSize: 13 }}>Team settings</div>
+          <label style={{ display: 'block', fontSize: 12.5, marginTop: 4 }}><input type="checkbox" checked={team.allowSnooze} onChange={(e) => void saveTeam({ allowSnooze: e.target.checked })} /> Allow snoozing: a snooze hides the thread for everyone on this mailbox. Follow-up reminders stay with the owner.</label>
+          <label style={{ display: 'block', fontSize: 12.5, marginTop: 4 }}><input type="checkbox" checked={team.autoAssign === 'round_robin'} onChange={(e) => void saveTeam({ autoAssign: e.target.checked ? 'round_robin' : 'off' })} /> Hand out new threads in turn (round robin). Only new mail that arrives live; replies and old mail are left alone.</label>
+          {team.autoAssign === 'round_robin' && (
+            <div style={{ margin: '4px 0 0 20px', fontSize: 12.5 }}>
+              {team.members.map((m) => (
+                <label key={m.userId} style={{ display: 'block' }}><input type="checkbox" checked={m.inPool}
+                  onChange={() => void saveTeam({ pool: team.members.filter((x) => (x.userId === m.userId ? !x.inPool : x.inPool)).map((x) => x.userId) })} /> {m.name} <span className="dim">({m.role}){m.away ? ' · away' : ''}</span> takes part in round robin</label>
+              ))}
+              <div className="dim">Each person can switch themselves “away” in Settings → Mailboxes; they are skipped until they are back. If nobody is available the thread stays unassigned.</div>
+            </div>
+          )}
+        </div>
+      )}
       <div className="row" style={{ display: 'flex', gap: 8, marginTop: 8 }}>
         <select className="text-input" value={who} onChange={(e) => setWho(e.target.value)} aria-label="Person">
           <option value="">Pick a person…</option>

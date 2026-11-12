@@ -22,6 +22,7 @@ import {
   EyeIcon, ImageIcon, AttachIcon, PencilIcon, ReplyIcon, ReplyAllIcon, ForwardIcon, DownloadIcon,
   EnvelopeOpenIcon, BackIcon, ArchiveIcon, JunkIcon, TrashIcon, EnvelopeIcon, SparkleIcon, CloseIcon,
   KebabIcon, SourceIcon, NoteIcon, CaretDownIcon, RestoreMailIcon, StarIcon, InboxIcon, ChartIcon, ShieldWarnIcon,
+  SnoozeIcon,
 } from '../icons.tsx';
 import { IconContext } from '@phosphor-icons/react';
 import SharedThread from './SharedThread.tsx';
@@ -616,7 +617,9 @@ export default function ReadingPane() {
         <button className="icon-btn" title="Mark unread (Shift+U)" onClick={() => { markRead(selected.id, false); void select(null); }}><EnvelopeIcon /></button>
         <button className={`icon-btn ${selected.keywords.$flagged ? 'active' : ''}`} title="Star (s)" onClick={() => actions.star(selected.id)}><StarIcon weight={selected.keywords.$flagged ? 'fill' : 'regular'} /></button>
         <LabelPicker value={selected.labelIds} accountId={selected.accountId} onChange={(ids) => applyLabels(selected.id, ids)} />
-        {selected.mailboxRole === 'inbox' && <SnoozeButton onPick={(at) => void actions.snooze(selected.id, at)} />}
+        {selected.mailboxRole === 'inbox' && selected.snoozeAllowed === false && <button className="icon-btn" disabled title="Snoozing is off for this shared mailbox" aria-label="Snoozing is off for this shared mailbox"><SnoozeIcon /></button>}
+        {selected.mailboxRole === 'inbox' && selected.snoozeAllowed !== false && <SnoozeButton onPick={(at) => void actions.snooze(selected.id, at)} />}
+        {selected.snoozedUntil && selected.snoozedBy && <span className="dim" style={{ fontSize: 12 }}>Snoozed by {selected.snoozedBy} until {new Date(selected.snoozedUntil).toLocaleString()}</span>}
         {inBin
           ? <button className="icon-btn" title={selected.mailboxRole === 'junk' ? 'Not spam' : 'Restore to Inbox'} onClick={() => (selected.mailboxRole === 'junk' ? actions.notSpam(selected.id) : actions.restore(selected.id))}><RestoreMailIcon /></button>
           : <button className="icon-btn" title="Archive (e)" onClick={() => actions.archive(selected.id)}><ArchiveIcon /></button>}

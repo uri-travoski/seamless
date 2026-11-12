@@ -51,7 +51,7 @@ export function EmailMenuItems({ email, close }: { email: ApiEmail; close: () =>
       </>}
       {item(unread ? 'Mark as read' : 'Mark as unread', unread ? EnvelopeOpenIcon : EnvelopeIcon, () => actions.markRead(email.id, unread))}
       {item(starred ? 'Remove star' : 'Star', StarIcon, () => actions.star(email.id))}
-      {email.mailboxRole === 'inbox' && (
+      {email.mailboxRole === 'inbox' && email.snoozeAllowed !== false && (
         <Sub label="Snooze" Icon={SnoozeIcon}>
           <SnoozeList onPick={(at) => { close(); void actions.snooze(email.id, at); }} />
         </Sub>

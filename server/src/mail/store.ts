@@ -6,6 +6,7 @@ import { deleteMessageRow } from './ingest.ts';
 import { newsletterInfo } from './newsletters.ts';
 import { VIP_SQL, isVipSender } from './vip.ts';
 import { scopeAccountIds, categoryIdByName } from './categories.ts';
+import { snoozeAllowedFor } from './team.ts';
 import { acceptedLabelIds, SHARED_LABEL_VISIBLE_SQL } from './sharedLabels.ts';
 import { accessibleAccountIds, roleFor, canSendRole, Forbidden, type AccessRole } from '../auth/access.ts';
 
@@ -70,7 +71,7 @@ export interface MsgRow {
   account_email: string; account_color: string; mailbox_role: string | null;
   message_id: string | null; references_ids: string;
   disposition: string; delete_at: number | null; classify_state: string;
-  snoozed_until: number | null; sort_date: number | null;
+  snoozed_until: number | null; snoozed_by?: number | null; sort_date: number | null;
   is_newsletter: boolean; newsletter_sender: string | null; list_unsubscribe: string | null; list_unsubscribe_post: string | null;
   read_later: boolean; read_later_at: number | null; read_minutes: number | null;
 }
@@ -170,6 +171,11 @@ export async function rowToApi(r: MsgRow, viewerId: number = r.user_id): Promise
     readLater: r.read_later,
     readMinutes: r.is_newsletter ? r.read_minutes : null,
     snoozedUntil: r.snoozed_until && r.snoozed_until > Date.now() ? new Date(Number(r.snoozed_until)).toISOString() : null,
+    ...(r.user_id !== viewerId ? {   // T8.3: shared mail — who snoozed it, and may I?
+      snoozedBy: r.snoozed_until && r.snoozed_until > Date.now() && r.snoozed_by
+        ? ((await one<{ name: string; email: string }>('SELECT name, email FROM users WHERE id = ?', [r.snoozed_by]))?.name || null) : null,
+      snoozeAllowed: await snoozeAllowedFor(viewerId, r.account_id),
+    } : { snoozedBy: null, snoozeAllowed: true }),
   };
 }
 

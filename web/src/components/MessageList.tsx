@@ -35,7 +35,7 @@ function fmtDate(iso: string): string {
 function dateCell(email: ApiEmail): React.ReactNode {
   if (email.readLater && email.readMinutes) return <span className="read-time" title="Estimated reading time">{email.readMinutes} min read · {fmtDate(email.receivedAt)}</span>;
   if (!email.snoozedUntil) return fmtDate(email.receivedAt);
-  return <span className="snooze-wake" title="Comes back to your Inbox then"><SnoozeIcon size={13} /> {fmtSnoozeLong(new Date(email.snoozedUntil).getTime())}</span>;
+  return <span className="snooze-wake" title="Comes back to your Inbox then"><SnoozeIcon size={13} /> {email.snoozedBy ? `Snoozed by ${email.snoozedBy} until ` : ''}{fmtSnoozeLong(new Date(email.snoozedUntil).getTime())}</span>;
 }
 
 /** Countdown chip for mail the retention sweep will trash ("3d" = three days left). */
@@ -106,7 +106,10 @@ function RowActions({ email }: { email: ApiEmail }) {
       <button className="icon-btn" title={unread ? 'Mark read (Shift+I)' : 'Mark unread (Shift+U)'} onClick={stop(() => actions.markRead(email.id, unread))}>
         {unread ? <EnvelopeOpenIcon size={17} /> : <EnvelopeIcon size={17} />}
       </button>
-      {email.mailboxRole === 'inbox' && (
+      {email.mailboxRole === 'inbox' && email.snoozeAllowed === false && (
+        <button className="icon-btn" title="Snoozing is off for this shared mailbox" aria-label="Snoozing is off for this shared mailbox" disabled><SnoozeIcon size={17} /></button>
+      )}
+      {email.mailboxRole === 'inbox' && email.snoozeAllowed !== false && (
         <button className="icon-btn" title="Snooze (b)" aria-label="Snooze"
           onClick={(e) => { e.stopPropagation(); const r = e.currentTarget.getBoundingClientRect(); useUi.getState().set({ snoozeFor: { id: email.id, x: r.left - 180, y: r.bottom + 4 } }); }}><SnoozeIcon size={17} /></button>
       )}

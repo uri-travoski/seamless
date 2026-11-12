@@ -175,6 +175,11 @@ export async function ingestMessage(args: IngestArgs): Promise<IngestResult | nu
     const det = detectNewsletter(rawHeaders(args.raw), from.email);
     await newsletterOnIngest(userId, rowId, det, readMinutes(bodyText), { live: isInboxLive }).catch((err) => console.error('[newsletters] ingest hook failed:', err?.message ?? err));
   }
+  if (isInboxLive) {   // T8.3: round-robin assignment of a NEW live thread on a shared mailbox (never backfill, never replies)
+    await import('./team.ts').then(async (m) => {
+      if (!(await m.threadHasOthers(args.accountId, threadId, rowId))) await m.assignOnArrival(args.accountId, threadId, parsed.subject ?? '', rowId);
+    }).catch((err) => console.error('[team] round robin failed:', err?.message ?? err));
+  }
   if (isInboxLive) await import('../leads/leads.ts').then((m) => m.captureLead(userId, rowId, parsed)).catch((err) => console.error('[leads] capture failed:', err?.message ?? err));   // lazy import: leads → store → sync → ingest would be a cycle; never blocks ingest
   if (atts.some((a) => !a.inline)) await queueAttachmentIndex(userId, rowId).catch((err) => console.error('[attachments] queue failed:', err?.message ?? err));   // text extraction runs as a job; never blocks ingest
   await ingestInvites(userId, args.accountId, rowId, parsed);

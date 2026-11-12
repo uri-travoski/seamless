@@ -23,8 +23,7 @@ change sharing. Removing someone, or changing their role, takes effect straight 
 - **Notes are private.** A note you add to a shared message is visible only to you.
 - **Sending:** replies from a shared mailbox go out through the owner's server and identity, and the copy lands in the
   mailbox's Sent folder. A viewer who tries to send gets "403 – viewers cannot send".
-- **Snooze, follow-ups and tracking reports** belong to the mailbox owner; they are not available to people the mailbox is
-  shared with yet.
+- **Follow-up reminders and tracking reports** belong to the mailbox owner. **Snooze** is off on shared mail unless the owner or a manager turns it on (see *Team settings* below).
 - The IMAP/SMTP facade for desktop clients only exposes your **own** mailboxes.
 
 ## Working a shared inbox together
@@ -72,3 +71,21 @@ decides for themselves.
 5. Changed your mind? Settings → Labels → **Shared with me** → **Leave** (or **Accept** again after rejecting).
 
 Your own labels stay personal and still cannot be used on shared mail.
+
+## Team settings: snooze and round robin
+Settings → Mailboxes → **Share with…** → **Team settings** (owner or a manager). Both are off until you turn them on, per mailbox.
+
+- **Allow snoozing.** When on, responders and managers can snooze a thread of this mailbox. It is hidden **for everyone** until the
+  time (a team decision) and the thread shows "Snoozed by <name> until …". It comes back as unread when the time is up. Anyone who
+  may snooze can also remove the snooze. When it is off the Snooze button is greyed with "Snoozing is off for this shared mailbox".
+  Viewers can never snooze. **Follow-up reminders stay with the owner.**
+- **Round robin.** Tick "Hand out new threads in turn" and choose who takes part (owner, responders, managers). Each **new** thread
+  that arrives live is assigned to the next person in the pool, who gets a notification. Replies to existing threads, old mail
+  fetched when a mailbox is first connected, and mail in other folders are never assigned. `assigned:me` finds your threads.
+  Settings → Mailboxes shows a **Round robin** box where you can tick "I'm away" for a mailbox: you are skipped until you untick it.
+  If nobody is available, the thread stays unassigned. The order carries on fairly after a restart; people removed from the
+  mailbox are skipped. Changes to these settings are written to the audit log.
+
+## Read and unread are shared
+There is one read state per message. When one person marks a shared message read, everyone with access sees it as read; when
+someone marks it unread again, it is unread for everyone. (Starring works the same way.) Notes and personal labels stay private.

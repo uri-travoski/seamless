@@ -9,12 +9,16 @@ export function register(app: FastifyInstance): void {
       const n = await snoozeThread(uid(req), String(b.emailId ?? ''), Number(b.until));
       return { ok: true, snoozed: n };
     } catch (err: any) {
-      return reply.code(err?.message === 'not found' ? 404 : 400).send({ error: err?.message ?? 'could not snooze' });
+      return reply.code(err?.statusCode ?? (err?.message === 'not found' ? 404 : 400)).send({ error: err?.message ?? 'could not snooze' });
     }
   });
 
-  app.delete('/api/snooze/:threadId', async (req) => {
-    const ok = await unsnoozeThread(uid(req), decodeURIComponent((req.params as any).threadId), { wake: false });
-    return { ok };
+  app.delete('/api/snooze/:threadId', async (req, reply) => {
+    try {
+      const ok = await unsnoozeThread(uid(req), decodeURIComponent((req.params as any).threadId), { wake: false });
+      return { ok };
+    } catch (err: any) {
+      return reply.code(err?.statusCode ?? 400).send({ error: err?.message ?? 'could not remove the snooze' });
+    }
   });
 }

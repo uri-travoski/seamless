@@ -42,6 +42,7 @@ import { register as storage } from './storage.ts';
 import { register as exportRoutes } from './export.ts';
 import { register as businesses } from './businesses.ts';
 import { register as shares } from './shares.ts';
+import { register as team } from './team.ts';
 import { register as assignments } from './assignments.ts';
 import { register as invites } from './invites.ts';
 import { register as views } from './views.ts';
@@ -156,6 +157,7 @@ export function registerRoutes(app: FastifyInstance): void {
   exportRoutes(app);
   businesses(app);
   shares(app);
+  team(app);
   assignments(app);
   invites(app);
   views(app);
