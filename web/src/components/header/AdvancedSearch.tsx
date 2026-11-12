@@ -1,7 +1,7 @@
 /** Gmail-style "show search options" panel: builds a search, or turns the same boxes into a filter. */
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import type { FilterAction, FilterCondition } from '@seamless/shared';
-import { api } from '../../api/client.ts';
+import { api, queryEmailPage } from '../../api/client.ts';
 import { toast } from '../../toast.ts';
 import { useMail } from '../../state/mail.ts';
 
@@ -11,13 +11,14 @@ const quote = (v: string) => (/\s/.test(v) ? `"${v.replace(/"/g, '')}"` : v);
 interface Form { from: string; to: string; subject: string; words: string; sizeOp: '>' | '<'; sizeNum: string; sizeUnit: 'kb' | 'mb'; within: string; hasAttachment: boolean; unread: boolean }
 const EMPTY: Form = { from: '', to: '', subject: '', words: '', sizeOp: '>', sizeNum: '', sizeUnit: 'mb', within: '', hasAttachment: false, unread: false };
 
-export function buildQuery(f: Form): string {
+export function buildQuery(f: Form, forFilter = false): string {
   const p: string[] = [];
   if (f.from.trim()) p.push(`from:${quote(f.from.trim())}`);
   if (f.to.trim()) p.push(`to:${quote(f.to.trim())}`);
   if (f.subject.trim()) p.push(`subject:${quote(f.subject.trim())}`);
   if (f.words.trim()) p.push(f.words.trim());
   if (f.hasAttachment) p.push('has:attachment');
+  if (forFilter) return p.join(' ');            // size, date and unread can't be filter conditions
   if (f.unread) p.push('is:unread');
   if (Number(f.sizeNum) > 0) p.push(`size${f.sizeOp}${Number(f.sizeNum)}${f.sizeUnit}`);
   if (f.within) p.push(`newer_than:${f.within}`);
@@ -46,6 +47,7 @@ export default function AdvancedSearch({ initial, onSearch, onClose }: { initial
   const [labelId, setLabelId] = useState('');
   const [applyExisting, setApplyExisting] = useState(true);
   const [busy, setBusy] = useState(false);
+  const [found, setFound] = useState<number | null>(null);
   const set = (patch: Partial<Form>) => setF((x) => ({ ...x, ...patch }));
   const conditions = buildConditions(f);
   const query = buildQuery(f);
@@ -57,6 +59,15 @@ export default function AdvancedSearch({ initial, onSearch, onClose }: { initial
   if (star) actions.push({ type: 'star' });
   if (labelId) actions.push({ type: 'label', value: labelId });
   if (del) actions.push({ type: 'delete' });
+
+  // how many Inbox messages the filter would touch (the same boxes, run as a search in the Inbox)
+  useEffect(() => {
+    if (step !== 'filter') return;
+    let alive = true; setFound(null);
+    queryEmailPage({ text: buildQuery(f, true), inMailbox: 'u:inbox' } as any, 0, 1)
+      .then((r) => { if (alive) setFound(r.query.total); }).catch(() => { if (alive) setFound(null); });
+    return () => { alive = false; };
+  }, [step]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const createFilter = async () => {
     setBusy(true);
@@ -117,7 +128,7 @@ export default function AdvancedSearch({ initial, onSearch, onClose }: { initial
                 <option value="">Choose label…</option>{labels.map((l) => <option key={l.id} value={String(l.id)}>{l.name}</option>)}
               </select></label>
             <label><input type="checkbox" checked={del} onChange={(e) => setDel(e.target.checked)} /> Delete it (move to Bin)</label>
-            <label><input type="checkbox" checked={applyExisting} onChange={(e) => setApplyExisting(e.target.checked)} /> Also apply to matching mail already in the Inbox</label>
+            <label><input type="checkbox" checked={applyExisting} onChange={(e) => setApplyExisting(e.target.checked)} /> Also apply to matching mail already in the Inbox{found !== null && <strong> ({found.toLocaleString()} found)</strong>}</label>
           </div>
           <div className="adv-foot">
             <button className="linklike" onClick={() => setStep('search')}>‹ Back</button>

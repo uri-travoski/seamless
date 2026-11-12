@@ -7,7 +7,7 @@ import { useEffect, useState } from 'react';
 import { useSession } from '../../state/session.ts';
 import { useMail, scopeToSlug } from '../../state/mail.ts';
 import { useRouter, navigate } from '../../router.ts';
-import { MenuIcon, SearchIcon, CloseIcon, MailLogo, FilterIcon } from '../../icons.tsx';
+import { MenuIcon, SearchIcon, CloseIcon, MailLogo, SearchOptionsIcon } from '../../icons.tsx';
 import AdvancedSearch from './AdvancedSearch.tsx';
 import { NO_AUTOFILL } from '../../state/ui.ts';
 import ScopeSwitcher from './ScopeSwitcher.tsx';
@@ -69,7 +69,7 @@ export default function AppHeader({ onMenu, connected }: { onMenu: () => void; c
         {!search && <kbd className="search-kbd" aria-hidden>/</kbd>}
         {search.trim() && <button className="icon-btn" onClick={() => useViews.getState().openSave(search.trim(), useMail.getState().scope)} aria-label="Save this search" title="Save this search as a smart view"><BookmarkSimple /></button>}
         {search && <button className="icon-btn" onClick={clear} aria-label="Clear search"><CloseIcon /></button>}
-        <button className={`icon-btn adv-btn ${advOpen ? 'active' : ''}`} onClick={() => setAdvOpen((v) => !v)} aria-label="Search options and filters" aria-expanded={advOpen} title="Search options — and create a filter"><FilterIcon /></button>
+        <button className={`icon-btn adv-btn ${advOpen ? 'active' : ''}`} onClick={() => setAdvOpen((v) => !v)} aria-label="Search options and filters" aria-expanded={advOpen} title="Search options — and create a filter"><SearchOptionsIcon /></button>
         {advOpen && (
           <>
             <div className="adv-scrim" onMouseDown={() => setAdvOpen(false)} />

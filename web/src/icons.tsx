@@ -83,6 +83,7 @@ export {
   Eraser as ClearFormatIcon,
   UserCircle as AccountIcon,
   Funnel as FilterIcon,
+  SlidersHorizontal as SearchOptionsIcon,
   SignOut as LogoutIcon,
   TextAa as FontSizeIcon,
   BellSimple as BellIcon,
