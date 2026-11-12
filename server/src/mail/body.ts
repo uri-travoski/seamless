@@ -9,6 +9,7 @@ import { attachmentMeta } from './ingest.ts';
 import { roleFor } from '../auth/access.ts';
 import { inviteForMessage } from './invites.ts';
 import { openPgpMessage, keyOffers } from './pgp.ts';
+import { openSmimeMessage } from './smime.ts';
 
 async function canReadAccount(userId: number, rowId: number): Promise<boolean> {
   const m = await one<{ account_id: number }>('SELECT account_id FROM messages WHERE id = ?', [rowId]);
@@ -116,11 +117,20 @@ export async function getEmailBody(userId: number, emailId: string, allowRemote:
   // T6.4 F-39: OpenPGP. Decrypt on view only; the plaintext lives in memory, is not stored and not indexed.
   let pgp: ApiEmailBody['pgp'] = null;
   let pgpKeys: ApiEmailBody['pgpKeys'];
+  let smime: ApiEmailBody['smime'] = null;
   if (row.s3_key) {
     const opened = await openPgpMessage(userId, await getBlob(row.s3_key), parsed, opts.pgpPassphrase).catch((e) => ({ status: { encrypted: false, decrypted: false, signature: 'none' as const, error: String(e?.message ?? e) } }));
     if (opened) {
       pgp = opened.status;
       if ('parsed' in opened && opened.parsed) { parsed = opened.parsed; holdParsed(row.id, parsed); }
+    }
+    // T6.5 F-39: S/MIME, same rules (decrypted in memory only)
+    if (!opened) {
+      const so = await openSmimeMessage(userId, await getBlob(row.s3_key), parsed).catch((e) => ({ status: { encrypted: false, decrypted: false, signature: 'none' as const, error: String(e?.message ?? e) } }));
+      if (so) {
+        smime = so.status;
+        if ('parsed' in so && so.parsed) { parsed = so.parsed; holdParsed(row.id, parsed); }
+      }
     }
     const offers = await keyOffers(userId, parsed);
     if (offers.length) pgpKeys = offers;
@@ -158,6 +168,7 @@ export async function getEmailBody(userId: number, emailId: string, allowRemote:
     tracking,
     invite: await inviteForMessage(userId, row.id, row.account_id),
     pgp,
+    ...(smime ? { smime } : {}),
     ...(pgpKeys ? { pgpKeys } : {}),
   };
 }

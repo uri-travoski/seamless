@@ -16,6 +16,7 @@ import { transportForAccount, sendWithFallback } from '../transport/registry.ts'
 import { resolveSendIdentity, effectivePayload, type SendIdentity } from '../business/sending.ts';
 import { markLeadReplies } from '../leads/leads.ts';
 import { protectMessage } from './pgp.ts';
+import { protectMessage as smimeProtect, SmimeError } from './smime.ts';
 
 const uploadDir = path.join(config.dataDir, 'uploads');
 fs.mkdirSync(uploadDir, { recursive: true });
@@ -93,7 +94,7 @@ interface BuildOpts { ident?: SendIdentity | null; draft?: boolean; date?: Date;
  */
 export async function trackingAllowed(userId: number, payload: ComposePayload): Promise<boolean> {
   if (!payload.track) return false;
-  if (payload.pgpSign || payload.pgpEncrypt) return false;   // a tracking pixel would break the signature / defeat the encryption
+  if (payload.pgpSign || payload.pgpEncrypt || payload.smimeSign || payload.smimeEncrypt) return false;   // a tracking pixel would break the signature / defeat the encryption
   const rcpts = [...payload.to, ...payload.cc, ...payload.bcc].map((a) => a.email.trim().toLowerCase()).filter(Boolean);
   if (rcpts.length === 0) return false;
   const own = new Set<string>();
@@ -167,6 +168,13 @@ export async function buildRaw(payload: ComposePayload, acct: AccountRow, extraF
     composer.compile().build((err, message) => (err ? reject(err) : resolve(message))),
   );
   // T6.4 F-39: PGP/MIME. Drafts stay readable (never signed or encrypted on the server before sending).
+  if (!extraFlags.draft && (payload.smimeSign || payload.smimeEncrypt)) {
+    if (payload.pgpSign || payload.pgpEncrypt) throw new SmimeError(400, 'Use either OpenPGP or S/MIME for one message, not both');
+    raw = await smimeProtect(acct.user_id, raw, {
+      sign: !!payload.smimeSign, encrypt: !!payload.smimeEncrypt, fromEmail: payload.fromEmail, identityId: payload.identityId ?? null,
+      recipients: [...payload.to, ...payload.cc, ...payload.bcc].map((a) => a.email),
+    });
+  }
   if (!extraFlags.draft && (payload.pgpSign || payload.pgpEncrypt)) {
     raw = await protectMessage(acct.user_id, raw, {
       sign: !!payload.pgpSign, encrypt: !!payload.pgpEncrypt, fromEmail: payload.fromEmail, identityId: payload.identityId ?? null,

@@ -1254,6 +1254,29 @@ CREATE TABLE pgp_keys (
 CREATE INDEX pgp_keys_user_email ON pgp_keys(user_id, lower(email));
 `,
   },
+  {
+    id: 38,
+    sql: `
+-- T6.5 F-39: S/MIME certificates (own certs keep the PKCS#8 private key encrypted under SEAMLESS_SECRET; contact certs are public only)
+CREATE TABLE smime_certs (
+  id SERIAL PRIMARY KEY,
+  user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  identity_id INTEGER REFERENCES identities(id) ON DELETE SET NULL,
+  kind TEXT NOT NULL CHECK (kind IN ('own','contact')),
+  email TEXT NOT NULL,
+  fingerprint TEXT NOT NULL,
+  subject TEXT NOT NULL,
+  issuer TEXT NOT NULL,
+  serial TEXT NOT NULL,
+  cert_pem TEXT NOT NULL,
+  key_enc TEXT,
+  not_after BIGINT NOT NULL,
+  created_at BIGINT NOT NULL,
+  UNIQUE (user_id, fingerprint)
+);
+CREATE INDEX smime_certs_user_email ON smime_certs(user_id, lower(email));
+`,
+  },
 ];
 
 /** Run `fn` in one transaction. Events emitted through the client are only turned into

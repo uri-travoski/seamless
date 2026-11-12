@@ -1,4 +1,4 @@
-# Encryption (OpenPGP)
+# Encryption (OpenPGP and S/MIME)
 
 Seamless can sign, encrypt, verify and decrypt mail with **OpenPGP** (PGP/MIME, RFC 3156), so it works with
 Thunderbird/Enigmail, GnuPG, Proton and other OpenPGP mail apps.
@@ -61,3 +61,37 @@ A bar above the message shows what Seamless found:
 
 Both PGP/MIME messages and older "inline" messages (`-----BEGIN PGP MESSAGE-----` in the body, or a clear-signed body) are handled.
 Seamless does not check keys against the web of trust: "verified" means the signature matches a key in **your** key ring.
+
+
+# S/MIME
+
+Seamless also signs, verifies, encrypts and decrypts with **S/MIME** (CMS, RFC 8551), the standard built into Outlook, Apple Mail
+and Thunderbird. Like OpenPGP it works in server-side mode: your private key is stored encrypted with the server secret.
+
+## Your certificate — Settings → Encryption → S/MIME
+
+- **Import your certificate (.p12)**: choose the identity (sending address), the `.p12` / `.pfx` file and the file's password.
+  The certificate must be valid for that address. Files protected with old RC2 / 3DES encryption are not read: re-export
+  with AES (with OpenSSL 3, just leave out `-legacy`).
+- **Add a contact's certificate**: paste a PEM certificate. You rarely need to: certificates of people who send you
+  **signed** mail are collected automatically (only when the signature is valid and the certificate matches the From address).
+- **Export certificate** gives you the public certificate; **Delete** removes it (deleting your own means you can no longer read
+  mail encrypted to it).
+
+## Writing
+
+When you have a certificate for the From address, two more toggles appear in the compose toolbar next to the OpenPGP ones:
+
+- **Sign** (seal): a detached SHA-256 signature (`multipart/signed`, `application/pkcs7-signature`).
+- **Encrypt** (padlock with key): AES-256 encryption (`application/pkcs7-mime; smime-type=enveloped-data`) for every recipient
+  and for yourself. It needs a certificate for **every** recipient; the tooltip names who is missing. Only RSA certificates can be encrypted to.
+
+Use S/MIME **or** OpenPGP for one message, not both (turning one on turns the other off). Open tracking is off for S/MIME mail.
+
+## Reading
+
+A bar above the message shows **S/MIME signed by <name> <address>, issuer <issuer> — not checked against a trust store**, a
+bad-signature warning if the message was altered, or an "encrypted — decrypted for you" note. The signature is only called
+verified when the certificate's address matches the sender. **Seamless does not decide whether the issuer is trustworthy**:
+a self-made certificate looks the same as one from a public authority, so check the issuer yourself for important mail.
+Encrypted mail is decrypted when you open it, held in memory only and not searchable by its content.

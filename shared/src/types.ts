@@ -185,12 +185,21 @@ export interface ApiEmailBody {
   tracking: TrackingInfo | null;
   invite?: ApiInvite | null; // T4 F-33: calendar invite carried by this message
   pgp?: ApiPgpStatus | null; // T6.4 F-39: OpenPGP badge when the message is signed / encrypted
+  smime?: ApiSmimeStatus | null; // T6.5 F-39: S/MIME badge
   pgpKeys?: ApiPgpKeyOffer[]; // public keys attached to the message that can be imported
 }
 
 export interface ApiPgpStatus {
   encrypted: boolean; decrypted: boolean; signature: 'verified' | 'unverified' | 'bad' | 'none';
   signer?: string; fingerprint?: string; locked?: boolean; error?: string;
+}
+export interface ApiSmimeStatus {
+  encrypted: boolean; decrypted: boolean; signature: 'verified' | 'unverified' | 'bad' | 'none';
+  signer?: string; issuer?: string; fingerprint?: string; error?: string;
+}
+export interface ApiSmimeCert {
+  id: number; kind: 'own' | 'contact'; identityId: number | null; email: string; fingerprint: string; subject: string; issuer: string;
+  hasPrivate: boolean; notAfter: number; expired: boolean; createdAt: number;
 }
 export interface ApiPgpKeyOffer { partId: string; filename: string; fingerprint: string; email: string; name: string; known: boolean }
 export interface ApiPgpKey {
@@ -290,6 +299,8 @@ export interface ComposePayload {
   followupDays?: number;     // T2 F-19: remind me if no reply in N days
   pgpSign?: boolean;         // T6.4 F-39: sign with the sender's OpenPGP key (PGP/MIME)
   pgpEncrypt?: boolean;      // encrypt to every recipient (and to yourself)
+  smimeSign?: boolean;       // T6.5 F-39: S/MIME signature (cannot be combined with the OpenPGP toggles)
+  smimeEncrypt?: boolean;    // S/MIME encryption to every recipient (and to yourself)
   pgpPassphrase?: string;    // only when the key is passphrase-protected; never stored
   quickReplyId?: number;     // T4 F-31: sent straight from a quick-reply chip (server re-checks it is safe to send directly)
 }

@@ -118,6 +118,8 @@ export {
   Moon as MoonIcon,
   Desktop as SystemIcon,
   Lock as LockIcon,
+  LockKey as LockKeyIcon,
+  SealCheck as SealCheckIcon,
   Copy as CopyIcon,
   Checks as ChecksIcon,
   FileText as TemplateIcon,

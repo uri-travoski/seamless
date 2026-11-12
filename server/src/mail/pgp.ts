@@ -234,20 +234,20 @@ export async function composeCheck(userId: number, o: { fromEmail: string; ident
 // ---------- MIME helpers ----------
 
 const CRLF = '\r\n';
-function splitMessage(raw: Buffer): { head: string; body: Buffer } {
+export function splitMessage(raw: Buffer): { head: string; body: Buffer } {
   const i = raw.indexOf('\r\n\r\n');
   if (i < 0) return { head: raw.toString('utf8'), body: Buffer.alloc(0) };
   return { head: raw.subarray(0, i).toString('utf8'), body: raw.subarray(i + 4) };
 }
-function headerBlocks(head: string): string[] { return head.replace(/\r?\n(?=[ \t])/g, '\u0000').split(/\r?\n/).filter(Boolean).map((l) => l.replace(/\u0000/g, '\r\n')); }
-const hname = (b: string) => b.slice(0, b.indexOf(':')).toLowerCase();
-const hvalue = (b: string) => b.slice(b.indexOf(':') + 1).replace(/\r?\n[ \t]+/g, ' ').trim();
-function ctParams(v: string): { type: string; params: Record<string, string> } {
+export function headerBlocks(head: string): string[] { return head.replace(/\r?\n(?=[ \t])/g, '\u0000').split(/\r?\n/).filter(Boolean).map((l) => l.replace(/\u0000/g, '\r\n')); }
+export const hname = (b: string) => b.slice(0, b.indexOf(':')).toLowerCase();
+export const hvalue = (b: string) => b.slice(b.indexOf(':') + 1).replace(/\r?\n[ \t]+/g, ' ').trim();
+export function ctParams(v: string): { type: string; params: Record<string, string> } {
   const parts = v.split(';'); const params: Record<string, string> = {};
   for (const p of parts.slice(1)) { const m = p.match(/^\s*([\w-]+)\s*=\s*(?:"([^"]*)"|([^;]*))\s*$/); if (m) params[m[1].toLowerCase()] = (m[2] ?? m[3] ?? '').trim(); }
   return { type: parts[0].trim().toLowerCase(), params };
 }
-const ENTITY_HEADERS = new Set(['content-type', 'content-transfer-encoding', 'content-disposition', 'content-id', 'content-description']);
+export const ENTITY_HEADERS = new Set(['content-type', 'content-transfer-encoding', 'content-disposition', 'content-id', 'content-description']);
 
 /** Split a multipart body into its raw parts (headers + body, no boundary lines, no trailing CRLF). */
 export function splitMultipart(body: Buffer, boundary: string): Buffer[] {

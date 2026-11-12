@@ -22,6 +22,8 @@ export interface Draft {
   followupDays?: number;       // T2 F-19: remind me if no reply in N days
   pgpSign?: boolean;           // T6.4 F-39
   pgpEncrypt?: boolean;
+  smimeSign?: boolean;         // T6.5 F-39 (exclusive with the OpenPGP toggles)
+  smimeEncrypt?: boolean;
   minimized: boolean;
   maximized: boolean;
 }

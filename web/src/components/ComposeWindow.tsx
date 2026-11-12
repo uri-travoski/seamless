@@ -28,7 +28,7 @@ import {
   ScheduledIcon, CaretDownIcon, TemplateIcon, KebabIcon, AlarmIcon,
 } from '../icons.tsx';
 import { IconContext } from '@phosphor-icons/react';
-import { ShieldIcon, LockIcon } from '../icons.tsx';
+import { ShieldIcon, LockIcon, SealCheckIcon, LockKeyIcon } from '../icons.tsx';
 
 interface QuickTime { label: string; at: number }
 
@@ -156,6 +156,7 @@ export default function ComposeWindow({ draft }: { draft: Draft }) {
 
   // T6.4 F-39: which of Sign / Encrypt are possible for this From and these recipients
   const [pgpInfo, setPgpInfo] = useState<{ needsPassphrase: boolean; canSign: boolean; signReason?: string; canEncrypt: boolean; encryptReason?: string } | null>(null);
+  const [smimeInfo, setSmimeInfo] = useState<{ canSign: boolean; signReason?: string; canEncrypt: boolean; encryptReason?: string } | null>(null);
   const toKey = draft.to.map((a) => a.email).join(',') + '|' + draft.cc.map((a) => a.email).join(',') + '|' + draft.bcc.map((a) => a.email).join(',');
   useEffect(() => {
     if (!draft.identity) return;
@@ -168,6 +169,14 @@ export default function ComposeWindow({ draft }: { draft: Draft }) {
           if (draft.pgpEncrypt && !r.canEncrypt) patch.pgpEncrypt = false;
           if (Object.keys(patch).length) update(draft.key, patch);
         }).catch(() => setPgpInfo(null));
+      void api.post<NonNullable<typeof smimeInfo>>('/api/smime/check', { fromEmail: draft.identity!.email, identityId: draft.identity!.id, to: draft.to, cc: draft.cc, bcc: draft.bcc })
+        .then((r) => {
+          setSmimeInfo(r);
+          const patch: Partial<Draft> = {};
+          if (draft.smimeSign && !r.canSign) patch.smimeSign = false;
+          if (draft.smimeEncrypt && !r.canEncrypt) patch.smimeEncrypt = false;
+          if (Object.keys(patch).length) update(draft.key, patch);
+        }).catch(() => setSmimeInfo(null));
     }, 400);
     return () => clearTimeout(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -194,10 +203,12 @@ export default function ComposeWindow({ draft }: { draft: Draft }) {
     attachmentIds: draft.attachments.map((a) => a.id),
     attachments: draft.attachments,
     followupDays: draft.followupDays,
-    track: draft.track && !draft.pgpSign && !draft.pgpEncrypt,
+    track: draft.track && !draft.pgpSign && !draft.pgpEncrypt && !draft.smimeSign && !draft.smimeEncrypt,
     perRecipientTracking: draft.track && draft.perRecipientTracking,
     ...(draft.pgpSign ? { pgpSign: true } : {}),
     ...(draft.pgpEncrypt ? { pgpEncrypt: true } : {}),
+    ...(draft.smimeSign ? { smimeSign: true } : {}),
+    ...(draft.smimeEncrypt ? { smimeEncrypt: true } : {}),
     draftId: draft.draftId,
   };
   }, [draft, editor]);
@@ -456,14 +467,26 @@ export default function ComposeWindow({ draft }: { draft: Draft }) {
           </button>
           <button className={`icon-btn pgp-toggle ${draft.pgpSign ? 'active' : ''}`} aria-pressed={!!draft.pgpSign} disabled={!pgpInfo?.canSign && !draft.pgpSign}
             title={pgpInfo && !pgpInfo.canSign ? (pgpInfo.signReason ?? 'Signing is not available') : draft.pgpSign ? 'OpenPGP signature ON (click to turn off)' : 'Sign with OpenPGP'}
-            onMouseDown={(e) => e.preventDefault()} onClick={() => update(draft.key, { pgpSign: !draft.pgpSign })}>
+            onMouseDown={(e) => e.preventDefault()} onClick={() => update(draft.key, { pgpSign: !draft.pgpSign, ...(!draft.pgpSign ? { smimeSign: false, smimeEncrypt: false } : {}) })}>
             <ShieldIcon weight={draft.pgpSign ? 'fill' : 'regular'} />
           </button>
           <button className={`icon-btn pgp-toggle ${draft.pgpEncrypt ? 'active' : ''}`} aria-pressed={!!draft.pgpEncrypt} disabled={!pgpInfo?.canEncrypt && !draft.pgpEncrypt}
             title={pgpInfo && !pgpInfo.canEncrypt ? (pgpInfo.encryptReason ?? 'Encryption is not available') : draft.pgpEncrypt ? 'OpenPGP encryption ON (click to turn off)' : 'Encrypt with OpenPGP'}
-            onMouseDown={(e) => e.preventDefault()} onClick={() => update(draft.key, { pgpEncrypt: !draft.pgpEncrypt })}>
+            onMouseDown={(e) => e.preventDefault()} onClick={() => update(draft.key, { pgpEncrypt: !draft.pgpEncrypt, ...(!draft.pgpEncrypt ? { smimeSign: false, smimeEncrypt: false } : {}) })}>
             <LockIcon weight={draft.pgpEncrypt ? 'fill' : 'regular'} />
           </button>
+          {(smimeInfo?.canSign || smimeInfo?.canEncrypt || draft.smimeSign || draft.smimeEncrypt) && (<>
+            <button className={`icon-btn pgp-toggle ${draft.smimeSign ? 'active' : ''}`} aria-pressed={!!draft.smimeSign} disabled={!smimeInfo?.canSign && !draft.smimeSign}
+              title={smimeInfo && !smimeInfo.canSign ? (smimeInfo.signReason ?? 'S/MIME signing is not available') : draft.smimeSign ? 'S/MIME signature ON (click to turn off)' : 'Sign with S/MIME'}
+              onMouseDown={(e) => e.preventDefault()} onClick={() => update(draft.key, { smimeSign: !draft.smimeSign, ...(!draft.smimeSign ? { pgpSign: false, pgpEncrypt: false } : {}) })}>
+              <SealCheckIcon weight={draft.smimeSign ? 'fill' : 'regular'} />
+            </button>
+            <button className={`icon-btn pgp-toggle ${draft.smimeEncrypt ? 'active' : ''}`} aria-pressed={!!draft.smimeEncrypt} disabled={!smimeInfo?.canEncrypt && !draft.smimeEncrypt}
+              title={smimeInfo && !smimeInfo.canEncrypt ? (smimeInfo.encryptReason ?? 'S/MIME encryption is not available') : draft.smimeEncrypt ? 'S/MIME encryption ON (click to turn off)' : 'Encrypt with S/MIME'}
+              onMouseDown={(e) => e.preventDefault()} onClick={() => update(draft.key, { smimeEncrypt: !draft.smimeEncrypt, ...(!draft.smimeEncrypt ? { pgpSign: false, pgpEncrypt: false } : {}) })}>
+              <LockKeyIcon weight={draft.smimeEncrypt ? 'fill' : 'regular'} />
+            </button>
+          </>)}
         </div>
 
         <div className="editor-scroll">
@@ -507,8 +530,9 @@ export default function ComposeWindow({ draft }: { draft: Draft }) {
           )}
           <div className="grow" />
           {draft.followupDays && <span className="track-state" title="You will be reminded if nobody replies"><AlarmIcon size={14} /> Remind in {draft.followupDays}d</span>}
+          {(draft.smimeSign || draft.smimeEncrypt) && <span className="track-state" title="S/MIME"><LockIcon weight="fill" size={14} /> S/MIME {draft.smimeEncrypt ? 'encrypted' : ''}{draft.smimeEncrypt && draft.smimeSign ? ' + ' : ''}{draft.smimeSign ? 'signed' : ''}</span>}
           {(draft.pgpSign || draft.pgpEncrypt) && <span className="track-state" title="OpenPGP (PGP/MIME)"><LockIcon weight="fill" size={14} /> {draft.pgpEncrypt ? 'Encrypted' : ''}{draft.pgpEncrypt && draft.pgpSign ? ' + ' : ''}{draft.pgpSign ? 'Signed' : ''}</span>}
-          {draft.track && !draft.pgpSign && !draft.pgpEncrypt && <span className="track-state" title="Open tracking is on for this message"><EyeIcon weight="fill" size={14} /> Tracked{draft.perRecipientTracking ? ' per recipient' : ''}</span>}
+          {draft.track && !draft.pgpSign && !draft.pgpEncrypt && !draft.smimeSign && !draft.smimeEncrypt && <span className="track-state" title="Open tracking is on for this message"><EyeIcon weight="fill" size={14} /> Tracked{draft.perRecipientTracking ? ' per recipient' : ''}</span>}
           <div className="label-menu">
             <button className={`icon-btn ${moreOpen ? 'active' : ''}`} title="More options" onClick={() => setMoreOpen((v) => !v)}><KebabIcon /></button>
             {moreOpen && (

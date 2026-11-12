@@ -320,7 +320,7 @@ function MessageCard({ email, expanded, onToggle }: { email: ApiEmail; expanded:
     // cache first, then network
     void cache.getBody(email.id).then((hit) => { if (alive && hit && !settings.allowRemoteImages) { setBody(hit); setNoteDraft(hit.note ?? ''); setNoteOpen(!!hit.note); } });
     fetchBody(email.id, settings.allowRemoteImages)
-      .then((b) => { if (alive) { setBody(b); setNoteDraft(b.note); setNoteOpen(!!b.note); if (!settings.allowRemoteImages && !b.pgp?.decrypted) void cache.putBody(email.id, b); } })
+      .then((b) => { if (alive) { setBody(b); setNoteDraft(b.note); setNoteOpen(!!b.note); if (!settings.allowRemoteImages && !b.pgp?.decrypted && !b.smime?.decrypted) void cache.putBody(email.id, b); } })
       .catch(() => {});
     return () => { alive = false; };
   }, [email.id, expanded, settings.allowRemoteImages]);
@@ -447,8 +447,8 @@ function MessageCard({ email, expanded, onToggle }: { email: ApiEmail; expanded:
               <button className="btn" onClick={loadRemote}>Load images</button>
             </div>
           )}
-          {body && (body.pgp || body.pgpKeys?.length) && (
-            <PgpBar emailId={email.id} pgp={body.pgp ?? null} keys={body.pgpKeys ?? []} onUnlock={(pass) => fetchBody(email.id, remoteLoaded, pass).then(setBody).catch(() => toast('Could not open the message', 'error'))} onImported={() => fetchBody(email.id, remoteLoaded).then(setBody).catch(() => {})} />
+          {body && (body.pgp || body.smime || body.pgpKeys?.length) && (
+            <PgpBar emailId={email.id} smime={body.smime ?? null} pgp={body.pgp ?? null} keys={body.pgpKeys ?? []} onUnlock={(pass) => fetchBody(email.id, remoteLoaded, pass).then(setBody).catch(() => toast('Could not open the message', 'error'))} onImported={() => fetchBody(email.id, remoteLoaded).then(setBody).catch(() => {})} />
           )}
           {body?.invite && <InviteCard invite={body.invite} onChange={(invite) => setBody({ ...body, invite })} />}
           <div className="msg-body">
