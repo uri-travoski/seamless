@@ -58,7 +58,7 @@ const seamlessLight: Tokens = {
   '--shadow-1': '0 1px 3px rgba(20, 30, 40, 0.10), 0 4px 14px rgba(20, 30, 40, 0.08)',
   '--shadow-2': '0 6px 18px rgba(20, 30, 40, 0.18), 0 18px 48px rgba(20, 30, 40, 0.16)',
   '--font-sans': SYSTEM_SANS, '--font-display': SYSTEM_SANS, '--font-mono': MONO, '--display-weight': '700',
-  '--header-height': '50px', '--sidebar-width': '232px',
+  '--header-height': '60px', '--sidebar-width': '232px',
 };
 
 const seamlessDark: Tokens = {
