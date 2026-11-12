@@ -152,3 +152,16 @@ export async function notifyViewMatches(userId: number, messageId: number): Prom
   if (fired) countCache.delete(userId);
   return fired;
 }
+
+// ---- default views (seeded once per user; the user can edit or delete them afterwards) ----
+const DEFAULT_VIEWS = [
+  { name: 'Waiting for reply', icon: 'hourglass', query: 'is:waiting' },
+  { name: 'Attachments 5 MB+', icon: 'paperclip', query: 'has:attachment size>5mb' },
+];
+
+export async function ensureDefaultViews(userId: number): Promise<void> {
+  if ((await getUserSetting(userId, 'default_views_seeded')) === '1') return;
+  await setUserSetting(userId, 'default_views_seeded', '1');
+  const have = new Set((await q<{ query: string }>('SELECT query FROM saved_views WHERE user_id = ?', [userId])).map((r) => r.query.toLowerCase()));
+  for (const v of DEFAULT_VIEWS) if (!have.has(v.query.toLowerCase())) await createView(userId, { ...v, showCount: false });
+}

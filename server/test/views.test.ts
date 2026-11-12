@@ -142,6 +142,16 @@ describe('saved views API', () => {
     expect((await api(cka, 'GET', '/api/views/counts')).json()[String(v.id)]).toBe(3);
   });
 
+  it('seeds Waiting for reply and Attachments 5 MB+ once, and does not bring back deleted ones', async () => {
+    await api(cka, 'POST', '/api/views/defaults');
+    const first = (await api(cka, 'GET', '/api/views')).json();
+    expect(first.map((v: any) => v.query).sort()).toEqual(['has:attachment size>5mb', 'is:waiting']);
+    await api(cka, 'DELETE', `/api/views/${first[0].id}`);
+    await api(cka, 'POST', '/api/views/defaults');
+    expect((await api(cka, 'GET', '/api/views')).json()).toHaveLength(1);
+    expect((await api(ckb, 'GET', '/api/views')).json()).toEqual([]);
+  });
+
   it('isolation: B cannot see, edit, delete or count A\'s views, and A\'s mail is not in B\'s counts', async () => {
     const v = (await api(cka, 'POST', '/api/views', { name: 'Mine', query: 'older_than:1d' })).json();
     await add('old', { ageDays: 3 });

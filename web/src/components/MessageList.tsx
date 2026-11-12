@@ -16,6 +16,7 @@ import {
 } from '../icons.tsx';
 import { useSession } from '../state/session.ts';
 import { useUi } from '../state/ui.ts';
+import QuickStrip from './QuickStrip.tsx';
 import SnoozeButton from './SnoozeMenu.tsx';
 import { fmtSnoozeLong } from '../snoozeTimes.ts';
 import { DENSITY } from '../theme/registry.ts';
@@ -385,12 +386,7 @@ export default function MessageList() {
       ) : (
         <div className="list-toolbar">
           <span className="title">{view.title}<span className="total">{total > 0 ? total.toLocaleString() : ''}</span></span>
-          <span className="quick-pills" role="group" aria-label="Quick filters">
-            {([[undefined, 'All'], ['unread', 'Unread'], ['attach', 'Attachments']] as const).map(([q, name]) => (
-              <button key={name} className={`quick-pill ${view.quick === q ? 'on' : ''}`}
-                onClick={() => useMail.getState().setView({ ...view, quick: q })}>{name}{q === 'unread' && viewMailbox && viewMailbox.unreadEmails > 0 ? ` (${viewMailbox.unreadEmails})` : ''}</button>
-            ))}
-          </span>
+          <span style={{ flex: 1 }} />
           <button className="icon-btn" title={table ? 'Split view' : 'Table view'}
             onClick={() => saveSettings({ layout: table ? 'split' : 'table' })}>
             {table ? <SplitViewIcon /> : <TableViewIcon />}
@@ -401,6 +397,7 @@ export default function MessageList() {
           </button>
         </div>
       )}
+      {!checkedCount && <QuickStrip view={view} unread={viewMailbox?.unreadEmails ?? 0} />}
       {!allMatching && pageAllChecked && total > checkedCount && (
         <div className="select-all-banner">
           All {checkedCount.toLocaleString()} loaded messages are selected.{' '}

@@ -23,10 +23,12 @@ interface ViewsState {
 
 export const VIEW_ICONS = ['magnifying-glass', 'star', 'hourglass', 'warning', 'paperclip', 'receipt', 'envelope-simple', 'tag'] as const;
 
+let defaultsAsked = false;
 export const useViews = create<ViewsState>((set, get) => ({
   views: [], counts: {}, suggestions: [], editing: null,
   load: async () => {
     try {
+      if (!defaultsAsked) { defaultsAsked = true; await api.post('/api/views/defaults'); }
       const [views, suggestions] = await Promise.all([
         api.get<ApiSavedView[]>('/api/views'), api.get<ApiViewSuggestion[]>('/api/views/suggestions')]);
       set({ views, suggestions });

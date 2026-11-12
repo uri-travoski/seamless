@@ -74,7 +74,7 @@ export function register(app: FastifyInstance): void {
 
   /** Bell dropdown: unread badge + the latest six. */
   app.get('/api/notifications/summary', async (req) => {
-    const page = await listNotifications(uid(req), { limit: 6 });
+    const page = await listNotifications(uid(req), { limit: 20 });
     return { unread: page.unread, latest: page.items };
   });
 

@@ -184,41 +184,6 @@ export default function Sidebar({ open, onNavigate, onAddLabel }: { open: boolea
         {labels.length === 0 && <button className="side-item side-hint" onClick={onAddLabel}><span className="name">+ New label</span></button>}
       </div>
 
-      <div className="side-section" aria-label="Leads">
-        <button className={`side-item ${route.page === 'leads' ? 'active' : ''}`} onClick={() => { navigate({ page: 'leads', params: {} }); onNavigate(); }} title="Leads captured from web forms">
-          <UserPlus className="glyph" /><span className="name">Leads</span>
-          {newLeads > 0 && <span className="count">{newLeads}</span>}
-        </button>
-      </div>
-
-      {(pinned.length > 0 || suggestions.length > 0) && (
-        <div className="side-section" aria-label="Smart views">
-          <div className="side-header"><span>Smart views</span></div>
-          {pinned.map((v) => (
-            <div key={v.id} className={`side-item view-item ${viewActive(v) ? 'active' : ''}`}>
-              <button className="view-open" onClick={() => openView(v)} title={v.query}>
-                <ViewGlyph icon={v.icon} className="glyph" />
-                <span className="view-dot" style={v.color ? { background: v.color } : { display: 'none' }} />
-                <span className="name">{v.name}</span>
-                {v.showCount && counts[String(v.id)] !== undefined && <span className="count muted">{counts[String(v.id)]}</span>}
-              </button>
-              <button className="icon-btn view-edit" aria-label={`Edit ${v.name}`} title="Edit" onClick={() => useViews.getState().openEdit(v)}><PencilSimple size={13} /></button>
-            </div>
-          ))}
-          {suggestions.length > 0 && (
-            <div className="view-suggest" role="region" aria-label="Suggested smart views">
-              <div className="view-suggest-title">Suggested views</div>
-              {suggestions.map((sg) => (
-                <button key={sg.key} className="view-suggest-item" onClick={() => void useViews.getState().addSuggestion(sg)} title={sg.query}>
-                  <ViewGlyph icon={sg.icon} className="glyph" /> <span>{sg.name}</span> <span className="view-suggest-add">+ Add</span>
-                </button>
-              ))}
-              <button className="btn ghost" onClick={() => void useViews.getState().dismissSuggestions()}>Dismiss</button>
-            </div>
-          )}
-        </div>
-      )}
-
       {hasShared && (
         <div className="side-section">
           <div className="side-header"><span>Shared</span></div>
