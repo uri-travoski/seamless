@@ -5,6 +5,7 @@ import { broadcast } from '../ws.ts';
 import { recomputeDisposition } from '../classify/engine.ts';
 import { scopeAccountIds } from '../mail/categories.ts';
 import { uid } from './util.ts';
+import { acceptedSharedLabels } from '../mail/sharedLabels.ts';
 
 const VIS = new Set(['always', 'unread', 'hidden']);
 
@@ -67,12 +68,29 @@ export function register(app: FastifyInstance): void {
         ${inScope ? 'AND m.account_id = ANY(?::int[])' : ''}
       GROUP BY ml.label_id`, inScope ? [userId, inScope] : [userId]);
     const byId = new Map(counts.map((c) => [c.label_id, c]));
-    return (await q('SELECT * FROM labels WHERE user_id = ? ORDER BY sort, lower(name)', [userId])).map((l: any) => ({
+    const own = (await q('SELECT * FROM labels WHERE user_id = ? ORDER BY sort, lower(name)', [userId])).map((l: any) => ({
       id: l.id, name: l.name, color: l.color, description: l.description, sort: l.sort,
       keepDefault: l.keep_default, retentionDays: l.retention_days, protected: l.protected, autoMarkRead: l.auto_mark_read,
       parentId: l.parent_id, sidebarVisibility: l.sidebar_visibility,
       total: byId.get(l.id)?.total ?? 0, unread: byId.get(l.id)?.unread ?? 0,
     }));
+    // T8.2: labels other people shared with me (accepted): read-only, counted over the shared mailboxes they apply to
+    const sharedMap = await acceptedSharedLabels(userId);
+    if (!sharedMap.size) return own;
+    const sc = await q<{ label_id: number; account_id: number; total: number; unread: number }>(`
+      SELECT ml.label_id, m.account_id, COUNT(*) AS total, COUNT(*) FILTER (WHERE m.unread) AS unread
+      FROM message_labels ml JOIN messages m ON m.id = ml.message_id JOIN mailboxes mb ON mb.id = m.mailbox_id
+      WHERE ml.label_id = ANY(?::int[]) AND m.user_id <> ? AND (mb.role IS NULL OR mb.role NOT IN ('trash','junk'))
+      GROUP BY ml.label_id, m.account_id`, [[...sharedMap.keys()], userId]);
+    const shared = [...sharedMap.entries()].map(([id, l]) => {
+      const rows = sc.filter((r) => r.label_id === id && l.accountIds.includes(r.account_id) && (!inScope || inScope.includes(r.account_id)));
+      return {
+        id, name: l.name, color: l.color, description: l.description, sort: 0, keepDefault: false, retentionDays: null, protected: false, autoMarkRead: false,
+        parentId: null, sidebarVisibility: 'always', total: rows.reduce((n, r) => n + Number(r.total), 0), unread: rows.reduce((n, r) => n + Number(r.unread), 0),
+        shared: true, sharedBy: l.ownerName, sharedAccountIds: l.accountIds,
+      };
+    });
+    return [...own, ...shared];
   });
 
   app.post('/api/labels', async (req, reply) => {

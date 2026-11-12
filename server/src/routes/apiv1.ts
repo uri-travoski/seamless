@@ -78,7 +78,7 @@ export function register(app: FastifyInstance): void {
 
   v1('post', '/messages/:id/labels', 'labels:write', async (req, reply) => {
     const id = String(req.params.id);
-    const row = await getMsgRow(uid(req), id, 'own');
+    const row = await getMsgRow(uid(req), id);
     if (!row) return reply.code(404).send({ error: 'not found' });
     const b = (req.body ?? {}) as any;
     const cur = (await q<{ label_id: number }>('SELECT label_id FROM message_labels WHERE message_id = ?', [row.id])).map((l) => l.label_id);

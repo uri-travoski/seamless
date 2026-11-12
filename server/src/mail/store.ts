@@ -6,6 +6,7 @@ import { deleteMessageRow } from './ingest.ts';
 import { newsletterInfo } from './newsletters.ts';
 import { VIP_SQL, isVipSender } from './vip.ts';
 import { scopeAccountIds, categoryIdByName } from './categories.ts';
+import { acceptedLabelIds, SHARED_LABEL_VISIBLE_SQL } from './sharedLabels.ts';
 import { accessibleAccountIds, roleFor, canSendRole, Forbidden, type AccessRole } from '../auth/access.ts';
 
 const UNIFIED_ROLES: MailboxRole[] = ['inbox', 'drafts', 'sent', 'scheduled', 'archive', 'junk', 'trash'];
@@ -82,7 +83,11 @@ const BASE_SELECT = `
 `;
 
 export async function rowToApi(r: MsgRow, viewerId: number = r.user_id): Promise<ApiEmail> {
-  const labels = await q<{ label_id: number }>('SELECT label_id FROM message_labels WHERE message_id = ?', [r.id]);
+  let labels = await q<{ label_id: number }>('SELECT label_id FROM message_labels WHERE message_id = ?', [r.id]);
+  if (viewerId !== r.user_id) {                      // on shared mail the viewer only sees the labels shared with them
+    const ok = new Set(await acceptedLabelIds(viewerId, r.account_id));
+    labels = labels.filter((l) => ok.has(l.label_id));
+  }
   let openCount = -1;
   let lastOpenAt: string | null = null;
   let autoOpenCount = 0;
@@ -253,8 +258,8 @@ export async function queryEmails(userId: number, req: EmailQueryRequest): Promi
   }
   if (f.accountId) { where.push('m.account_id = ?'); params.push(f.accountId); }
   if (f.label) {
-    where.push('EXISTS (SELECT 1 FROM message_labels ml WHERE ml.message_id = m.id AND ml.label_id = ?)');
-    params.push(f.label);
+    where.push(`EXISTS (SELECT 1 FROM message_labels ml JOIN labels l ON l.id = ml.label_id WHERE ml.message_id = m.id AND ml.label_id = ? AND ${SHARED_LABEL_VISIBLE_SQL})`);
+    params.push(f.label, userId, userId);
   }
   if (f.hasKeyword === '$seen') where.push('m.unread = false');
   if (f.notKeyword === '$seen') where.push('m.unread = true');
@@ -298,8 +303,8 @@ export async function queryEmails(userId: number, req: EmailQueryRequest): Promi
     if (p.subject) { where.push('m.subject ILIKE ?'); params.push(`%${p.subject.replace(/[\\%_]/g, '\\$&')}%`); }
     if (p.to) { where.push('m.to_json ILIKE ?'); params.push(`%${p.to}%`); }
     if (p.label) {
-      where.push('EXISTS (SELECT 1 FROM message_labels ml JOIN labels l ON l.id = ml.label_id WHERE ml.message_id = m.id AND lower(l.name) = lower(?))');
-      params.push(p.label);
+      where.push(`EXISTS (SELECT 1 FROM message_labels ml JOIN labels l ON l.id = ml.label_id WHERE ml.message_id = m.id AND lower(l.name) = lower(?) AND ${SHARED_LABEL_VISIBLE_SQL})`);
+      params.push(p.label, userId, userId);
     }
     if (p.inRole) { where.push('mb.role = ?'); params.push(p.inRole); }
     if (p.category) {
@@ -434,8 +439,9 @@ export async function setKeywords(userId: number, emailId: string, patch: Record
 }
 
 export async function setLabels(userId: number, emailId: string, labelIds: number[]): Promise<void> {
-  const row = await getMsgRow(userId, emailId, 'own'); // labels are per user: not on shared mail in T4
+  const row = await getMsgRow(userId, emailId);
   if (!row) return;
+  if (row.user_id !== userId) return setSharedLabels(userId, row, labelIds);   // T8.2: shared mail, shared labels only
   const before = (await q<{ label_id: number }>('SELECT label_id FROM message_labels WHERE message_id = ?', [row.id])).map((l) => l.label_id);
   await run('DELETE FROM message_labels WHERE message_id = ?', [row.id]);
   for (const lid of labelIds) {
@@ -446,6 +452,21 @@ export async function setLabels(userId: number, emailId: string, labelIds: numbe
     `, [row.id, lid, userId]);
   }
   await recordCorrection(userId, row, before, labelIds);
+  await bumpState();
+}
+
+/** A responder/manager who accepted the owner's labels changes ONLY those labels; the owner's others stay as they are. */
+async function setSharedLabels(userId: number, row: MsgRow, labelIds: number[]): Promise<void> {
+  const role = await roleFor(userId, row.account_id);
+  if (!canSendRole(role)) throw new Forbidden();
+  const allowed = await acceptedLabelIds(userId, row.account_id);
+  if (!allowed.length) throw new Forbidden('accept the shared labels first (Settings → Labels)');
+  const have = new Set((await q<{ label_id: number }>('SELECT label_id FROM message_labels WHERE message_id = ?', [row.id])).map((l) => l.label_id));
+  // ids that are not shared with me are fine only when they are already on the message (a bulk snapshot carries them along)
+  if (labelIds.some((id) => !allowed.includes(Number(id)) && !have.has(Number(id)))) throw new Forbidden('that label is not shared with you for this mailbox');
+  const want = labelIds.map(Number).filter((id) => allowed.includes(id));
+  await run('DELETE FROM message_labels WHERE message_id = ? AND label_id = ANY(?::int[])', [row.id, allowed]);
+  for (const lid of want) await run('INSERT INTO message_labels(message_id, label_id) VALUES (?,?) ON CONFLICT DO NOTHING', [row.id, lid]);
   await bumpState();
 }
 

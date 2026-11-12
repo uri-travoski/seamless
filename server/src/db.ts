@@ -1340,6 +1340,23 @@ CREATE TABLE quota_alerts (
 );
 `,
   },
+  {
+    id: 42,
+    // T8.2: shared labels. The share row says whether the owner offered their labels and what the invitee answered;
+    // shared_label_offers = the picked labels (no rows = all of the owner's labels).
+    sql: `
+ALTER TABLE mailbox_shares ADD COLUMN labels_shared BOOLEAN NOT NULL DEFAULT false;
+ALTER TABLE mailbox_shares ADD COLUMN labels_status TEXT NOT NULL DEFAULT 'none' CHECK (labels_status IN ('none','pending','accepted','rejected'));
+ALTER TABLE mailbox_shares ADD COLUMN labels_later_at BIGINT;
+CREATE TABLE shared_label_offers (
+  account_id INTEGER NOT NULL,
+  user_id INTEGER NOT NULL,
+  label_id INTEGER NOT NULL REFERENCES labels(id) ON DELETE CASCADE,
+  PRIMARY KEY (account_id, user_id, label_id),
+  FOREIGN KEY (account_id, user_id) REFERENCES mailbox_shares(account_id, user_id) ON DELETE CASCADE
+);
+`,
+  },
 ];
 
 /** Run `fn` in one transaction. Events emitted through the client are only turned into

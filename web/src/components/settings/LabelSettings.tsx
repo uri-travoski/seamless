@@ -67,8 +67,65 @@ function SidebarLayout() {
   );
 }
 
+interface Offer {
+  accountId: number; email: string; mailbox: string; ownerName: string; owner: string; status: 'pending' | 'accepted' | 'rejected';
+  role: string; count: number; labels: { id: number; name: string; color: string }[]; hideBannerUntil: number | null;
+}
+
+/** T8.2: labels other people offered from a shared mailbox — banner for new offers, list for the rest. */
+function SharedWithMe({ onChanged }: { onChanged: () => void }) {
+  const [offers, setOffers] = useState<Offer[]>([]);
+  const load = async () => { try { setOffers(await api.get<Offer[]>('/api/labels/shared')); } catch { /* not signed in yet */ } };
+  useEffect(() => { void load(); }, []);
+  const answer = async (o: Offer, action: 'accept' | 'reject' | 'later' | 'leave') => {
+    try {
+      await api.post(`/api/labels/shared/${o.accountId}/respond`, { action });
+      toast(action === 'accept' ? 'Shared labels added' : action === 'later' ? 'We will keep this for later' : action === 'reject' ? 'Rejected' : 'You left the shared labels');
+      await load(); onChanged();
+    } catch (e: any) { toast(e?.message ?? 'Failed', 'error'); }
+  };
+  if (!offers.length) return null;
+  const pending = offers.filter((o) => o.status === 'pending' && !(o.hideBannerUntil && o.hideBannerUntil > Date.now()));
+  const names = (o: Offer) => o.labels.map((l) => l.name).join(', ');
+  return (
+    <div>
+      {pending.map((o) => (
+        <div key={o.accountId} className="edit-card" role="status">
+          <b>{o.ownerName}</b> shared {o.count} label{o.count === 1 ? '' : 's'} from <b>{o.mailbox}</b>
+          <div className="dim">{names(o)}</div>
+          <div className="row" style={{ display: 'flex', gap: 8, marginTop: 8 }}>
+            <button className="btn primary" onClick={() => void answer(o, 'accept')}>Accept</button>
+            <button className="btn" onClick={() => void answer(o, 'reject')}>Reject</button>
+            <button className="btn ghost" onClick={() => void answer(o, 'later')}>Decide later</button>
+          </div>
+        </div>
+      ))}
+      <h3>Shared with me</h3>
+      <p className="settings-desc">Labels other people share from a mailbox they share with you. You cannot rename or delete them; responders and managers can put them on that mailbox's mail.</p>
+      <table className="tbl">
+        <thead><tr><th>From</th><th>Labels</th><th>Status</th><th></th></tr></thead>
+        <tbody>
+          {offers.map((o) => (
+            <tr key={o.accountId}>
+              <td>{o.ownerName} <span className="dim">· {o.mailbox}</span></td>
+              <td>{o.labels.map((l) => <span key={l.id} className="label-cell" style={{ marginRight: 8 }}><span className="label-dot" style={{ background: l.color }} /> {l.name}</span>)}</td>
+              <td className="dim">{o.status === 'accepted' ? 'Accepted' : o.status === 'rejected' ? 'Rejected' : 'Waiting for your answer'}</td>
+              <td className="row-btns">
+                {o.status !== 'accepted' && <button className="btn small" onClick={() => void answer(o, 'accept')}>Accept</button>}
+                {o.status === 'accepted' && <button className="btn ghost small danger" onClick={() => void answer(o, 'leave')}>Leave</button>}
+                {o.status === 'pending' && <button className="btn ghost small" onClick={() => void answer(o, 'reject')}>Reject</button>}
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
 export default function LabelSettings() {
-  const labels = useMail((s) => s.labels);
+  const allLabels = useMail((s) => s.labels);
+  const labels = useMemo(() => allLabels.filter((l) => !l.shared), [allLabels]);
   const refreshLabels = useMail((s) => s.refreshLabels);
   const labelSort = useSession((s) => s.settings.labelSort) ?? 'az';
   const save = useSession((s) => s.saveSettings);
@@ -139,6 +196,8 @@ export default function LabelSettings() {
         Labels work across every mailbox. Nest them under a parent, choose when they show in the sidebar, and give each a
         retention: protected labels are never auto-deleted, keep-labels keep forever, delete-after starts a countdown.
       </p>
+
+      <SharedWithMe onChanged={() => void refreshLabels()} />
 
       {editing && (
         <div className="edit-card">

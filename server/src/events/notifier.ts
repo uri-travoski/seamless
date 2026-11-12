@@ -50,6 +50,7 @@ export const DEFAULT_PREFS: Record<EventType, { inApp: boolean; push: boolean }>
   'webhook.failed': { inApp: true, push: false },
   'quota.warning': { inApp: true, push: true },
   'quota.full': { inApp: true, push: true },
+  'labels.offered': { inApp: true, push: true },
 };
 
 export const ALL_EVENT_TYPES = Object.keys(DEFAULT_PREFS) as EventType[];
@@ -168,6 +169,8 @@ export function render(ev: EventRow): Rendered {
       }
       return { title: `${p.email ?? 'A user'} ${full ? 'has used all of their mailbox space' : `is ${p.percent}% full`}`, body: `${use}. Nothing is refused or deleted.`, link: '/settings/users', groupKey: null, accountId: null };
     }
+    case 'labels.offered':
+      return { title: `${p.ownerName ?? 'Someone'} shared ${p.count ?? 'some'} label${p.count === 1 ? '' : 's'} from ${p.email ?? 'a mailbox'}`, body: 'Accept or reject them in Settings → Labels.', link: '/settings/labels', groupKey: null, accountId };
     case 'reminder.due':
     case 'followup.due':
     case 'snooze.woke':

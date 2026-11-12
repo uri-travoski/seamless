@@ -19,7 +19,7 @@ change sharing. Removing someone, or changing their role, takes effect straight 
 - Search covers shared mail you can read — never mail from mailboxes that were not shared with you.
 
 ## Good to know
-- **Labels are personal.** You cannot label shared mail; the owner's labels stay the owner's.
+- **Labels are personal unless the owner shares them.** Your own labels never go onto shared mail. The owner can offer their labels, and you can accept them (see *Sharing labels* below).
 - **Notes are private.** A note you add to a shared message is visible only to you.
 - **Sending:** replies from a shared mailbox go out through the owner's server and identity, and the copy lands in the
   mailbox's Sent folder. A viewer who tries to send gets "403 – viewers cannot send".
@@ -46,3 +46,29 @@ If someone's access is removed, their assignments are cleared.
 In the sidebar, a **Shared** section appears as soon as you have any sharing: **Assigned to me** and **Unassigned**.
 Search operators: `assigned:me`, `assigned:none`, `status:open`, `status:pending`, `status:done`
 (for example `status:pending assigned:me`).
+
+## Sharing labels
+Labels are personal by default. The owner of a mailbox can offer their labels to the people they share it with; each person
+decides for themselves.
+
+**If you own the mailbox (offering):**
+1. Settings → **Mailboxes**, find the mailbox and click **Share with…**.
+2. When adding a person, tick **Also share my labels with this person** and click **Share**. For someone you already share
+   with, tick the same box under their name.
+3. By default all your labels are offered. To offer only some, click **Pick labels** next to their name and tick the ones you want
+   (nothing ticked = all labels).
+4. Next to their name you see where it stands: *waiting for their answer*, *accepted* or *rejected*. If they rejected, you can
+   click **Offer again**.
+5. To stop, untick the box. The labels disappear for that person straight away; they stay on the messages for you.
+
+**If you were offered labels:**
+1. You get a notification ("Alex shared 3 labels from Support") and a banner at the top of Settings → **Labels**.
+2. Click **Accept** to use them, **Reject** to say no, or **Decide later**. *Decide later* keeps the offer waiting and hides the
+   banner for a week; you can still answer any time under **Shared with me** on the same page.
+3. Accepted labels show on the shared mailbox's mail (with the owner's name and colour), appear in the sidebar, and work in
+   search (`label:Work`). You cannot rename, recolour or delete them.
+4. **Responders and managers** can tick or untick these labels on messages of that shared mailbox; everyone who has the label
+   sees the change. **Viewers** see the labels but cannot change them.
+5. Changed your mind? Settings → Labels → **Shared with me** → **Leave** (or **Accept** again after rejecting).
+
+Your own labels stay personal and still cannot be used on shared mail.

@@ -615,7 +615,7 @@ export default function ReadingPane() {
         <span className="tb-sep" />
         <button className="icon-btn" title="Mark unread (Shift+U)" onClick={() => { markRead(selected.id, false); void select(null); }}><EnvelopeIcon /></button>
         <button className={`icon-btn ${selected.keywords.$flagged ? 'active' : ''}`} title="Star (s)" onClick={() => actions.star(selected.id)}><StarIcon weight={selected.keywords.$flagged ? 'fill' : 'regular'} /></button>
-        <LabelPicker value={selected.labelIds} onChange={(ids) => applyLabels(selected.id, ids)} />
+        <LabelPicker value={selected.labelIds} accountId={selected.accountId} onChange={(ids) => applyLabels(selected.id, ids)} />
         {selected.mailboxRole === 'inbox' && <SnoozeButton onPick={(at) => void actions.snooze(selected.id, at)} />}
         {inBin
           ? <button className="icon-btn" title={selected.mailboxRole === 'junk' ? 'Not spam' : 'Restore to Inbox'} onClick={() => (selected.mailboxRole === 'junk' ? actions.notSpam(selected.id) : actions.restore(selected.id))}><RestoreMailIcon /></button>

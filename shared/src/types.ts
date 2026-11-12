@@ -41,6 +41,9 @@ export interface ApiLabel {
   sidebarVisibility?: 'always' | 'unread' | 'hidden';
   total?: number;                                    // messages carrying it (outside Bin/Spam)
   unread?: number;
+  shared?: boolean;                                  // T8.2: someone else's label shared with me (read-only)
+  sharedBy?: string;
+  sharedAccountIds?: number[];
 }
 
 export interface ApiRule {
@@ -489,7 +492,8 @@ export type EventType =
   | 'disposable.received' | 'disposable.leak' | 'lead.captured' | 'view.match' | 'assignment.changed' | 'comment.mention'
   | 'security.login' | 'security.2fa_changed'
   | 'webhook.failed'
-  | 'quota.warning' | 'quota.full';
+  | 'quota.warning' | 'quota.full'
+  | 'labels.offered';
 
 /** UI filter groups on the notifications page (each maps to one or more event types). */
 export const NOTIFICATION_GROUPS: { id: string; name: string; types: EventType[] }[] = [
@@ -506,7 +510,7 @@ export const NOTIFICATION_GROUPS: { id: string; name: string; types: EventType[]
   { id: 'integrations', name: 'Integrations', types: ['webhook.failed'] },
   { id: 'views', name: 'Smart views', types: ['view.match'] },
   { id: 'quota', name: 'Mailbox space', types: ['quota.warning', 'quota.full'] },
-  { id: 'assignments', name: 'Assignments', types: ['assignment.changed', 'comment.mention'] },
+  { id: 'assignments', name: 'Assignments', types: ['assignment.changed', 'comment.mention', 'labels.offered'] },
 ];
 
 export interface ApiNotification {
