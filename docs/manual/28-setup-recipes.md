@@ -95,8 +95,11 @@ Scheduled (send-later) mail is not delayed. More: [Composing & sending](04-compo
 ## Archive mail older than N years
 
 1. In Settings > Storage, add a **backup** storage target (a different bucket from your mail).
-2. Ask for a preview of what N years would archive (`GET /api/archives/preview?olderThan=3y`) and a dry run (`POST /api/archives` with `"dryRun": true`).
-3. Create the archive with mode **copy** first (`POST /api/archives` with `olderThanYears`, `targetId`, `mode`). Check the result and try a search (`GET /api/archives/<id>/search?q=…`).
-4. When you are happy, run the same rule with mode **move** to free space in the app. Restore anything later with `POST /api/archives/<id>/restore`.
+2. Open Settings > Backup > **Archive old mail**. Choose *Archive mail older than* 3 years (or any 1–10, or **Other…**), the mailboxes and the target.
+3. Leave *Copy only* selected first and press **Dry run**, then **Run now**. When the status says *Finished*, press **Browse / search** and try a search.
+4. Happy with it? Run the same rule again with **Move** (type MOVE to confirm) to free space in the app. Restore anything later with **Restore…**.
+5. Want it to repeat? Tick **Every month** and you get a notification each time.
+
+(The same steps are available through the API: `/api/archives`, `/api/archives/preview`, `/api/archives/schedule`.)
 
 See [Backup and restore](11-backup-restore.md) for what is included and what is left out.

@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import type { ApiEmail } from '@seamless/shared';
+import ArchiveHint from './ArchiveHint.tsx';
 import { AttachmentMatch } from './AttachmentMatch.tsx';
 import { AssigneeChip } from './SharedThread.tsx';
 import { useMail, PAGE, PAGINATE_AT, BULK_MAX } from '../state/mail.ts';
@@ -426,6 +427,7 @@ export default function MessageList() {
       </IconContext.Provider>
       <div className="list-scroll" ref={scrollRef}>
         {total === 0 && <div className="list-empty">No messages here.</div>}
+        {total === 0 && view.kind === 'search' && view.query && !/^\s*(is|assigned|in):/.test(view.query) && <ArchiveHint query={view.query} />}
         <div style={{ height: virtualizer.getTotalSize(), position: 'relative' }}>
           {items.map((item) => {
             const id = ids[item.index];

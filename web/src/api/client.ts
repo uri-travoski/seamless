@@ -24,7 +24,7 @@ export const api = {
   post: <T>(url: string, body?: unknown) => req<T>(url, { method: 'POST', body: body !== undefined ? JSON.stringify(body) : undefined }),
   put: <T>(url: string, body?: unknown) => req<T>(url, { method: 'PUT', body: JSON.stringify(body) }),
   patch: <T>(url: string, body?: unknown) => req<T>(url, { method: 'PATCH', body: JSON.stringify(body ?? {}) }),
-  del: <T>(url: string) => req<T>(url, { method: 'DELETE' }),
+  del: <T>(url: string, body?: unknown) => req<T>(url, { method: 'DELETE', body: body !== undefined ? JSON.stringify(body) : undefined }),
 };
 
 type MethodCall = [string, any, string];

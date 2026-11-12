@@ -495,7 +495,8 @@ export type EventType =
   | 'security.login' | 'security.2fa_changed'
   | 'webhook.failed'
   | 'quota.warning' | 'quota.full'
-  | 'labels.offered';
+  | 'labels.offered'
+  | 'archive.done' | 'archive.failed';
 
 /** UI filter groups on the notifications page (each maps to one or more event types). */
 export const NOTIFICATION_GROUPS: { id: string; name: string; types: EventType[] }[] = [
@@ -506,7 +507,7 @@ export const NOTIFICATION_GROUPS: { id: string; name: string; types: EventType[]
   { id: 'snooze', name: 'Snooze', types: ['snooze.woke'] },
   { id: 'send', name: 'Send failures', types: ['send.failed', 'mail.bounced'] },
   { id: 'sync', name: 'Sync errors', types: ['sync.failed', 'oauth.expiring', 'job.failed'] },
-  { id: 'backup', name: 'Backups', types: ['backup.failed', 'backup.ok', 'storage.unreachable', 'storage.migration.done', 'storage.migration.failed', 'export.created', 'export.imported'] },
+  { id: 'backup', name: 'Backups', types: ['backup.failed', 'backup.ok', 'storage.unreachable', 'storage.migration.done', 'storage.migration.failed', 'export.created', 'export.imported', 'archive.done', 'archive.failed'] },
   { id: 'security', name: 'Security', types: ['security.login', 'security.2fa_changed'] },
   { id: 'leads', name: 'Leads', types: ['lead.captured'] },
   { id: 'integrations', name: 'Integrations', types: ['webhook.failed'] },

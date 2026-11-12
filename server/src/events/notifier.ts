@@ -51,6 +51,8 @@ export const DEFAULT_PREFS: Record<EventType, { inApp: boolean; push: boolean }>
   'quota.warning': { inApp: true, push: true },
   'quota.full': { inApp: true, push: true },
   'labels.offered': { inApp: true, push: true },
+  'archive.done': { inApp: true, push: false },
+  'archive.failed': { inApp: true, push: true },
 };
 
 export const ALL_EVENT_TYPES = Object.keys(DEFAULT_PREFS) as EventType[];
@@ -169,6 +171,17 @@ export function render(ev: EventRow): Rendered {
         return { title: full ? 'Your mailbox space is full' : `Your mailbox space is ${p.percent}% used`, body: full ? `${use}. Mail keeps arriving and nothing is deleted, but ask your administrator for more space.` : use, link: '/settings/storage', groupKey: null, accountId: null };
       }
       return { title: `${p.email ?? 'A user'} ${full ? 'has used all of their mailbox space' : `is ${p.percent}% full`}`, body: `${use}. Nothing is refused or deleted.`, link: '/settings/users', groupKey: null, accountId: null };
+    }
+    case 'archive.done':
+    case 'archive.failed': {
+      const bad = ev.type === 'archive.failed';
+      const n = Number(p.archived ?? 0);
+      return {
+        title: bad ? `Archive "${String(p.name ?? '').slice(0, 60)}" failed` : `Archive "${String(p.name ?? '').slice(0, 60)}" is finished`,
+        body: bad ? String(p.error ?? 'Something went wrong.').slice(0, 200)
+          : `${n.toLocaleString()} message${n === 1 ? '' : 's'} ${p.mode === 'move' ? 'moved' : 'copied'}${p.failed ? `, ${p.failed} could not be verified and ${p.mode === 'move' ? 'stayed in the app' : 'were left out'}` : ''}.`,
+        link: '/settings/backup', groupKey: null, accountId: null,
+      };
     }
     case 'labels.offered':
       return { title: `${p.ownerName ?? 'Someone'} shared ${p.count ?? 'some'} label${p.count === 1 ? '' : 's'} from ${p.email ?? 'a mailbox'}`, body: 'Accept or reject them in Settings → Labels.', link: '/settings/labels', groupKey: null, accountId };

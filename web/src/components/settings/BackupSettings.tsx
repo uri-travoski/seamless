@@ -3,6 +3,7 @@ import type { ApiBackup, ApiBackupConfig, ApiBackupStatus, BackupFrequency } fro
 import { api } from '../../api/client.ts';
 import { toast } from '../../toast.ts';
 import { ExportDialog, ImportForm } from './ExportDialog.tsx';
+import ArchiveSettings from './ArchiveSettings.tsx';
 
 const FREQUENCIES: { id: BackupFrequency; name: string }[] = [
   { id: 'every_n_hours', name: 'Every few hours…' },
@@ -229,6 +230,8 @@ export default function BackupSettings() {
           </tbody>
         </table>
       )}
+
+      <ArchiveSettings />
 
       <h3>Export and import</h3>
       <p className="settings-desc">

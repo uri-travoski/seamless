@@ -41,7 +41,7 @@ const ENTRIES: Omit<SettingsEntry, 'tabName'>[] = [
   { label: 'Logs', tab: 'logs', words: 'errors debug activity' },
   { label: 'Audit log (who did what), audit retention', tab: 'audit', words: 'security history export csv retention keep days' },
   { label: 'Storage buckets (mail, backups, spool)', tab: 'storage', admin: true, words: 'r2 b2 s3 minio migrate bucket' },
-  { label: 'Backups and restore', tab: 'backup', admin: true, words: 'export import restore drill mirror' },
+  { label: 'Backups and restore', tab: 'backup', admin: true, words: 'export import restore drill mirror archive old mail older than years move copy' },
   { label: 'Users and roles', tab: 'users', admin: true, words: 'invite admin member password reset disable quota storage limit mailbox for user sign out everywhere' },
 ];
 

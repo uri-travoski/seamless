@@ -6,6 +6,8 @@ import { audit } from '../audit/log.ts';
 import { ArchiveError, parseOlderThan, previewArchive, sampleArchive, type ArchiveOptions } from '../archive/select.ts';
 import { planArchive, getArchive, view, archiveStore, archivePrefix } from '../archive/run.ts';
 import { searchArchive, downloadEml, startRestore } from '../archive/restore.ts';
+import { getSchedule, saveSchedule } from '../archive/schedule.ts';
+import { listTargets } from '../storage/targets.ts';
 
 const fail = (reply: FastifyReply, err: any) => {
   if (err instanceof ArchiveError) return reply.code(err.status).send({ error: err.message });
@@ -24,6 +26,32 @@ export function register(app: FastifyInstance): void {
       const days = parseOlderThan(b);
       return { olderThanDays: days, ...(await previewArchive(uid(req), String(b.scope || 'all'), days, optsOf(b))) };
     } catch (e) { return fail(reply, e); }
+  });
+
+  /** Saved backup storage targets, names only — the archive card needs them and the full list is admin-only. */
+  app.get('/api/archives/targets', async () => ({
+    targets: (await listTargets()).filter((t) => t.role === 'backup').map((t) => ({ id: t.id, name: `${t.bucket}${t.prefix ? ` / ${t.prefix}` : ''}`, provider: t.provider, active: t.active })),
+  }));
+
+  app.get('/api/archives/schedule', async (req) => ({ schedule: await getSchedule(uid(req)) }));
+  app.put('/api/archives/schedule', async (req, reply) => {
+    try { return { schedule: await saveSchedule(uid(req), req.body ?? {}) }; } catch (e) { return fail(reply, e); }
+  });
+
+  /** "Older mail may be in an archive": search every finished archive's index for the signed-in user. */
+  app.get('/api/archives/search', async (req) => {
+    const b = (req.query ?? {}) as any;
+    const rows = await q<any>("SELECT id, name FROM mail_archives WHERE user_id = ? AND manifest_key IS NOT NULL AND status IN ('done','restoring') ORDER BY id DESC", [uid(req)]);
+    const out: any[] = []; let total = 0;
+    for (const a of rows) {
+      try {
+        const r = await searchArchive(uid(req), a.id, { q: b.q ? String(b.q) : undefined, limit: 50 });
+        total += r.total;
+        for (const x of r.results) out.push({ ...x, archiveId: a.id, archiveName: a.name });
+      } catch { /* an unreachable archive store must not hide the others */ }
+    }
+    out.sort((x, y) => y.date - x.date);
+    return { archives: rows.length, total, results: out.slice(0, 100) };
   });
 
   app.get('/api/archives', async (req) => {

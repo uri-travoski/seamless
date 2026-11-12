@@ -1418,6 +1418,24 @@ CREATE TABLE mail_archive_items (
 CREATE INDEX mail_archive_items_state ON mail_archive_items(archive_id, state);
 `,
   },
+  {
+    id: 45,
+    // T8.5: optional monthly archive rule (one per user) with a notification summary.
+    sql: `
+CREATE TABLE archive_schedules (
+  user_id INTEGER PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+  enabled BOOLEAN NOT NULL DEFAULT false,
+  older_than_days INTEGER NOT NULL DEFAULT 1095,
+  scope TEXT NOT NULL DEFAULT 'all',
+  mode TEXT NOT NULL DEFAULT 'copy' CHECK (mode IN ('copy','move')),
+  target_id INTEGER REFERENCES storage_targets(id) ON DELETE SET NULL,
+  options JSONB NOT NULL DEFAULT '{}',
+  next_due_at BIGINT,
+  last_run_at BIGINT,
+  last_archive_id INTEGER
+);
+`,
+  },
 ];
 
 /** Run `fn` in one transaction. Events emitted through the client are only turned into

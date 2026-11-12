@@ -11,6 +11,7 @@ import { deleteMessageRow } from '../mail/ingest.ts';
 import { pkgVersion } from '../routes/util.ts';
 import { ArchiveError, DAY_MS, selectionFrom, scopeAccounts, parseOlderThan, previewArchive, sampleArchive, type ArchiveOptions } from './select.ts';
 import { buildConfig } from './config.ts';
+import { emitEvent } from '../events/emit.ts';
 
 export const BATCH = 200;
 export const INDEX_CHUNK = 5000;
@@ -236,6 +237,7 @@ export async function runArchiveSlice(archiveId: number, opts: RunOpts = {}): Pr
     [Date.now(), failed ? `${failed} message${failed === 1 ? '' : 's'} could not be verified and ${a.mode === 'move' ? 'were kept in the app' : 'are not in the archive'}` : null, a.id]);
   await audit(null, 'archive.complete', { type: 'archive', id: a.id }, { mode: a.mode, archived: (c.verified ?? 0) + (c.removed ?? 0), failed }, { userId: a.user_id });
   await bumpState(); broadcast({ type: 'stateChange' }, a.user_id);
+  await emitEvent(a.user_id, 'archive.done', { type: 'archive', id: a.id }, { name: a.name, mode: a.mode, archived: (c.verified ?? 0) + (c.removed ?? 0), failed });
   return true;
 }
 
@@ -248,6 +250,11 @@ registerJob('archive.run', async (job) => {
     const fatal = err instanceof ArchiveError || job.attempts >= MAX_ATTEMPTS;
     await run('UPDATE mail_archives SET error = ?, status = CASE WHEN ? THEN \'failed\' ELSE status END, finished_at = CASE WHEN ? THEN ? ELSE finished_at END WHERE id = ?',
       [msg, fatal, fatal, Date.now(), id]);
+    if (fatal) {
+      const a = await byId(id);
+      if (a) broadcast({ type: 'stateChange' }, a.user_id);
+      if (a) await emitEvent(a.user_id, 'archive.failed', { type: 'archive', id }, { name: a.name, error: msg }).catch(() => {});
+    }
     if (fatal && err instanceof ArchiveError) return;   // nothing a retry can fix
     throw err;
   }

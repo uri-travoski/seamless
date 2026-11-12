@@ -19,6 +19,7 @@ import { startScheduler, onScheduledSend } from './mail/scheduler.ts';
 import { startJobRunner } from './jobs/runner.ts';
 import { ensureAuditPruneJob } from './audit/prune.ts';
 import { ensureQuotaJob } from './admin/quota.ts';
+import { ensureArchiveScheduleJob } from './archive/schedule.ts';
 import { startHealthAlerts, shouldAlert } from './health/alerts.ts';
 import { wakeOnReply } from './mail/snooze.ts';
 import { settleOnReply } from './mail/followups.ts';
@@ -144,6 +145,7 @@ onScheduledSend(async () => broadcast({ type: 'stateChange', state: await curren
 startScheduler();
 startJobRunner();
 ensureQuotaJob().catch((err) => console.error('quota schedule failed:', err?.message ?? err));
+ensureArchiveScheduleJob().catch((err) => console.error('archive schedule failed:', err?.message ?? err));
 ensureAuditPruneJob().catch((err) => console.error('audit prune schedule failed:', err?.message ?? err));
 resumeMigrations().catch((err) => console.error('storage migration resume failed:', err?.message ?? err));
 startHealthAlerts();

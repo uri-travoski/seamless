@@ -258,7 +258,7 @@ describe('restore + search', () => {
     expect((await q<any>('SELECT label_id FROM message_labels WHERE message_id = ?', [back.id])).map((x) => x.label_id)).toEqual([label]);
     expect(await q('SELECT 1 FROM message_fts WHERE message_id = ?', [back.id])).toHaveLength(1);
     // no notifications, no pending filter/AI work from a restore
-    expect(await q('SELECT 1 FROM notifications')).toHaveLength(0);
+    expect(await q("SELECT 1 FROM notifications WHERE type NOT LIKE 'archive.%'")).toHaveLength(0);
 
     expect(await restoreArchive(TEST_USER, a.id, {})).toMatchObject({ expected: 1, restored: 0, alreadyPresent: 1, ok: true });
     expect(await rows()).toHaveLength(1);

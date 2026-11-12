@@ -2,6 +2,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { api } from '../../api/client.ts';
 import { toast } from '../../toast.ts';
+import { navigate } from '../../router.ts';
 import { formatBytes } from '../Sidebar.tsx';
 
 type Light = 'ok' | 'warn' | 'red';
@@ -13,6 +14,7 @@ interface Report {
   ai: { providers: number; status: Light; note: string };
   storage?: { reachable: boolean; latencyMs: number; error: string; checkedAt: number; bytes: number; messages: number; spool?: boolean; status: Light };
   backups?: { enabled: boolean; lastAt: number | null; lastStatus: string | null; lastError: string; nextDueAt: number | null; status: Light; note: string };
+  archives?: { id: number; name: string; status: string; mode: string; messages: number }[];
   attachmentIndex?: { state: string; processed: number; total: number } | null;
   system?: { version: string; uptimeSec: number; dbBytes: number; rssBytes: number; freeBytes: number | null; status: Light };
 }
@@ -102,6 +104,15 @@ export default function HealthSettings() {
             </div>
           ))}
         </Card>
+
+        {!!r.archives?.length && (
+          <Card title="Archive running" status="ok">
+            {r.archives.map((a) => (
+              <p key={a.id}>{a.name}: {a.status === 'planned' ? 'waiting to start' : a.status === 'restoring' ? 'restoring' : a.mode === 'move' ? 'moving' : 'copying'} {a.messages.toLocaleString()} messages.</p>
+            ))}
+            <button className="btn small" onClick={() => navigate({ page: 'settings', tab: 'backup' })}>See progress</button>
+          </Card>
+        )}
 
         {r.isAdmin && r.attachmentIndex && (
           <Card title="Attachment search" status="ok">

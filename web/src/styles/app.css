@@ -1526,3 +1526,18 @@ mark[data-ai-pending], mark[data-unknown-var] { outline: 1px dashed var(--md-bor
 :root[data-theme="seamless"][data-mode="light"] .msg-row:not(.unread):not(.selected):not(.checked):not(:hover),
 :root[data-theme="simply"][data-mode="light"] .msg-row:not(.unread):not(.selected):not(.checked):not(:hover),
 :root[data-theme="simply"] .msg-row.table:not(.unread):not(.selected):not(.checked):not(:hover) { background: #f2f4f8; }
+
+/* Archive old mail (T8.5) */
+.archive-card { border-top: 1px solid var(--md-border); margin-top: 18px; padding-top: 6px; }
+.archive-preview { padding: 10px 12px; border: 1px solid var(--md-border); border-radius: var(--radius-md); background: var(--md-surface); }
+.archive-confirm { margin-top: 10px; padding: 12px 14px; border: 1px solid var(--color-warning); border-radius: var(--radius-md); background: var(--md-surface); }
+.archive-confirm p { margin: 0 0 8px; }
+.archive-list td { vertical-align: top; }
+.archive-hint { padding: 14px 16px; text-align: center; color: var(--md-text-soft); }
+.archive-hint ul { text-align: left; }
+@media (max-width: 640px) {
+  .archive-card .field-row { flex-direction: column; }
+  .archive-list thead { display: none; }
+  .archive-list tr { display: block; padding: 8px 0; border-bottom: 1px solid var(--md-border); }
+  .archive-list td { display: block; padding: 2px 0; }
+}

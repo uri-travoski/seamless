@@ -228,7 +228,26 @@ A backup protects the whole app. An **archive** is different: it copies your *ol
 
 Every plan, run, completion, restore and deletion is written to the audit log.
 
-> The screens for this arrive with the next release step; until then the archive is available through the API (`/api/archives`).
+### Step by step in the app
+
+Open **Settings > Backup** and find the card **Archive old mail** (people who are not administrators find the same card under **Settings > Storage**).
+
+1. **Archive mail older than** — pick 1 to 10 years, or **Other…** and type a number of months or years.
+2. **Which mailboxes** — *All of mine*, or one mailbox.
+3. **Where to** — a backup storage target. If the list says there is none, an administrator adds one in **Settings > Storage**.
+4. **What to do** — *Copy only* (everything stays in the app) or *Move* (copy, check every file, then remove from the app). Move can also send the mail to the Bin on the mail server; that is off unless you tick it.
+5. Tick-boxes: keep starred mail, keep VIP senders, include Spam and Bin.
+6. Watch the line under the choices. It updates as you change them, for example *1 234 567 messages, 38.2 GB, from 2012 to 2023*.
+7. **Dry run** lists the oldest messages the rule picks and changes nothing. **Run now** shows the numbers and the mode and asks you to confirm. Move asks a second time: type the word **MOVE**.
+8. **Every month** — tick it to run the same rule on its own once a month. You get a notification each time a run finishes or fails. If the storage target has gone, the monthly rule switches itself off and tells you.
+
+The **Archives** list under the card shows each run: date, rule, number of messages, size and a progress bar while it works. While an archive is running, **Settings > Health** also shows it.
+
+- **Browse / search** looks through the archive index; **Download .eml** saves one message.
+- **Restore…** brings back everything, a date range or the messages matching a search. Restored mail looks like normal mail.
+- **Delete…** asks you to type the archive's name.
+
+**Searched and found nothing?** When a search has no result and you have a finished archive, the list says *Older mail may be in an archive* with a **Search archives** button.
 
 ## Reference
 
