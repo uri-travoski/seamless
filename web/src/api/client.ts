@@ -81,8 +81,8 @@ export async function emailSet(update: Record<string, Record<string, unknown>>, 
   await jmap([['Email/set', { update, destroy }, 's']]);
 }
 
-export const fetchBody = (id: string, remote: boolean) =>
-  api.get<ApiEmailBody>(`/api/message/${id}/body${remote ? '?remote=1' : ''}`);
+export const fetchBody = (id: string, remote: boolean, pgpPassphrase?: string) =>
+  req<ApiEmailBody>(`/api/message/${id}/body${remote ? '?remote=1' : ''}`, pgpPassphrase ? { headers: { 'x-pgp-passphrase': pgpPassphrase } } : undefined);
 export const fetchTracking = (id: string) => api.get<TrackingInfo>(`/api/message/${id}/tracking`);
 
 export const saveNote = (emailId: string, body: string) => api.put<{ ok: boolean }>(`/api/message/${emailId}/note`, { body });

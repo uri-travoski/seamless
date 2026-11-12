@@ -1428,3 +1428,18 @@ mark[data-ai-pending], mark[data-unknown-var] { outline: 1px dashed var(--md-bor
 .newsletter-bar .nl-text { flex: 1 1 200px; }
 .newsletter-bar .nl-actions { display: flex; gap: 6px; }
 .read-time { white-space: nowrap; color: var(--md-text-soft); }
+
+/* T6.4 F-39: OpenPGP badge, compose toggles, key settings */
+.pgp-bars { display: flex; flex-direction: column; gap: 6px; margin: 0 0 8px; }
+.pgp-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; padding: 7px 12px; border-radius: 8px; font-size: 13px; }
+.pgp-bar.ok { background: var(--color-success-soft); color: var(--color-success); }
+.pgp-bar.warn { background: var(--color-warning-soft); color: var(--color-warning); }
+.pgp-bar.bad { background: var(--color-danger-soft); color: var(--md-danger); }
+.pgp-chip { display: inline-flex; align-items: center; gap: 5px; font-weight: 600; }
+.pgp-note { font-weight: 400; opacity: 0.9; }
+.pgp-unlock { display: inline-flex; gap: 6px; margin-left: auto; }
+.pgp-unlock input { width: 160px; }
+.pgp-toggle.active { color: var(--color-accent-strong); }
+.pgp-toggle:disabled { opacity: 0.4; cursor: not-allowed; }
+.settings-section .field-row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin: 8px 0; }
+.settings-section textarea.text-input { width: 100%; font-family: monospace; font-size: 12px; }

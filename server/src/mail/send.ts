@@ -15,6 +15,7 @@ import { logoAttachments } from '../business/logo.ts';
 import { transportForAccount, sendWithFallback } from '../transport/registry.ts';
 import { resolveSendIdentity, effectivePayload, type SendIdentity } from '../business/sending.ts';
 import { markLeadReplies } from '../leads/leads.ts';
+import { protectMessage } from './pgp.ts';
 
 const uploadDir = path.join(config.dataDir, 'uploads');
 fs.mkdirSync(uploadDir, { recursive: true });
@@ -92,6 +93,7 @@ interface BuildOpts { ident?: SendIdentity | null; draft?: boolean; date?: Date;
  */
 export async function trackingAllowed(userId: number, payload: ComposePayload): Promise<boolean> {
   if (!payload.track) return false;
+  if (payload.pgpSign || payload.pgpEncrypt) return false;   // a tracking pixel would break the signature / defeat the encryption
   const rcpts = [...payload.to, ...payload.cc, ...payload.bcc].map((a) => a.email.trim().toLowerCase()).filter(Boolean);
   if (rcpts.length === 0) return false;
   const own = new Set<string>();
@@ -161,9 +163,16 @@ export async function buildRaw(payload: ComposePayload, acct: AccountRow, extraF
     // drafts remember the compose toolbar's tracking toggle
     headers: extraFlags.draft ? { 'X-Seamless-Track': payload.track ? '1' : '0' } : undefined,
   });
-  const raw = await new Promise<Buffer>((resolve, reject) =>
+  let raw = await new Promise<Buffer>((resolve, reject) =>
     composer.compile().build((err, message) => (err ? reject(err) : resolve(message))),
   );
+  // T6.4 F-39: PGP/MIME. Drafts stay readable (never signed or encrypted on the server before sending).
+  if (!extraFlags.draft && (payload.pgpSign || payload.pgpEncrypt)) {
+    raw = await protectMessage(acct.user_id, raw, {
+      sign: !!payload.pgpSign, encrypt: !!payload.pgpEncrypt, fromEmail: payload.fromEmail, identityId: payload.identityId ?? null,
+      recipients: [...payload.to, ...payload.cc, ...payload.bcc].map((a) => a.email), passphrase: payload.pgpPassphrase,
+    });
+  }
   return { raw, trackingToken };
 }
 

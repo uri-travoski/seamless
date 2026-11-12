@@ -12,7 +12,7 @@ export function register(app: FastifyInstance): void {
   // ---- message body / blobs ----
   app.get('/api/message/:id/body', async (req, reply) => {
     const allowRemote = (req.query as any).remote === '1';
-    const body = await getEmailBody(uid(req), (req.params as any).id, allowRemote);
+    const body = await getEmailBody(uid(req), (req.params as any).id, allowRemote, { pgpPassphrase: String(req.headers['x-pgp-passphrase'] ?? '') || undefined });
     if (!body) return reply.code(404).send({ error: 'not found' });
     return body;
   });

@@ -8,6 +8,7 @@ import { getMsgRow, getNote } from './store.ts';
 import { attachmentMeta } from './ingest.ts';
 import { roleFor } from '../auth/access.ts';
 import { inviteForMessage } from './invites.ts';
+import { openPgpMessage, keyOffers } from './pgp.ts';
 
 async function canReadAccount(userId: number, rowId: number): Promise<boolean> {
   const m = await one<{ account_id: number }>('SELECT account_id FROM messages WHERE id = ?', [rowId]);
@@ -32,6 +33,12 @@ export async function getParsed(rowId: number, userId?: number): Promise<ParsedM
   cache.set(rowId, parsed);
   if (cache.size > CACHE_MAX) cache.delete(cache.keys().next().value!);
   return parsed;
+}
+
+/** Keep a decrypted message in the in-memory LRU only (never written anywhere) so its attachments can be downloaded. */
+function holdParsed(rowId: number, p: ParsedMail): void {
+  cache.delete(rowId); cache.set(rowId, p);
+  if (cache.size > CACHE_MAX) cache.delete(cache.keys().next().value!);
 }
 
 export function sanitizeEmailHtml(html: string, opts: {
@@ -100,11 +107,24 @@ export async function getTracking(userId: number, emailId: string): Promise<Trac
   return trackingFor(row.tracking_token);
 }
 
-export async function getEmailBody(userId: number, emailId: string, allowRemote: boolean): Promise<ApiEmailBody | null> {
+export async function getEmailBody(userId: number, emailId: string, allowRemote: boolean, opts: { pgpPassphrase?: string } = {}): Promise<ApiEmailBody | null> {
   const row = await getMsgRow(userId, emailId);
   if (!row) return null;
-  const parsed = await getParsed(row.id);
+  let parsed = await getParsed(row.id);
   if (!parsed) return null;
+
+  // T6.4 F-39: OpenPGP. Decrypt on view only; the plaintext lives in memory, is not stored and not indexed.
+  let pgp: ApiEmailBody['pgp'] = null;
+  let pgpKeys: ApiEmailBody['pgpKeys'];
+  if (row.s3_key) {
+    const opened = await openPgpMessage(userId, await getBlob(row.s3_key), parsed, opts.pgpPassphrase).catch((e) => ({ status: { encrypted: false, decrypted: false, signature: 'none' as const, error: String(e?.message ?? e) } }));
+    if (opened) {
+      pgp = opened.status;
+      if ('parsed' in opened && opened.parsed) { parsed = opened.parsed; holdParsed(row.id, parsed); }
+    }
+    const offers = await keyOffers(userId, parsed);
+    if (offers.length) pgpKeys = offers;
+  }
 
   const atts = attachmentMeta(parsed);
   const cids = new Map<string, string>();
@@ -137,5 +157,7 @@ export async function getEmailBody(userId: number, emailId: string, allowRemote:
     },
     tracking,
     invite: await inviteForMessage(userId, row.id, row.account_id),
+    pgp,
+    ...(pgpKeys ? { pgpKeys } : {}),
   };
 }

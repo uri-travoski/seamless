@@ -1235,6 +1235,25 @@ CREATE TABLE newsletter_senders (
 );
 `,
   },
+  {
+    id: 37,
+    sql: `
+-- T6.4 F-39: OpenPGP keys (own keys keep the private key encrypted under SEAMLESS_SECRET; contact keys are public only)
+CREATE TABLE pgp_keys (
+  id SERIAL PRIMARY KEY,
+  user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  identity_id INTEGER REFERENCES identities(id) ON DELETE SET NULL,
+  kind TEXT NOT NULL CHECK (kind IN ('own','contact')),
+  email TEXT NOT NULL,
+  fingerprint TEXT NOT NULL,
+  public_armored TEXT NOT NULL,
+  private_enc TEXT,
+  created_at BIGINT NOT NULL,
+  UNIQUE (user_id, fingerprint)
+);
+CREATE INDEX pgp_keys_user_email ON pgp_keys(user_id, lower(email));
+`,
+  },
 ];
 
 /** Run `fn` in one transaction. Events emitted through the client are only turned into

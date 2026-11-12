@@ -15,6 +15,7 @@ import { getBusiness, cleanSigHtml } from '../business/businesses.ts';
 import { one } from '../db.ts';
 import { checkQuickReplySend } from '../templates/render.ts';
 import { emitEvent } from '../events/emit.ts';
+import { PgpError } from '../mail/pgp.ts';
 
 export function register(app: FastifyInstance): void {
   // ---- compose ----
@@ -39,6 +40,7 @@ export function register(app: FastifyInstance): void {
       return { ok: true, queued: false, trackingToken: result.sent.trackingToken };
     } catch (err: any) {
       if (err?.statusCode === 403) return reply.code(403).send({ error: err.message });
+      if (err instanceof PgpError) return reply.code(err.status).send({ error: err.message });
       const p = req.body as ComposePayload;
       await emitEvent(uid(req), 'send.failed', null, { subject: p?.subject ?? '', accountId: p?.accountId ?? null, error: err?.message ?? 'send failed' }).catch(() => {});
       return reply.code(502).send({ error: err?.message ?? 'send failed' });

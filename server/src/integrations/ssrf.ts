@@ -97,7 +97,7 @@ export async function resolveTarget(rawUrl: string, allow: string[] = [], lookup
   return { url, hostname, address: pick.address, family: pick.family === 6 || net.isIPv6(pick.address) ? 6 : 4 };
 }
 
-export interface SafeResponse { status: number; text: string }
+export interface SafeResponse { status: number; text: string; body?: Buffer }
 
 export interface SafeRequest {
   method?: string;
@@ -132,7 +132,7 @@ export async function safeRequest(rawUrl: string, o: SafeRequest = {}): Promise<
       const chunks: Buffer[] = [];
       let n = 0;
       res.on('data', (c: Buffer) => { if (n < max) { chunks.push(c); n += c.length; } });
-      res.on('end', () => resolve({ status: res.statusCode ?? 0, text: Buffer.concat(chunks).subarray(0, max).toString('utf8') }));
+      res.on('end', () => { const b = Buffer.concat(chunks).subarray(0, max); resolve({ status: res.statusCode ?? 0, text: b.toString('utf8'), body: b }); });
       res.on('error', reject);
     });
     req.setTimeout(o.timeoutMs ?? 10_000, () => req.destroy(new Error('timeout')));

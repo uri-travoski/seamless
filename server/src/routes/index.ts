@@ -28,6 +28,7 @@ import { register as templates } from './templates.ts';
 import { register as bulk } from './bulk.ts';
 import { register as prefs } from './prefs.ts';
 import { register as snooze } from './snooze.ts';
+import { register as pgp } from './pgp.ts';
 import { register as newsletters } from './newsletters.ts';
 import { register as followups } from './followups.ts';
 import { register as risk } from './risk.ts';
@@ -113,6 +114,7 @@ export function registerRoutes(app: FastifyInstance): void {
   bulk(app);
   prefs(app);
   snooze(app);
+  pgp(app);
   newsletters(app);
   followups(app);
   risk(app);

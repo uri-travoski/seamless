@@ -28,6 +28,7 @@ import {
   ScheduledIcon, CaretDownIcon, TemplateIcon, KebabIcon, AlarmIcon,
 } from '../icons.tsx';
 import { IconContext } from '@phosphor-icons/react';
+import { ShieldIcon, LockIcon } from '../icons.tsx';
 
 interface QuickTime { label: string; at: number }
 
@@ -153,6 +154,25 @@ export default function ComposeWindow({ draft }: { draft: Draft }) {
   });
   editorRef.current = editor;
 
+  // T6.4 F-39: which of Sign / Encrypt are possible for this From and these recipients
+  const [pgpInfo, setPgpInfo] = useState<{ needsPassphrase: boolean; canSign: boolean; signReason?: string; canEncrypt: boolean; encryptReason?: string } | null>(null);
+  const toKey = draft.to.map((a) => a.email).join(',') + '|' + draft.cc.map((a) => a.email).join(',') + '|' + draft.bcc.map((a) => a.email).join(',');
+  useEffect(() => {
+    if (!draft.identity) return;
+    const t = setTimeout(() => {
+      void api.post<NonNullable<typeof pgpInfo>>('/api/pgp/check', { fromEmail: draft.identity!.email, identityId: draft.identity!.id, to: draft.to, cc: draft.cc, bcc: draft.bcc })
+        .then((r) => {
+          setPgpInfo(r);
+          const patch: Partial<Draft> = {};
+          if (draft.pgpSign && !r.canSign) patch.pgpSign = false;
+          if (draft.pgpEncrypt && !r.canEncrypt) patch.pgpEncrypt = false;
+          if (Object.keys(patch).length) update(draft.key, patch);
+        }).catch(() => setPgpInfo(null));
+    }, 400);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [toKey, draft.identity?.id, draft.identity?.email]);
+
   const payload = useCallback((forSend = false): ComposePayload => {
     let html = editor?.getHTML() ?? '';
     let subject = draft.subject;
@@ -174,8 +194,10 @@ export default function ComposeWindow({ draft }: { draft: Draft }) {
     attachmentIds: draft.attachments.map((a) => a.id),
     attachments: draft.attachments,
     followupDays: draft.followupDays,
-    track: draft.track,
+    track: draft.track && !draft.pgpSign && !draft.pgpEncrypt,
     perRecipientTracking: draft.track && draft.perRecipientTracking,
+    ...(draft.pgpSign ? { pgpSign: true } : {}),
+    ...(draft.pgpEncrypt ? { pgpEncrypt: true } : {}),
     draftId: draft.draftId,
   };
   }, [draft, editor]);
@@ -209,7 +231,13 @@ export default function ComposeWindow({ draft }: { draft: Draft }) {
           if (!window.confirm(`${w.message}\n\nSend anyway?`)) { setSending(false); return; }
         }
       }
-      const res = await sendMail(payload(true));
+      const sendPayload = payload(true);
+      if ((draft.pgpSign || draft.pgpEncrypt) && pgpInfo?.needsPassphrase) {
+        const pp = window.prompt('Passphrase for your OpenPGP key (used once, not stored):');
+        if (pp === null) { setSending(false); return; }
+        sendPayload.pgpPassphrase = pp;
+      }
+      const res = await sendMail(sendPayload);
       if (res.queued && res.jobId && res.releaseAt) {
         const jobId = res.jobId;
         const stop = countdownToast((n) => `Sending in ${n}s…`, res.releaseAt, async () => {
@@ -426,6 +454,16 @@ export default function ComposeWindow({ draft }: { draft: Draft }) {
             onMouseDown={(e) => e.preventDefault()} onClick={() => update(draft.key, { track: !draft.track })}>
             <EyeIcon weight={draft.track ? 'fill' : 'regular'} />
           </button>
+          <button className={`icon-btn pgp-toggle ${draft.pgpSign ? 'active' : ''}`} aria-pressed={!!draft.pgpSign} disabled={!pgpInfo?.canSign && !draft.pgpSign}
+            title={pgpInfo && !pgpInfo.canSign ? (pgpInfo.signReason ?? 'Signing is not available') : draft.pgpSign ? 'OpenPGP signature ON (click to turn off)' : 'Sign with OpenPGP'}
+            onMouseDown={(e) => e.preventDefault()} onClick={() => update(draft.key, { pgpSign: !draft.pgpSign })}>
+            <ShieldIcon weight={draft.pgpSign ? 'fill' : 'regular'} />
+          </button>
+          <button className={`icon-btn pgp-toggle ${draft.pgpEncrypt ? 'active' : ''}`} aria-pressed={!!draft.pgpEncrypt} disabled={!pgpInfo?.canEncrypt && !draft.pgpEncrypt}
+            title={pgpInfo && !pgpInfo.canEncrypt ? (pgpInfo.encryptReason ?? 'Encryption is not available') : draft.pgpEncrypt ? 'OpenPGP encryption ON (click to turn off)' : 'Encrypt with OpenPGP'}
+            onMouseDown={(e) => e.preventDefault()} onClick={() => update(draft.key, { pgpEncrypt: !draft.pgpEncrypt })}>
+            <LockIcon weight={draft.pgpEncrypt ? 'fill' : 'regular'} />
+          </button>
         </div>
 
         <div className="editor-scroll">
@@ -469,7 +507,8 @@ export default function ComposeWindow({ draft }: { draft: Draft }) {
           )}
           <div className="grow" />
           {draft.followupDays && <span className="track-state" title="You will be reminded if nobody replies"><AlarmIcon size={14} /> Remind in {draft.followupDays}d</span>}
-          {draft.track && <span className="track-state" title="Open tracking is on for this message"><EyeIcon weight="fill" size={14} /> Tracked{draft.perRecipientTracking ? ' per recipient' : ''}</span>}
+          {(draft.pgpSign || draft.pgpEncrypt) && <span className="track-state" title="OpenPGP (PGP/MIME)"><LockIcon weight="fill" size={14} /> {draft.pgpEncrypt ? 'Encrypted' : ''}{draft.pgpEncrypt && draft.pgpSign ? ' + ' : ''}{draft.pgpSign ? 'Signed' : ''}</span>}
+          {draft.track && !draft.pgpSign && !draft.pgpEncrypt && <span className="track-state" title="Open tracking is on for this message"><EyeIcon weight="fill" size={14} /> Tracked{draft.perRecipientTracking ? ' per recipient' : ''}</span>}
           <div className="label-menu">
             <button className={`icon-btn ${moreOpen ? 'active' : ''}`} title="More options" onClick={() => setMoreOpen((v) => !v)}><KebabIcon /></button>
             {moreOpen && (

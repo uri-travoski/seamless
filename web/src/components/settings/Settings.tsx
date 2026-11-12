@@ -6,6 +6,7 @@ import MailboxSettings from './MailboxSettings.tsx';
 import LabelSettings from './LabelSettings.tsx';
 import NotificationSettings from './NotificationSettings.tsx';
 import SecuritySettings from './SecuritySettings.tsx';
+import EncryptionSettings from './EncryptionSettings.tsx';
 import FilterSettings from './FilterSettings.tsx';
 import AiSettings from './AiSettings.tsx';
 import UserSettings from './UserSettings.tsx';
@@ -27,7 +28,7 @@ import { useMail, scopeToSlug } from '../../state/mail.ts';
 import { navigate } from '../../router.ts';
 import {
   SettingsIcon, MailboxIcon, TagIcon, FilterIcon, SparkleIcon, UsersIcon, LogoutIcon, BackIcon, RulesIcon, ImportIcon,
-  LogsIcon, DevicesIcon, ContactsIcon, SentIcon, BackupIcon, PaletteIcon, TemplateIcon, BellIcon, LockIcon, HelpIcon, KeyboardIcon, HealthIcon, TimerIcon, CloudIcon,
+  LogsIcon, DevicesIcon, ContactsIcon, SentIcon, BackupIcon, PaletteIcon, TemplateIcon, BellIcon, LockIcon, HelpIcon, KeyboardIcon, HealthIcon, TimerIcon, CloudIcon, KeyIcon,
 } from '../../icons.tsx';
 import LeadSettings from './LeadSettings.tsx';
 import { useUi } from '../../state/ui.ts';
@@ -43,6 +44,7 @@ const TABS: { id: string; name: string; Icon: ComponentType<{ className?: string
   { id: 'templates', name: 'Templates', Icon: TemplateIcon, C: () => <><h2>Templates</h2><TemplatesView embedded /></> },
   { id: 'notifications', name: 'Notifications', Icon: BellIcon, C: NotificationSettings },
   { id: 'security', name: 'Security', Icon: LockIcon, C: SecuritySettings },
+  { id: 'encryption', name: 'Encryption', Icon: KeyIcon, C: EncryptionSettings },
   { id: 'rules', name: 'Rules', Icon: RulesIcon, C: RulesSettings },
   { id: 'automation', name: 'Import & Retention', Icon: ImportIcon, C: AutomationSettings },
   { id: 'filters', name: 'Filters', Icon: FilterIcon, C: FilterSettings },

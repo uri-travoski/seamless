@@ -19,7 +19,7 @@ export type QueueResult =
 
 export async function queueSend(userId: number, payload: ComposePayload): Promise<QueueResult> {
   const secs = Number(await getUserSetting(userId, 'undo_send_seconds') || '10');
-  if (!secs) return { queued: false, sent: await sendEmail(userId, payload) };
+  if (!secs || payload.pgpPassphrase) return { queued: false, sent: await sendEmail(userId, payload) };
 
   // validate now so a bad message fails at once instead of 10 seconds later
   await actingUser(userId, payload.accountId); // owner, or responder/manager on a shared mailbox (viewer → 403)

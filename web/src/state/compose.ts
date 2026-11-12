@@ -20,6 +20,8 @@ export interface Draft {
   track: boolean;
   perRecipientTracking: boolean;
   followupDays?: number;       // T2 F-19: remind me if no reply in N days
+  pgpSign?: boolean;           // T6.4 F-39
+  pgpEncrypt?: boolean;
   minimized: boolean;
   maximized: boolean;
 }
