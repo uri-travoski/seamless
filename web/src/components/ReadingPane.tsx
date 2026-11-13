@@ -393,13 +393,6 @@ function MessageCard({ email, expanded, onToggle }: { email: ApiEmail; expanded:
           <NewsletterPrompt email={email} />
           <RiskBanner email={email} linksOn={linksOn} onEnableLinks={() => setLinksOn(true)} />
           {email.needsReview && <ReviewBanner email={email} />}
-          {noteOpen && (
-            <div className="note-box">
-              <div className="note-head"><NoteIcon size={14} weight="fill" /> Private note <span className="note-hint">only you can see this</span></div>
-              <textarea className="note-text" value={noteDraft} placeholder="Add a personal note about this email…"
-                onChange={(e) => setNoteDraft(e.target.value)} onBlur={() => void persistNote(noteDraft)} />
-            </div>
-          )}
           <FollowupBanner email={email} />
           {email.openCount >= 0 && (
             <div className="track-wrap">
@@ -472,6 +465,13 @@ function MessageCard({ email, expanded, onToggle }: { email: ApiEmail; expanded:
               </>
             )}
           </div>
+          {noteOpen && (
+            <div className="note-box">
+              <div className="note-head"><NoteIcon size={14} weight="fill" /> Private note <span className="note-hint">only you can see this</span></div>
+              <textarea className="note-text" value={noteDraft} placeholder="Add a personal note about this email…"
+                onChange={(e) => setNoteDraft(e.target.value)} onBlur={() => void persistNote(noteDraft)} />
+            </div>
+          )}
         </>
       )}
     </article>

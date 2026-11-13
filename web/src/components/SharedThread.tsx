@@ -97,8 +97,8 @@ export default function SharedThread({ email }: { email: ApiEmail }) {
           ))}
         </span>
       </div>
-      <div className="comments-panel" aria-label="Internal comments">
-        <div className="comments-head">Internal comments <span className="dim">never sent to anyone outside</span></div>
+      <div className="comments-panel" aria-label="Team internal comments">
+        <div className="comments-head">Team internal comments <span className="dim">never sent to anyone outside</span></div>
         {comments.map((c) => (
           <div key={c.id} className="comment">
             <b>{c.userName}</b> <span className="dim">{new Date(c.createdAt).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' })}</span>
@@ -107,7 +107,7 @@ export default function SharedThread({ email }: { email: ApiEmail }) {
         ))}
         {canWork && (
           <div className="comment-form">
-            <textarea value={text} maxLength={5000} placeholder="Add an internal comment… use @name to mention someone" onChange={(e) => setText(e.target.value)}
+            <textarea value={text} maxLength={5000} placeholder="Add a team internal comment… use @name to mention someone" onChange={(e) => setText(e.target.value)}
               onKeyDown={(e) => { if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) void send(); }} />
             <button className="btn" disabled={!text.trim()} onClick={() => void send()}>Comment</button>
           </div>

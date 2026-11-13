@@ -32,7 +32,7 @@ Open a thread in a shared mailbox and you'll find, under the messages:
 - **Assigned to…** — pick who owns the thread (only people with access to the mailbox are listed). They get a notification
   ("Alex assigned you a thread"). The list shows their initials on the row.
 - **Open / Pending / Done** — the thread's status. A thread nobody has touched counts as Open.
-- **Internal comments** — a clearly marked box for notes to your team. They are **never sent** to the customer. Type `@name`
+- **Team internal comments** — a clearly marked box for notes to your team. They are **never sent** to the customer. Type `@name`
   (first name or the part of the email before `@`) to mention a teammate; they get a notification, but only if they have access
   to that mailbox. Comments are limited to 5000 characters. Viewers can read comments but not write.
 - **"Alex is replying…"** — while a teammate has a reply open on the same thread you see this line, so you don't answer twice.
