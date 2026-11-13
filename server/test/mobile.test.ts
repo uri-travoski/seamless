@@ -280,6 +280,34 @@ describe('what is pushed', () => {
     expect((await q<any>('SELECT fcm_token FROM mobile_devices')).map((r) => r.fcm_token)).toEqual([TOK_B]);
   });
 
+  it('reading a message sends a content-free "read" data message so phones clear the notification', async () => {
+    await configure(); await register(cookie, TOK_A);
+    const { rowId } = await newMail();
+    calls = [];
+    const r = await app.inject({ method: 'POST', url: '/api/bulk', headers: { cookie }, payload: { ids: [`m${rowId}`], action: 'read' } });
+    expect(r.statusCode).toBe(200);
+    await settle();
+    expect(sends()).toHaveLength(1);
+    expect(sends()[0].body.message.data).toEqual({ type: 'read', messageId: String(rowId) });
+    // already read: reading again announces nothing
+    calls = [];
+    await app.inject({ method: 'POST', url: '/api/bulk', headers: { cookie }, payload: { ids: [`m${rowId}`], action: 'read' } });
+    await settle();
+    expect(sends()).toHaveLength(0);
+  });
+
+  it('other users\' phones get no "read" message', async () => {
+    await configure();
+    const { rowId } = await newMail();
+    await makeUser('b@local');
+    const ckB = await login(app, 'b@local');
+    await register(ckB, TOK_B);
+    calls = [];
+    await app.inject({ method: 'POST', url: '/api/bulk', headers: { cookie }, payload: { ids: [`m${rowId}`], action: 'read' } });
+    await settle();
+    expect(sends()).toHaveLength(0);
+  });
+
   it('other FCM errors keep the token', async () => {
     await configure(); await register(cookie, TOK_A);
     sendStatus = () => ({ status: 500, body: { error: { status: 'INTERNAL' } } });

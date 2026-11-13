@@ -48,6 +48,22 @@ class AppViewModel(private val app: SeamlessApp) : ViewModel() {
         else pendingCompose = request
     }
 
+    private var pendingTarget: OpenTarget? = null
+
+    /** A tap on a notification. Waits for sign-in if needed. */
+    fun openTarget(t: OpenTarget) {
+        val m = mail
+        if (m != null && screen == Screen.Home) { overlay = Overlay.None; m.openTarget(t) } else pendingTarget = t
+    }
+
+    /** Show the "why we ask" screen once, right after the first sign-in, never on launch. */
+    var askNotifications by mutableStateOf(false)
+
+    fun notificationsAsked() { session.notifyPromptShown = true; askNotifications = false }
+
+    /** Re-tell the server about this phone after a notification switch changed. */
+    fun pushPrefsChanged() { PushRegistrar.register(app) }
+
     private var mfaToken = ""
     private var checkedUrl = ""
 
@@ -145,8 +161,13 @@ class AppViewModel(private val app: SeamlessApp) : ViewModel() {
     private fun enterHome() {
         mail = MailViewModel(api, session, viewModelScope, onSignedOut = { signedOut("You were signed out. Sign in again to continue.") }, files = ContentFiles(app)).also { it.start() }
         pendingCompose?.let { pendingCompose = null; mail?.compose(it) }
+        pendingTarget?.let { pendingTarget = null; mail?.openTarget(it) }
+        Notifier.ensureChannels(app)
+        PushRegistrar.register(app)
+        SyncScheduler.schedule(app)
+        if (!session.notifyPromptShown && !Notifier.allowed(app)) askNotifications = true
         settings = SettingsModel(api, session, viewModelScope, onSignedOut = { signedOut("You were signed out. Sign in again to continue.") },
-            onMessage = { messages.tryEmit(it) }, onTheme = { theme = it })
+            onMessage = { messages.tryEmit(it) }, onTheme = { theme = it }, onPushPrefs = ::pushPrefsChanged)
         overlay = Overlay.None
         screen = Screen.Home
     }
@@ -154,12 +175,16 @@ class AppViewModel(private val app: SeamlessApp) : ViewModel() {
     fun logout() {
         val url = session.serverUrl
         viewModelScope.launch {
-            withContext(Dispatchers.IO) { api.logout(url) } // best effort: also drops the cookie locally below
+            withContext(Dispatchers.IO) {
+                PushRegistrar.unregister(app, url)   // while the cookie still works
+                api.logout(url)                      // best effort: also drops the cookie locally below
+            }
             signedOut(null)
         }
     }
 
     private fun signedOut(message: String?) {
+        SyncScheduler.cancel(app); Notifier.cancelAll(app)
         session.clear(); mail = null; settings = null; overlay = Overlay.None
         password = ""; code = ""; mfaToken = ""
         checkedUrl = session.serverUrl; address = session.serverUrl

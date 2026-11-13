@@ -44,6 +44,16 @@ fun SettingsScreen(vm: AppViewModel, mail: MailViewModel, onBack: () -> Unit) {
             }
 
             Header("Notifications")
+            var allowed by remember { mutableStateOf(Notifier.allowed(ctx)) }
+            val lifecycle = androidx.lifecycle.compose.LocalLifecycleOwner.current.lifecycle
+            DisposableEffect(lifecycle) {
+                val o = androidx.lifecycle.LifecycleEventObserver { _, e -> if (e == androidx.lifecycle.Lifecycle.Event.ON_RESUME) allowed = Notifier.allowed(ctx) }
+                lifecycle.addObserver(o); onDispose { lifecycle.removeObserver(o) }
+            }
+            if (!allowed) ClickRow("Notifications are turned off", "Android is blocking Seamless from showing notifications. Tap to open the settings.") {
+                ctx.startActivity(Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS).putExtra(Settings.EXTRA_APP_PACKAGE, ctx.packageName).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+            }
+            InfoRow("How you are notified", if (vm.session.pushActive) "Push (instant)" else "Checked every 15 minutes (push is not set up on this server)")
             SwitchRow("New mail", "Notify me about new messages", st.notifyMail, st::updateNotifyMail)
             SwitchRow("Critical alerts", "Tell me when a mailbox stops working", st.notifyAlerts, st::updateNotifyAlerts)
             SwitchRow("Hide message content", "Show only \"New mail\" – no sender or subject", st.hideContent, st::updateHideContent)
@@ -56,6 +66,10 @@ fun SettingsScreen(vm: AppViewModel, mail: MailViewModel, onBack: () -> Unit) {
             }
             ClickRow("Notification channels", "Sound, vibration and lock-screen options in Android settings") {
                 ctx.startActivity(Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS).putExtra(Settings.EXTRA_APP_PACKAGE, ctx.packageName).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+            }
+
+            ClickRow(if (st.checking) "Checking…" else "Check now", st.lastSync.takeIf { it > 0 }?.let { "Last checked " + Format.time(java.time.Instant.ofEpochMilli(it).toString()) } ?: "Look for new mail and alerts right away") {
+                st.checkNow { Notifier.handle(ctx, it) }
             }
 
             Header("Mail")
@@ -74,6 +88,16 @@ fun SettingsScreen(vm: AppViewModel, mail: MailViewModel, onBack: () -> Unit) {
             InfoRow("Server", vm.session.serverUrl)
             if (st.serverVersion.isNotEmpty()) InfoRow("Server version", st.serverVersion)
             ClickRow("Open-source licences", null) { dialog = "licences" }
+            if (BuildConfig.DEBUG) {
+                ClickRow("Simulate push: new mail", "Debug build only – shows a notification for the newest message in the list") {
+                    val e = mail.main.items.firstOrNull()
+                    val id = e?.id?.removePrefix("m")?.toLongOrNull() ?: 1L
+                    Notifier.handle(ctx, PushPayload("mail", id, e?.accountId, sender = e?.sender ?: "Ann Lee", subject = e?.subject ?: "Quarterly numbers", snippet = e?.preview ?: "Hi there, the figures are attached."))
+                }
+                ClickRow("Simulate push: critical alert", "Debug build only") {
+                    Notifier.handle(ctx, PushPayload("alert", alertId = 9001, subject = "A mailbox stopped working", snippet = "Sign-in failed for me@example.com. Open Seamless to fix it."))
+                }
+            }
             Spacer(Modifier.height(8.dp))
             OutlinedButton(onClick = { confirmSignOut = true }, Modifier.padding(horizontal = 16.dp).fillMaxWidth()) { Text("Sign out") }
             Spacer(Modifier.height(32.dp).navigationBarsPadding())

@@ -20,6 +20,7 @@ class SettingsModel(
     private val onSignedOut: () -> Unit,
     private val onMessage: (String) -> Unit,
     private val onTheme: (String) -> Unit,
+    private val onPushPrefs: () -> Unit = {},
 ) {
     private val base get() = session.serverUrl
 
@@ -55,13 +56,32 @@ class SettingsModel(
         }
     }
 
+    var checking by mutableStateOf(false); private set
+    var lastSync by mutableStateOf(session.lastSyncAt); private set
+
+    /** "Check now": the same check the 15-minute background sync does, run on demand (even when push works). */
+    fun checkNow(post: (PushPayload) -> Unit) {
+        if (checking) return
+        checking = true
+        scope.launch {
+            val r = withContext(Dispatchers.IO) { SyncRunner.run(api, session, post, force = true) }
+            checking = false; lastSync = session.lastSyncAt
+            when {
+                r.signedOut -> onSignedOut()
+                r.error != null -> onMessage(r.error)
+                r.newMail + r.newAlerts == 0 -> onMessage("Nothing new.")
+                else -> onMessage(listOfNotNull(r.newMail.takeIf { it > 0 }?.let { "$it new message${if (it == 1) "" else "s"}" }, r.newAlerts.takeIf { it > 0 }?.let { "$it alert${if (it == 1) "" else "s"}" }).joinToString(" and ") + ".")
+            }
+        }
+    }
+
     fun chooseTheme(t: ThemeChoice) { theme = t.key; session.theme = t.key; onTheme(t.key) }
     fun chooseSwipeRight(a: SwipeAction) { swipeRight = a; session.swipeRight = a.key }
     fun chooseSwipeLeft(a: SwipeAction) { swipeLeft = a; session.swipeLeft = a.key }
     fun updateConversationView(v: Boolean) { conversationView = v; session.conversationView = v }
-    fun updateNotifyMail(v: Boolean) { notifyMail = v; session.notifyMail = v }
-    fun updateNotifyAlerts(v: Boolean) { notifyAlerts = v; session.notifyAlerts = v }
-    fun updateHideContent(v: Boolean) { hideContent = v; session.hideContent = v }
+    fun updateNotifyMail(v: Boolean) { notifyMail = v; session.notifyMail = v; onPushPrefs() }
+    fun updateNotifyAlerts(v: Boolean) { notifyAlerts = v; session.notifyAlerts = v; onPushPrefs() }
+    fun updateHideContent(v: Boolean) { hideContent = v; session.hideContent = v; onPushPrefs() }
     fun chooseDefaultFrom(email: String) { defaultFrom = email; session.defaultFrom = email }
 
     fun chooseUndo(seconds: Int) {

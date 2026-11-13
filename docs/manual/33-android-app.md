@@ -27,7 +27,11 @@ At the top right the app has a **mailbox selector** instead of an account picker
 - **Hide message content** (in the app's notification settings) shows only "New mail" instead of the sender and subject. The server then never sends the text to Google's push service at all.
 - Viewing mode sends no mail notifications, because no mail is received. See [Viewing old mail](30-viewing-old-mail.md).
 
-If the administrator has not set up push (below), the app checks for new mail about every 15 minutes instead, and shows the same notifications.
+If the administrator has not set up push (below), the app checks for new mail about every 15 minutes instead, and shows the same notifications. Settings → Notifications → **Check now** looks straight away.
+
+Each mail notification shows the sender, subject and the start of the message, with the mailbox name, and has **Mark as read**, **Archive**, **Delete** and **Reply** buttons. Tapping it opens the conversation; a critical alert opens the alert details. Swiping a notification away only hides it — the message stays unread. When you read a message on another device (or the web), its notification disappears from the phone.
+
+The first time you sign in, the app explains why it wants to notify you and then asks Android for permission (Android 13 and later). If you said no, Settings → Notifications shows a line that opens Android's settings. Android also lists three notification channels (New mail, Critical alerts, Background sync) where you can change sound and vibration. A "Compose" shortcut is available by long-pressing the app icon.
 
 ## Setting up push (administrator, once)
 

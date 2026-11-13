@@ -53,3 +53,15 @@ export async function pushTest(userId: number): Promise<{ devices: number; sent:
   const sent = await fanOut(devices, () => ({ type: 'test', subject: 'Test push from Seamless', snippet: 'If you can read this, push works.' }), 'test');
   return { devices: devices.length, sent };
 }
+
+/** A message was read somewhere else: tell the phones so they can clear its notification (data-only, no content). */
+const readBudget = new Map<number, { at: number; n: number }>();
+export async function pushRead(userId: number, messageId: number): Promise<number> {
+  // "mark all as read" must not turn into hundreds of FCM calls: at most 30 a minute per user
+  const now = Date.now(), b = readBudget.get(userId);
+  if (!b || now - b.at > 60_000) readBudget.set(userId, { at: now, n: 1 });
+  else if (++b.n > 30) return 0;
+  const devices = await q<DeviceRow>('SELECT * FROM mobile_devices WHERE user_id = ?', [userId]);
+  if (!devices.length) return 0;
+  return fanOut(devices, () => ({ type: 'read', messageId: String(messageId) }), `read-${messageId}`);
+}

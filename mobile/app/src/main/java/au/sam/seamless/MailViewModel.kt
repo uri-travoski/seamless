@@ -47,6 +47,8 @@ class MailViewModel(
     private var folderTitleOverride by mutableStateOf<String?>(null)
     private var userSettings: kotlinx.serialization.json.JsonObject? = null
     var alert by mutableStateOf<ApiAlert?>(null); private set
+    /** A tap on an alert notification: the alert dialog opens as soon as the alert is known. */
+    var alertRequest by mutableStateOf(false)
     var viewingMode by mutableStateOf(false); private set
     var selection by mutableStateOf<Set<String>>(emptySet()); private set
     var pickerOpen by mutableStateOf(false)
@@ -95,9 +97,11 @@ class MailViewModel(
             (off as? ApiResult.Ok)?.let { offers = it.value }
             (set as? ApiResult.Ok)?.let { userSettings = it.value; sidebar = Sidebar.fromSettings(it.value) }
             (vw as? ApiResult.Ok)?.let { allViews = it.value }
+            (ov as? ApiResult.Ok)?.let { o -> session.accountNames = o.value.mailboxes.associate { it.id to it.name.ifBlank { it.email } } }
             (ov as? ApiResult.Ok)?.let { overview = it.value; if (!scopeStillExists()) chooseScope(MailQuery.UNIFIED) }
             (acc as? ApiResult.Ok)?.let { a -> problemAccounts = a.value.filter { it.hasProblem }.map { it.id }.toSet() }
             (al as? ApiResult.Ok)?.let { a -> alert = a.value.items.firstOrNull { it.state == "open" } }
+            if (alertRequest && alert == null && al is ApiResult.Ok) { alertRequest = false; snacks.tryEmit(Snack("That problem has already been fixed.")) }
             (mode as? ApiResult.Ok)?.let { viewingMode = it.value.mode == "viewing" }
             (lab as? ApiResult.Ok)?.let { labels = it.value }
             (vw as? ApiResult.Ok)?.let { views = it.value.filter { v -> v.pinned } }
@@ -174,6 +178,27 @@ class MailViewModel(
         if (e.mailboxRole == "drafts" || e.keywords["\$draft"] == true) { compose(ComposeRequest.Draft(e)); return }
         val mine = (overview?.mailboxes?.map { it.email.lowercase() }.orEmpty() + listOf(session.email.lowercase())).toSet()
         conversation = ConversationViewModel(api, session, this, scope, e, close = { conversation = null }, myEmails = { mine }).also { it.start() }
+    }
+
+    // ---- notification taps (T9.7) ----
+    fun openTarget(t: OpenTarget) {
+        when (t) {
+            is OpenTarget.Alert -> { alertRequest = true; loadSide() }
+            is OpenTarget.Message, is OpenTarget.Reply -> {
+                val id = if (t is OpenTarget.Message) t.id else (t as OpenTarget.Reply).id
+                scope.launch {
+                    val r = withContext(Dispatchers.IO) { api.emailsByIds(base, listOf(Push.emailId(id))) }
+                    val e = (r as? ApiResult.Ok)?.value?.firstOrNull()
+                    when {
+                        e != null -> if (t is OpenTarget.Reply) compose("reply", e) else open(e)
+                        r is ApiResult.Ok -> snacks.tryEmit(Snack("That message is no longer here."))
+                        r is ApiResult.Network -> snacks.tryEmit(Snack(r.message))
+                        r is ApiResult.Failed -> snacks.tryEmit(Snack(r.message))
+                        else -> {}
+                    }
+                }
+            }
+        }
     }
 
     // ---- compose (T9.6) ----

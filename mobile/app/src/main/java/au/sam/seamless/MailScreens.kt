@@ -72,6 +72,24 @@ fun HomeScreen(vm: AppViewModel) {
     PendingSendBar(mail, Modifier.align(Alignment.BottomCenter))
     }
     if (help) HelpDialog(vm.session.serverUrl) { help = false }
+    if (vm.askNotifications) NotificationAsk(vm)
+}
+
+/** Explains why Seamless wants to notify, then asks Android. Shown once after the first sign-in (Android 13+). */
+@Composable
+private fun NotificationAsk(vm: AppViewModel) {
+    val launcher = androidx.activity.compose.rememberLauncherForActivityResult(androidx.activity.result.contract.ActivityResultContracts.RequestPermission()) { vm.notificationsAsked() }
+    AlertDialog(
+        onDismissRequest = vm::notificationsAsked,
+        title = { Text("Get notified about new mail?") },
+        text = { Text("Seamless can tell you when mail arrives and when one of your mailboxes stops working. You can pick which mailboxes, hide the message text, or turn it off any time in Settings.") },
+        confirmButton = {
+            TextButton(onClick = {
+                if (android.os.Build.VERSION.SDK_INT >= 33) launcher.launch(android.Manifest.permission.POST_NOTIFICATIONS) else vm.notificationsAsked()
+            }) { Text("Continue") }
+        },
+        dismissButton = { TextButton(onClick = vm::notificationsAsked) { Text("Not now") } },
+    )
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -86,6 +104,7 @@ fun MailHome(mail: MailViewModel, onMenu: () -> Unit) {
     }
     var sheet by remember { mutableStateOf<Sheet?>(null) }
     var alertOpen by remember { mutableStateOf(false) }
+    LaunchedEffect(mail.alertRequest, mail.alert) { if (mail.alertRequest && mail.alert != null) { alertOpen = true; mail.alertRequest = false } }
     val selecting = mail.selection.isNotEmpty()
     BackHandler(enabled = selecting && !mail.searchOpen) { mail.clearSelection() }
 

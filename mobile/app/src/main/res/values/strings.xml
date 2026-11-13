@@ -1,1 +1,11 @@
-<resources><string name="app_name">Seamless</string></resources>
+<resources>
+    <string name="app_name">Seamless</string>
+    <string name="shortcut_compose_short">Compose</string>
+    <string name="shortcut_compose_long">Write a new message</string>
+    <string name="channel_mail">New mail</string>
+    <string name="channel_mail_desc">Messages that arrive in your inbox</string>
+    <string name="channel_alerts">Critical alerts</string>
+    <string name="channel_alerts_desc">A mailbox stopped working or something else needs your attention</string>
+    <string name="channel_sync">Background sync</string>
+    <string name="channel_sync_desc">Quiet checks for new mail when push is not set up</string>
+</resources>

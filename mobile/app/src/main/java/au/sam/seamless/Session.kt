@@ -71,10 +71,36 @@ class Session(private val store: KeyValueStore, val jar: PersistentCookieJar) {
         get() = store.get("imageSenders")?.split('\n')?.filter { it.isNotBlank() }?.toSet().orEmpty()
         set(v) = store.put("imageSenders", v.joinToString("\n"))
 
+    // ---- push and background sync (T9.7) ----
+    var fcmToken: String
+        get() = store.get("fcmToken").orEmpty()
+        set(v) = store.put("fcmToken", v)
+    /** True once the server has accepted this phone's FCM token and has push switched on. Then the polling fallback stays quiet. */
+    var pushActive: Boolean
+        get() = store.get("pushActive") == "true"
+        set(v) = store.put("pushActive", v.toString())
+    var notifyPromptShown: Boolean
+        get() = store.get("notifyPromptShown") == "true"
+        set(v) = store.put("notifyPromptShown", v.toString())
+    /** Message ids the fallback sync has already looked at (null = never ran: first run is a baseline). */
+    var syncSeen: List<String>?
+        get() = store.get("syncSeen")?.split('\n')?.filter { it.isNotBlank() }
+        set(v) = store.put("syncSeen", v?.joinToString("\n"))
+    var syncAlerts: Set<Int>
+        get() = store.get("syncAlerts")?.split(',')?.mapNotNull { it.toIntOrNull() }?.toSet().orEmpty()
+        set(v) = store.put("syncAlerts", v.joinToString(","))
+    var lastSyncAt: Long
+        get() = store.get("lastSyncAt")?.toLongOrNull() ?: 0L
+        set(v) = store.put("lastSyncAt", v.toString())
+    /** accountId → mailbox name, so a background notification can say which mailbox it is for. */
+    var accountNames: Map<Int, String>
+        get() = store.get("accountNames")?.split('\n')?.mapNotNull { l -> l.split('\t', limit = 2).takeIf { it.size == 2 }?.let { (a, b) -> a.toIntOrNull()?.let { it to b } } }?.toMap().orEmpty()
+        set(v) = store.put("accountNames", v.entries.joinToString("\n") { "${it.key}\t${it.value.replace('\n', ' ')}" })
+
     val hasSession: Boolean get() = serverUrl.isNotEmpty() && jar.hasCookies()
 
     /** Forget the sign-in but keep the address, so the login screen is pre-filled. */
-    fun clear() { jar.clear(); store.put("recent", null) }
+    fun clear() { jar.clear(); store.put("recent", null); store.put("pushActive", null); store.put("syncSeen", null); store.put("syncAlerts", null); store.put("accountNames", null) }
 
     companion object {
         fun create(ctx: Context): Session {

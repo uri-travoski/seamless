@@ -81,6 +81,19 @@ class Api(
 
     fun mobileConfig(baseUrl: String): ApiResult<MobileConfig> = call(baseUrl, "/api/mobile/config", null) { json.decodeFromString<MobileConfig>(it) }
 
+    // ---- push (T9.7) ----
+    fun registerDevice(baseUrl: String, token: String, notifyMail: Boolean, notifyAlerts: Boolean, hideContent: Boolean): ApiResult<Boolean> {
+        val body = buildJsonObject {
+            put("fcmToken", token); put("deviceName", deviceName); put("appVersion", appVersion)
+            put("notifyMail", notifyMail); put("notifyAlerts", notifyAlerts); put("hideContent", hideContent)
+        }.toString()
+        return call(baseUrl, "/api/mobile/device", body) { json.parseToJsonElement(it).jsonObject["pushEnabled"]?.jsonPrimitive?.booleanOrNull ?: false }
+    }
+
+    /** Forget this phone on the server (logout). With no token it drops every device of this session. */
+    fun unregisterDevice(baseUrl: String, token: String): ApiResult<Unit> =
+        call(baseUrl, "/api/mobile/device" + if (token.isNotEmpty()) "?fcmToken=" + java.net.URLEncoder.encode(token, "UTF-8") else "", null, method = "DELETE") { }
+
     // ---- mailbox (T9.3) ----
 
     private fun <T> getJson(baseUrl: String, path: String, parse: (String) -> T) = call(baseUrl, path, null, parse = parse)

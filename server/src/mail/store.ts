@@ -431,6 +431,8 @@ export async function setKeywords(userId: number, emailId: string, patch: Record
     (val ? add : remove).push(map.imap);
   }
   if (patch.$seen === true) {
+    // T9.7: a recent unread message was just read: phones clear its notification
+    if (row.unread && row.mailbox_role === 'inbox') void import('../push/mobile.ts').then((m) => m.pushRead(userId, row.id)).catch(() => {});
     await run('UPDATE messages SET opened_at = COALESCE(opened_at, ?) WHERE id = ?', [Date.now(), row.id]);
     if (row.read_later && row.user_id === userId) await import('./newsletters.ts').then((m) => m.archiveAfterRead(userId, row.id)).catch(() => {});
   }
