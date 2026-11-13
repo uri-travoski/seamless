@@ -1,5 +1,5 @@
 /* Seamless service worker: offline app shell + web push */
-const SHELL_CACHE = 'seamless-shell-v2';
+const SHELL_CACHE = 'seamless-shell-v4';
 const RUNTIME_CACHE = 'seamless-runtime-v1';
 
 self.addEventListener('install', (event) => {

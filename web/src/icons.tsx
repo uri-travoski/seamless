@@ -8,6 +8,23 @@ export function MailLogo({ size = '1.3em' }: { size?: string | number }) {
   return <img src="/icon.svg" alt="" aria-hidden="true" style={{ height: h, width: 'auto', display: 'block', flex: 'none' }} />;
 }
 
+// Archive glyphs supplied by the user: outline box for the toolbar, solid-lid box for the sidebar.
+type IconProps = { size?: number | string; className?: string };
+export function ArchiveToolbarIcon({ size = 18, className }: IconProps) {
+  return (
+    <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} fill="currentColor" viewBox="0 0 256 256" className={className} aria-hidden="true">
+      <path d="M224,36H32A16,16,0,0,0,16,52V76A16,16,0,0,0,32,92V204a16,16,0,0,0,16,16H208a16,16,0,0,0,16-16V92a16,16,0,0,0,16-16V52A16,16,0,0,0,224,36ZM208,204H48V92H208ZM224,76H32V52H224V76ZM96,132a8,8,0,0,1,8-8h48a8,8,0,0,1,0,16H104A8,8,0,0,1,96,132Z" />
+    </svg>
+  );
+}
+export function ArchiveSidebarIcon({ size = 18, className }: IconProps) {
+  return (
+    <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} fill="currentColor" viewBox="0 0 256 256" className={className} aria-hidden="true">
+      <path d="M224,36H32A16,16,0,0,0,16,52V76A16,16,0,0,0,32,92V204a16,16,0,0,0,16,16H208a16,16,0,0,0,16-16V92a16,16,0,0,0,16-16V52A16,16,0,0,0,224,36Zm-72,104H104a8,8,0,0,1,0-16h48a8,8,0,0,1,0,16Zm72-64H32V52H224V76Z" />
+    </svg>
+  );
+}
+
 // Custom outline paperclip used for the attachment flag in list rows.
 export function AttachClipIcon({ size = '1.2em', className, ...rest }: { size?: number | string; className?: string; [k: string]: unknown }) {
   return (

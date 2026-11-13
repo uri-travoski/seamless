@@ -14,7 +14,7 @@ import { useCompose } from '../state/compose.ts';
 import { useSession, normaliseSidebar, SIDEBAR_FOLDERS } from '../state/session.ts';
 import { useRouter, navigate, FOLDER_ROLE, FOLDER_TITLE } from '../router.ts';
 import {
-  InboxIcon, DraftsIcon, SentIcon, ScheduledIcon, ArchiveIcon, JunkIcon, TrashIcon, FolderIcon, ComposeIcon,
+  InboxIcon, DraftsIcon, SentIcon, ScheduledIcon, ArchiveSidebarIcon, JunkIcon, TrashIcon, FolderIcon, ComposeIcon,
   CaretDownIcon, CaretRightIcon, StarIcon, ReviewIcon, TemplateIcon, MailLogo, SidebarCollapseIcon, SettingsIcon, SnoozeIcon, ReadLaterIcon, WaitingIcon,
 } from '../icons.tsx';
 import { IconContext } from '@phosphor-icons/react';
@@ -26,11 +26,11 @@ import { PencilSimple, UserPlus } from '@phosphor-icons/react';
 import LabelColorPicker from './LabelColorPicker.tsx';
 
 /** Sidebar spam icon: the filled octagon (the top bar uses the outline). */
-const SpamFolderIcon = (p: { className?: string }) => <JunkIcon weight="fill" className={p.className} />;
+const SpamFolderIcon = (p: { className?: string }) => <JunkIcon className={p.className} />;
 
 const FOLDER_ICON: Record<string, ComponentType<{ className?: string }>> = {
   inbox: InboxIcon, starred: StarIcon, drafts: DraftsIcon, scheduled: ScheduledIcon, sent: SentIcon,
-  templates: TemplateIcon, spam: SpamFolderIcon, bin: TrashIcon, archive: ArchiveIcon, review: ReviewIcon,
+  templates: TemplateIcon, spam: SpamFolderIcon, bin: TrashIcon, archive: ArchiveSidebarIcon, review: ReviewIcon,
   snoozed: SnoozeIcon, readlater: ReadLaterIcon, waiting: WaitingIcon,
 };
 

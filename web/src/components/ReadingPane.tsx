@@ -22,7 +22,7 @@ import { EmailMenuItems } from './EmailMenu.tsx';
 import { actions } from '../state/actions.ts';
 import {
   EyeIcon, ImageIcon, AttachIcon, PencilIcon, ReplyIcon, ReplyAllIcon, ForwardIcon, DownloadIcon,
-  EnvelopeOpenIcon, BackIcon, ArchiveIcon, JunkIcon, TrashIcon, EnvelopeIcon, SparkleIcon, CloseIcon,
+  EnvelopeOpenIcon, BackIcon, ArchiveIcon, ArchiveToolbarIcon, JunkIcon, TrashIcon, EnvelopeIcon, SparkleIcon, CloseIcon,
   KebabIcon, SourceIcon, NoteIcon, CaretDownIcon, RestoreMailIcon, StarIcon, InboxIcon, ChartIcon, ShieldWarnIcon,
   SnoozeIcon,
 } from '../icons.tsx';
@@ -606,7 +606,7 @@ export default function ReadingPane() {
         <span className="tb-sep" />
         {inBin
           ? <button className="icon-btn" title={selected.mailboxRole === 'junk' ? 'Not spam' : 'Restore to Inbox'} onClick={() => (selected.mailboxRole === 'junk' ? actions.notSpam(selected.id) : actions.restore(selected.id))}><RestoreMailIcon /></button>
-          : <button className="icon-btn" title="Archive (e)" onClick={() => actions.archive(selected.id)}><ArchiveIcon /></button>}
+          : <button className="icon-btn" title="Archive (e)" onClick={() => actions.archive(selected.id)}><ArchiveToolbarIcon /></button>}
         {selected.mailboxRole !== 'junk' && <button className="icon-btn" title="Report spam (!)" onClick={() => actions.spam(selected.id)}><JunkIcon /></button>}
         <button className="icon-btn" title={inBin ? 'Delete forever' : 'Delete (#)'} onClick={() => actions.trash(selected.id)}><TrashIcon /></button>
         <span className="tb-sep" />

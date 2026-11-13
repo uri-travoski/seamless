@@ -156,7 +156,7 @@ export const THEMES: ThemeDef[] = [
   },
   {
     id: 'simply', name: 'Simply Seamless', description: 'Content-first: quiet rows, tinted labels, outline icons. Light only.',
-    tokens: { light: simplyLight }, swatch: ['#1e324e', '#2563eb', '#f8fafc'],
+    tokens: { light: simplyLight }, fonts: ['Fraunces'], swatch: ['#1e324e', '#2563eb', '#f8fafc'],
   },
   {
     id: 'rolltop', name: 'Rolltop', description: 'Warm paper neutrals, terracotta accent, serif titles.',

@@ -13,7 +13,7 @@ import { readableTextOn } from './LabelColorPicker.tsx';
 import { ContextMenu, type MenuPos } from './EmailMenu.tsx';
 import { IconContext } from '@phosphor-icons/react';
 import {
-  StarIcon, EyeIcon, AttachClipIcon, EnvelopeIcon, EnvelopeOpenIcon, ArchiveIcon, JunkIcon, TrashIcon,
+  StarIcon, EyeIcon, AttachClipIcon, EnvelopeIcon, EnvelopeOpenIcon, ArchiveIcon, ArchiveToolbarIcon, JunkIcon, TrashIcon,
   TableViewIcon, SplitViewIcon, CompactIcon, ComfortableIcon, CloseIcon, NoteIcon, RestoreMailIcon, ReplyIcon, InboxIcon, SnoozeIcon,
 } from '../icons.tsx';
 import { useSession } from '../state/session.ts';
@@ -393,7 +393,7 @@ export default function MessageList() {
           <span className="bulk-count">{selectedCount.toLocaleString()} selected</span>
           {inBin
             ? <button className="icon-btn" title={inSpam ? 'Not spam' : 'Restore to Inbox'} onClick={() => void runBulk('inbox')}><RestoreMailIcon /></button>
-            : <button className="icon-btn" title="Archive" onClick={() => void runBulk('archive')}><ArchiveIcon /></button>}
+            : <button className="icon-btn" title="Archive" onClick={() => void runBulk('archive')}><ArchiveToolbarIcon /></button>}
           {!inSpam && <button className="icon-btn" title="Report spam" onClick={() => void runBulk('spam')}><JunkIcon /></button>}
           <button className="icon-btn" title={inBin ? 'Delete forever' : 'Delete'} onClick={() => void runBulk('delete')}><TrashIcon /></button>
           <span className="sep" />
@@ -424,7 +424,7 @@ export default function MessageList() {
           </button>
         </div>
       )}
-      {!checkedCount && <QuickStrip view={view} unread={viewMailbox?.unreadEmails ?? 0} />}
+      <div className={checkedCount ? 'strip-hold' : ''}><QuickStrip view={view} unread={viewMailbox?.unreadEmails ?? 0} /></div>
       {!allMatching && pageAllChecked && total > checkedCount && (
         <div className="select-all-banner">
           {paged ? `All ${checkedCount.toLocaleString()} messages on this page are selected.` : `All ${checkedCount.toLocaleString()} loaded messages are selected.`}{' '}
