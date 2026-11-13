@@ -39,6 +39,33 @@ class Session(private val store: KeyValueStore, val jar: PersistentCookieJar) {
         recentSearches = (listOf(t) + recentSearches.filter { !it.equals(t, true) }).take(10)
     }
 
+    // ---- app settings that stay on this phone (T9.4) ----
+    var swipeRight: String
+        get() = store.get("swipeRight") ?: "archive"
+        set(v) = store.put("swipeRight", v)
+    var swipeLeft: String
+        get() = store.get("swipeLeft") ?: "delete"
+        set(v) = store.put("swipeLeft", v)
+    var conversationView: Boolean
+        get() = store.get("conversationView") != "false"
+        set(v) = store.put("conversationView", v.toString())
+    var notifyMail: Boolean
+        get() = store.get("notifyMail") != "false"
+        set(v) = store.put("notifyMail", v.toString())
+    var notifyAlerts: Boolean
+        get() = store.get("notifyAlerts") != "false"
+        set(v) = store.put("notifyAlerts", v.toString())
+    var hideContent: Boolean
+        get() = store.get("hideContent") == "true"
+        set(v) = store.put("hideContent", v.toString())
+    var theme: String
+        get() = store.get("theme") ?: "system"
+        set(v) = store.put("theme", v)
+    /** Email of the identity new messages start from; empty = follow the mailbox being viewed. */
+    var defaultFrom: String
+        get() = store.get("defaultFrom").orEmpty()
+        set(v) = store.put("defaultFrom", v)
+
     val hasSession: Boolean get() = serverUrl.isNotEmpty() && jar.hasCookies()
 
     /** Forget the sign-in but keep the address, so the login screen is pre-filled. */

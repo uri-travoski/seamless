@@ -11,10 +11,11 @@ import kotlinx.coroutines.withContext
 
 enum class Screen { Splash, Login, Home }
 enum class LoginStep { Address, Password, Code }
+enum class Overlay { None, Settings, Labels }
 
 class AppViewModel(private val app: SeamlessApp) : ViewModel() {
     private val api get() = app.api
-    private val session get() = app.session
+    val session get() = app.session
 
     var screen by mutableStateOf(if (session.hasSession) Screen.Splash else Screen.Login); private set
     var step by mutableStateOf(LoginStep.Address); private set
@@ -32,6 +33,10 @@ class AppViewModel(private val app: SeamlessApp) : ViewModel() {
     var splashError by mutableStateOf<String?>(null); private set
     var notice by mutableStateOf<String?>(null)
     var mail by mutableStateOf<MailViewModel?>(null); private set
+    var settings by mutableStateOf<SettingsModel?>(null); private set
+    var overlay by mutableStateOf(Overlay.None)
+    var theme by mutableStateOf(session.theme); private set
+    val messages = kotlinx.coroutines.flow.MutableSharedFlow<String>(extraBufferCapacity = 4, onBufferOverflow = kotlinx.coroutines.channels.BufferOverflow.DROP_OLDEST)
 
     private var mfaToken = ""
     private var checkedUrl = ""
@@ -128,7 +133,10 @@ class AppViewModel(private val app: SeamlessApp) : ViewModel() {
     }
 
     private fun enterHome() {
-        mail = MailViewModel(api, session, viewModelScope).also { it.start() }
+        mail = MailViewModel(api, session, viewModelScope, onSignedOut = { signedOut("You were signed out. Sign in again to continue.") }).also { it.start() }
+        settings = SettingsModel(api, session, viewModelScope, onSignedOut = { signedOut("You were signed out. Sign in again to continue.") },
+            onMessage = { messages.tryEmit(it) }, onTheme = { theme = it })
+        overlay = Overlay.None
         screen = Screen.Home
     }
 
@@ -141,7 +149,7 @@ class AppViewModel(private val app: SeamlessApp) : ViewModel() {
     }
 
     private fun signedOut(message: String?) {
-        session.clear(); mail = null
+        session.clear(); mail = null; settings = null; overlay = Overlay.None
         password = ""; code = ""; mfaToken = ""
         checkedUrl = session.serverUrl; address = session.serverUrl
         step = if (address.isNotEmpty()) LoginStep.Password else LoginStep.Address

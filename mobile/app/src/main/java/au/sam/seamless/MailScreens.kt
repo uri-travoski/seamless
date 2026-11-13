@@ -50,37 +50,23 @@ fun HomeScreen(vm: AppViewModel) {
     val mail = vm.mail ?: return
     val drawer = rememberDrawerState(DrawerValue.Closed)
     val scope = rememberCoroutineScope()
+    var help by remember { mutableStateOf(false) }
+    when (vm.overlay) {
+        Overlay.Settings -> { SettingsScreen(vm, mail) { vm.overlay = Overlay.None }; return }
+        Overlay.Labels -> { LabelsScreen(mail) { vm.overlay = Overlay.None }; return }
+        Overlay.None -> {}
+    }
     ModalNavigationDrawer(
         drawerState = drawer,
         gesturesEnabled = !mail.searchOpen,
         drawerContent = {
-            ModalDrawerSheet {
-                Column(Modifier.padding(horizontal = 28.dp, vertical = 24.dp).statusBarsPadding()) {
-                    Text("Seamless", style = MaterialTheme.typography.titleLarge, color = MaterialTheme.colorScheme.primary)
-                    Spacer(Modifier.height(4.dp))
-                    Text(vm.userEmail, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                }
-                HorizontalDivider()
-                Column(Modifier.weight(1f).verticalScroll(rememberScrollState())) {
-                    mail.folders.forEach { f ->
-                        NavigationDrawerItem(
-                            label = { Text(f.name) }, selected = f.id == mail.folder,
-                            badge = { if (f.unreadEmails > 0) Text(Format.count(f.unreadEmails)) },
-                            onClick = { scope.launch { drawer.close() }; mail.chooseFolder(f.id) },
-                            modifier = Modifier.padding(NavigationDrawerItemDefaults.ItemPadding),
-                        )
-                    }
-                }
-                NavigationDrawerItem(
-                    label = { Text("Log out") }, selected = false,
-                    onClick = { scope.launch { drawer.close() }; vm.logout() },
-                    modifier = Modifier.padding(NavigationDrawerItemDefaults.ItemPadding).navigationBarsPadding(),
-                )
-            }
+            DrawerContent(vm, mail, close = { scope.launch { drawer.close() } },
+                onSettings = { vm.overlay = Overlay.Settings }, onLabels = { vm.overlay = Overlay.Labels }, onHelp = { help = true })
         },
     ) {
         MailHome(mail, onMenu = { scope.launch { drawer.open() } })
     }
+    if (help) HelpDialog(vm.session.serverUrl) { help = false }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -109,6 +95,7 @@ fun MailHome(mail: MailViewModel, onMenu: () -> Unit) {
                 else TopBar(mail, onMenu, onSearch = mail::openSearch, onScope = { mail.pickerOpen = true })
                 if (!selecting) QuickChips(mail)
                 mail.alert?.let { AlertBanner(it) { alertOpen = true } }
+                mail.bannerOffer?.let { o -> OfferBanner(o) { action -> mail.answerOffer(o, action) } }
                 if (mail.viewingMode) NoticeBanner("Viewing mode: this server is not sending mail, so Compose and Send are off.")
                 EmailList(mail, mail.main, mail.mainItems, mail.mainStatus, mail::refresh, mail::loadMore, summary = null, empty = "Nothing here")
             }
@@ -396,21 +383,38 @@ private fun ErrorBlock(message: String, retry: () -> Unit) {
 private fun EmailRow(e: ApiEmail, mail: MailViewModel, showDot: Boolean, labelById: Map<Int, ApiLabel>) {
     val selecting = mail.selection.isNotEmpty()
     val selected = e.id in mail.selection
+    val right = mail.swipeRight
+    val left = mail.swipeLeft
+    // the state remembers its first lambda, so read the current row and settings through these
+    val rowNow by rememberUpdatedState(e)
+    val rightNow by rememberUpdatedState(right)
+    val leftNow by rememberUpdatedState(left)
     val dismiss = rememberSwipeToDismissBoxState(confirmValueChange = { v ->
-        when (v) {
-            SwipeToDismissBoxValue.StartToEnd -> { mail.act("archive", setOf(e.id)); true }
-            SwipeToDismissBoxValue.EndToStart -> { mail.act("delete", setOf(e.id)); true }
-            else -> false
-        }
+        val a = when (v) { SwipeToDismissBoxValue.StartToEnd -> rightNow; SwipeToDismissBoxValue.EndToStart -> leftNow; else -> SwipeAction.None }
+        val bulk = a.bulkFor(rowNow)
+        if (bulk != null) mail.act(bulk, setOf(rowNow.id))
+        bulk != null && a.removesRow // read/star keep the row, so it springs back
     })
     SwipeToDismissBox(
-        state = dismiss, enableDismissFromStartToEnd = !selecting, enableDismissFromEndToStart = !selecting,
+        state = dismiss,
+        enableDismissFromStartToEnd = !selecting && right != SwipeAction.None,
+        enableDismissFromEndToStart = !selecting && left != SwipeAction.None,
         backgroundContent = {
             val toRight = dismiss.dismissDirection == SwipeToDismissBoxValue.StartToEnd
+            val a = if (toRight) right else left
             Box(
-                Modifier.fillMaxSize().background(if (toRight) MaterialTheme.colorScheme.primary else ProblemRed).padding(horizontal = 24.dp),
+                Modifier.fillMaxSize().background(if (a == SwipeAction.Delete) ProblemRed else MaterialTheme.colorScheme.primary).padding(horizontal = 24.dp),
                 contentAlignment = if (toRight) Alignment.CenterStart else Alignment.CenterEnd,
-            ) { Icon(if (toRight) Icons.Filled.Archive else Icons.Filled.Delete, if (toRight) "Archive" else "Delete", tint = Color.White) }
+            ) {
+                val icon = when (a) {
+                    SwipeAction.Archive -> Icons.Filled.Archive
+                    SwipeAction.Delete -> Icons.Filled.Delete
+                    SwipeAction.ToggleRead -> if (e.unread) Icons.Filled.MarkEmailRead else Icons.Filled.MarkEmailUnread
+                    SwipeAction.Star -> Icons.Filled.Star
+                    SwipeAction.None -> Icons.Filled.Archive
+                }
+                Icon(icon, a.title, tint = Color.White)
+            }
         },
     ) {
         val bold = if (e.unread) FontWeight.Bold else FontWeight.Normal

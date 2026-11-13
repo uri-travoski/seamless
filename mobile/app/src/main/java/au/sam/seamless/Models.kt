@@ -16,6 +16,7 @@ import kotlinx.serialization.Serializable
     val server: ServerBrand? = null,
     val mustChangePassword: Boolean = false,
     val mfaEnrollRequired: Boolean = false,
+    val settings: kotlinx.serialization.json.JsonObject? = null,
 )
 
 @Serializable data class LoginRequest(val email: String, val password: String)

@@ -130,12 +130,59 @@ class Api(
     fun undo(baseUrl: String, token: String): ApiResult<Unit> =
         call(baseUrl, "/api/bulk/undo", json.encodeToString(UndoRequest(token))) { }
 
-    private fun <T> call(baseUrl: String, path: String, body: String?, isLogin: Boolean = false, parse: (String) -> T): ApiResult<T> {
+    // ---- drawer, labels, settings (T9.4) ----
+
+    /** The signed-in user's synced settings (the web app's `settings_json`, which holds the sidebar layout). */
+    fun userSettings(baseUrl: String) = getJson(baseUrl, "/api/me") {
+        json.parseToJsonElement(it).jsonObject["settings"] as? JsonObject ?: JsonObject(emptyMap())
+    }
+
+    /** `PUT /api/settings` replaces the whole object, so callers send the merged object they just read. */
+    fun saveUserSettings(baseUrl: String, settings: JsonObject): ApiResult<Unit> =
+        call(baseUrl, "/api/settings", settings.toString(), method = "PUT") { }
+
+    fun createLabel(baseUrl: String, name: String, color: String, parentId: Int?): ApiResult<Int> =
+        call(baseUrl, "/api/labels", labelBody(name, color, parentId, true).toString()) { json.parseToJsonElement(it).jsonObject["id"]!!.jsonPrimitive.int }
+
+    fun updateLabel(baseUrl: String, id: Int, name: String, color: String, parentId: Int?): ApiResult<Unit> =
+        call(baseUrl, "/api/labels/$id", labelBody(name, color, parentId, true).toString(), method = "PUT") { }
+
+    fun deleteLabel(baseUrl: String, id: Int): ApiResult<Unit> = call(baseUrl, "/api/labels/$id", null, method = "DELETE") { }
+
+    private fun labelBody(name: String, color: String, parentId: Int?, withParent: Boolean) = buildJsonObject {
+        put("name", name.trim()); put("color", color)
+        if (withParent) put("parentId", parentId?.let { JsonPrimitive(it) } ?: JsonNull)
+    }
+
+    fun sharedLabelOffers(baseUrl: String) = getJson(baseUrl, "/api/labels/shared") { json.decodeFromString<List<ApiLabelOffer>>(it) }
+
+    /** action = accept | reject | later */
+    fun respondSharedLabels(baseUrl: String, accountId: Int, action: String): ApiResult<Unit> =
+        call(baseUrl, "/api/labels/shared/$accountId/respond", buildJsonObject { put("action", action) }.toString()) { }
+
+    fun serverSettings(baseUrl: String) = getJson(baseUrl, "/api/settings/server") { json.decodeFromString<ApiServerSettings>(it) }
+    fun saveUndoSeconds(baseUrl: String, seconds: Int): ApiResult<Unit> =
+        call(baseUrl, "/api/settings/server", buildJsonObject { put("undoSendSeconds", seconds) }.toString(), method = "PUT") { }
+
+    fun notificationPrefs(baseUrl: String) = getJson(baseUrl, "/api/notification-prefs") { json.decodeFromString<ApiNotificationPrefs>(it) }
+    /** Sends only the mute list; the server leaves the other notification settings alone. */
+    fun saveMutedAccounts(baseUrl: String, ids: List<Int>): ApiResult<Unit> =
+        call(baseUrl, "/api/notification-prefs", buildJsonObject { put("mutedAccountIds", JsonArray(ids.map { JsonPrimitive(it) })) }.toString(), method = "PUT") { }
+
+    fun identities(baseUrl: String) = getJson(baseUrl, "/api/identities") { json.decodeFromString<List<ApiIdentity>>(it) }
+
+    private fun <T> call(baseUrl: String, path: String, body: String?, isLogin: Boolean = false, method: String? = null, parse: (String) -> T): ApiResult<T> {
         val req = Request.Builder().url(baseUrl + path)
             .header("X-Seamless-Client", "android/$appVersion")
             .header("X-Seamless-Device", deviceName)
             .header("Accept", "application/json")
-            .apply { if (body != null) post(body.toRequestBody(jsonType)) }
+            .apply {
+                when {
+                    method == "DELETE" -> delete()
+                    method != null -> method(method, (body ?: "{}").toRequestBody(jsonType))
+                    body != null -> post(body.toRequestBody(jsonType))
+                }
+            }
             .build()
         return try {
             client.newCall(req).execute().use { res ->

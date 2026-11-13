@@ -60,3 +60,28 @@ Opening a message arrives in a later update.
 - **Test push says Google did not accept it** — the key belongs to a different Firebase project than the one in the app's `google-services.json`, or the key was deleted in Firebase. Generate a new one and save it again.
 - **Notifications stopped after a phone reset** — sign in again; the old registration is cleaned up automatically when Google reports the phone as gone.
 - **The app says it was signed out** — someone pressed Sign out for that phone in Settings → Security, an administrator disabled the account, or the phone was not used for 90 days.
+
+## The menu (drawer)
+
+Open it with the menu button or by swiping from the left edge. It shows, top to bottom:
+
+- **Your name and the server** you are signed in to.
+- **Folders** in the same order as the web app's sidebar (Inbox, Starred, Drafts, Scheduled, Snoozed, Sent, Spam, Archive, Bin), with the unread count for Inbox and Spam. Change the order in the web app (drag folders in the sidebar) and the phone follows. Templates are edited in the web app only.
+- **Labels**, with a colour square, name and unread count. Labels inside other labels are indented. Tap one to see its mail. Labels you hid in the web sidebar stay hidden.
+- **Smart views** – your saved searches such as *Waiting for reply*.
+- **Settings**, **Help** and **Log out**.
+
+### Labels
+
+**Manage labels** lists every label. Tap one to rename it, pick another colour or move it inside another label; tap the bin to delete it (the messages stay, only the label is removed). **New label** makes one. These are the same labels as on the web: a change on the phone shows up there and the other way round. Labels other people shared with you are listed too, read-only.
+
+When someone shares labels from their mailbox with you, a banner appears above the list: **Accept**, **Reject** or **Decide later**.
+
+## Settings on the phone
+
+- **Notifications:** new mail on/off, critical alerts on/off, hide message content, a switch per mailbox to mute it (kept on the server, so the web app agrees) and a shortcut to Android's own channel settings.
+- **Swipe right / left:** archive, delete, mark read/unread, star, or nothing.
+- **Conversation view**, **Default "From"** (which of your addresses new messages start from; by default the mailbox you are looking at), **Undo send delay** (the server setting, shared with the web app).
+- **Signature:** shown for information; edit it in the web app.
+- **Theme:** match the phone, light or dark.
+- **About:** app version, server address and version, open-source licences, and **Sign out**.

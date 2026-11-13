@@ -57,7 +57,24 @@ data class EmailPage(val total: Int, val emails: List<ApiEmail>)
     val hasProblem: Boolean get() = status == "error" || (lastError.isNotBlank() && status != "ok" && status != "connecting")
 }
 
-@Serializable data class ApiLabel(val id: Int, val name: String = "", val color: String = "", val parentId: Int? = null, val unread: Int = 0)
+@Serializable data class ApiLabel(
+    val id: Int, val name: String = "", val color: String = "", val parentId: Int? = null, val unread: Int = 0,
+    val shared: Boolean = false, val sharedBy: String = "", val sidebarVisibility: String = "always",
+)
+
+@Serializable data class ApiOfferLabel(val id: Int, val name: String = "", val color: String = "")
+
+/** Someone shared labels from their mailbox with me (`status`: pending | accepted | rejected). */
+@Serializable data class ApiLabelOffer(
+    val accountId: Int, val mailbox: String = "", val ownerName: String = "", val status: String = "pending",
+    val count: Int = 0, val labels: List<ApiOfferLabel> = emptyList(), val hideBannerUntil: Long? = null,
+)
+
+@Serializable data class ApiServerSettings(val undoSendSeconds: Int = 10, val snoozeWakeOnReply: Boolean = true)
+
+@Serializable data class ApiNotificationPrefs(val mutedAccountIds: List<Int> = emptyList())
+
+@Serializable data class ApiIdentity(val email: String = "", val name: String = "", val accountId: Int = 0, val isDefault: Boolean = false)
 
 @Serializable data class ApiSavedView(val id: Int, val name: String = "", val query: String = "", val scope: String = "unified", val pinned: Boolean = false)
 

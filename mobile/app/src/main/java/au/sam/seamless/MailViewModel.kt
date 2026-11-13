@@ -37,6 +37,11 @@ class MailViewModel(
     var views by mutableStateOf<List<ApiSavedView>>(emptyList()); private set
     var labels by mutableStateOf<List<ApiLabel>>(emptyList()); private set
     var folders by mutableStateOf<List<ApiMailbox>>(emptyList()); private set
+    var allViews by mutableStateOf<List<ApiSavedView>>(emptyList()); private set
+    var offers by mutableStateOf<List<ApiLabelOffer>>(emptyList()); private set
+    var sidebar by mutableStateOf(Sidebar.normalise(null, null)); private set
+    private var folderTitleOverride by mutableStateOf<String?>(null)
+    private var userSettings: kotlinx.serialization.json.JsonObject? = null
     var alert by mutableStateOf<ApiAlert?>(null); private set
     var viewingMode by mutableStateOf(false); private set
     var selection by mutableStateOf<Set<String>>(emptySet()); private set
@@ -66,7 +71,10 @@ class MailViewModel(
 
     val scopeTitle: String get() = MailQuery.scopeTitle(scopeId, overview)
     val showMailboxDot: Boolean get() = MailQuery.showsMailboxDot(scopeId, overview)
-    val folderTitle: String get() = folders.firstOrNull { it.id == folder }?.name ?: "Inbox"
+    val folderTitle: String get() = folderTitleOverride ?: folders.firstOrNull { it.id == folder }?.name ?: "Inbox"
+    val swipeRight: SwipeAction get() = SwipeAction.of(session.swipeRight, SwipeAction.Archive)
+    val swipeLeft: SwipeAction get() = SwipeAction.of(session.swipeLeft, SwipeAction.Delete)
+    val bannerOffer: ApiLabelOffer? get() = offers.firstOrNull { it.showBanner(System.currentTimeMillis()) }
 
     fun start() {
         scope.launch { main.reload(keep = false); checkSignedOut(main) }
@@ -76,9 +84,13 @@ class MailViewModel(
     /** Overview, banners and the label/view lists – small calls, failures are quietly ignored (the list shows its own error). */
     fun loadSide() {
         scope.launch {
-            val (ov, acc, al, mode, lab, vw, mb) = withContext(Dispatchers.IO) {
-                Side(api.categories(base), api.accounts(base), api.alerts(base), api.mode(base), api.labels(base), api.views(base), api.mailboxes(base, MailQuery.UNIFIED))
+            val (ov, acc, al, mode, lab, vw, mb, off, set) = withContext(Dispatchers.IO) {
+                Side(api.categories(base), api.accounts(base), api.alerts(base), api.mode(base), api.labels(base), api.views(base), api.mailboxes(base, MailQuery.UNIFIED),
+                    api.sharedLabelOffers(base), api.userSettings(base))
             }
+            (off as? ApiResult.Ok)?.let { offers = it.value }
+            (set as? ApiResult.Ok)?.let { userSettings = it.value; sidebar = Sidebar.fromSettings(it.value) }
+            (vw as? ApiResult.Ok)?.let { allViews = it.value }
             (ov as? ApiResult.Ok)?.let { overview = it.value; if (!scopeStillExists()) chooseScope(MailQuery.UNIFIED) }
             (acc as? ApiResult.Ok)?.let { a -> problemAccounts = a.value.filter { it.hasProblem }.map { it.id }.toSet() }
             (al as? ApiResult.Ok)?.let { a -> alert = a.value.items.firstOrNull { it.state == "open" } }
@@ -92,6 +104,7 @@ class MailViewModel(
     private data class Side(
         val ov: ApiResult<ApiCategoryOverview>, val acc: ApiResult<List<ApiAccountStatus>>, val al: ApiResult<AlertSummary>,
         val mode: ApiResult<ModeResponse>, val lab: ApiResult<List<ApiLabel>>, val vw: ApiResult<List<ApiSavedView>>, val mb: ApiResult<List<ApiMailbox>>,
+        val off: ApiResult<List<ApiLabelOffer>>, val set: ApiResult<kotlinx.serialization.json.JsonObject>,
     )
 
     /** A remembered scope can vanish (mailbox deleted on the server): fall back to All mailboxes. */
@@ -114,8 +127,18 @@ class MailViewModel(
         loadSide()
     }
 
-    fun chooseFolder(id: String) {
-        folder = id; quick = Quick.All; clearSelection()
+    fun chooseFolder(id: String, title: String? = null) {
+        folder = id; folderTitleOverride = title; quick = Quick.All; clearSelection()
+        scope.launch { main.reload(keep = false) }
+    }
+
+    /** A label from the drawer: its mail, in any folder but Trash/Spam as the server decides. */
+    fun chooseLabel(l: ApiLabel) = chooseFolder("q:" + LabelTree.query(l), l.name)
+
+    /** A smart view from the drawer: shows the view's results from the Inbox chips row. */
+    fun chooseView(v: ApiSavedView) {
+        folder = "u:inbox"; folderTitleOverride = null; clearSelection()
+        quick = Quick.View(v.id, v.name, v.query)
         scope.launch { main.reload(keep = false) }
     }
 
@@ -142,6 +165,55 @@ class MailViewModel(
 
     /** Reading a conversation arrives with T9.5; until then a tap says so. */
     fun open(@Suppress("UNUSED_PARAMETER") e: ApiEmail) { snacks.tryEmit(Snack("Reading mail arrives in the next update.")) }
+
+    // ---- labels (T9.4): same API as the web app ----
+    /** Create (id == null) or change a label. `done` gets null on success or a sentence to show. */
+    fun saveLabel(id: Int?, name: String, color: String, parentId: Int?, done: (String?) -> Unit) {
+        LabelTree.validate(name, labels, id)?.let { done(it); return }
+        scope.launch {
+            val r = withContext(Dispatchers.IO) {
+                if (id == null) api.createLabel(base, name, color, parentId).map { } else api.updateLabel(base, id, name, color, parentId)
+            }
+            when (r) {
+                is ApiResult.Ok -> { loadSide(); done(null) }
+                is ApiResult.Failed -> done(r.message)
+                is ApiResult.Network -> done(r.message)
+                ApiResult.Unauthorized -> onSignedOut()
+            }
+        }
+    }
+
+    fun removeLabel(l: ApiLabel) {
+        scope.launch {
+            when (val r = withContext(Dispatchers.IO) { api.deleteLabel(base, l.id) }) {
+                is ApiResult.Ok -> {
+                    snacks.tryEmit(Snack("Label \"${l.name}\" deleted"))
+                    if (folder.startsWith("q:label:") && folderTitleOverride == l.name) chooseFolder("u:inbox")
+                    loadSide()
+                }
+                is ApiResult.Failed -> snacks.tryEmit(Snack(r.message))
+                is ApiResult.Network -> snacks.tryEmit(Snack(r.message))
+                ApiResult.Unauthorized -> onSignedOut()
+            }
+        }
+    }
+
+    /** accept | reject | later for a shared-labels offer. */
+    fun answerOffer(o: ApiLabelOffer, action: String) {
+        // hide the banner at once; the server's answer decides what comes back
+        offers = offers.map { if (it.accountId == o.accountId) it.copy(status = if (action == "accept") "accepted" else if (action == "reject") "rejected" else it.status, hideBannerUntil = if (action == "later") Long.MAX_VALUE else it.hideBannerUntil) else it }
+        scope.launch {
+            when (val r = withContext(Dispatchers.IO) { api.respondSharedLabels(base, o.accountId, action) }) {
+                is ApiResult.Ok -> {
+                    if (action == "accept") snacks.tryEmit(Snack("Added ${o.count} shared label${if (o.count == 1) "" else "s"} from ${o.ownerName}"))
+                    loadSide()
+                }
+                is ApiResult.Failed -> { snacks.tryEmit(Snack(r.message)); loadSide() }
+                is ApiResult.Network -> { snacks.tryEmit(Snack(r.message)); loadSide() }
+                ApiResult.Unauthorized -> onSignedOut()
+            }
+        }
+    }
 
     // ---- selection ----
     fun toggle(id: String) { selection = if (id in selection) selection - id else selection + id }

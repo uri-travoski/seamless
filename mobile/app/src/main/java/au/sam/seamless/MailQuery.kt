@@ -23,14 +23,16 @@ object MailQuery {
 
     /** The JMAP filter for a list: folder + scope + the quick chip, or a free-text search over everything. */
     fun filter(scope: String, folder: String, quick: Quick, search: String? = null): JsonObject = buildJsonObject {
+        // "q:<search>" folders (Starred, Snoozed, a label) are a search rather than a mailbox
+        val folderText = if (folder.startsWith("q:")) folder.drop(2) else ""
         val text = when {
             search != null -> search.trim()
-            quick is Quick.Unread -> "is:unread"
-            quick is Quick.Attachments -> "has:attachment"
+            quick is Quick.Unread -> listOf(folderText, "is:unread").filter { it.isNotEmpty() }.joinToString(" ")
+            quick is Quick.Attachments -> listOf(folderText, "has:attachment").filter { it.isNotEmpty() }.joinToString(" ")
             quick is Quick.View -> quick.query
-            else -> ""
+            else -> folderText
         }
-        if (search == null && quick !is Quick.View) put("inMailbox", folder)
+        if (search == null && quick !is Quick.View && folderText.isEmpty()) put("inMailbox", folder)
         if (text.isNotEmpty()) put("text", text)
         if (scope != UNIFIED) put("scope", scope)
     }

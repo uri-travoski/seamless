@@ -19,6 +19,9 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
-        setContent { SeamlessTheme { AppRoot(vm) } }
+        setContent {
+            val dark = when (vm.theme) { "dark" -> true; "light" -> false; else -> androidx.compose.foundation.isSystemInDarkTheme() }
+            SeamlessTheme(dark) { AppRoot(vm) }
+        }
     }
 }
