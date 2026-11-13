@@ -1603,3 +1603,7 @@ mark[data-ai-pending], mark[data-unknown-var] { outline: 1px dashed var(--md-bor
 .sender-card { position: absolute; z-index: 30; top: 100%; left: 0; min-width: 240px; max-width: 320px; padding: 10px 12px; border-radius: 8px;
   border: 1px solid var(--md-border); background: var(--md-surface); box-shadow: 0 6px 22px rgba(0,0,0,.18); font-size: 12.5px; text-align: left; }
 .sender-card b { display: block; font-size: 13.5px; }
+
+/* Shared Mailbox submenu in the top-right menu */
+.app-menu .menu-sub { margin: 2px 0 4px 18px; padding-left: 6px; border-left: 2px solid var(--color-border, rgba(128,128,128,.3)); }
+.app-menu .menu-sub .side-item { padding: 8px 12px; font-size: 13.5px; }

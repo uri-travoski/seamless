@@ -4,19 +4,27 @@ import { api } from '../../api/client.ts';
 import { toast } from '../../toast.ts';
 import { navigate } from '../../router.ts';
 import { useSession } from '../../state/session.ts';
-import { MenuIcon, RedoIcon, SettingsIcon, LogoutIcon, KeyboardIcon, HelpIcon, SunIcon, MoonIcon, SystemIcon } from '../../icons.tsx';
+import { UsersIcon, CaretRightIcon, MenuIcon, RedoIcon, SettingsIcon, LogoutIcon, KeyboardIcon, HelpIcon, SunIcon, MoonIcon, SystemIcon } from '../../icons.tsx';
 import { useUi } from '../../state/ui.ts';
+import { useMail, scopeToSlug } from '../../state/mail.ts';
+import { useShared } from '../../state/shared.ts';
 
 export default function AppMenu() {
   const [open, setOpen] = useState(false);
   const [fetching, setFetching] = useState(false);
+  const [sharedOpen, setSharedOpen] = useState(false);
+  const overview = useMail((x) => x.overview);
+  const scope = useMail((x) => x.scope);
+  const ownedShared = useShared((x) => x.ownedShared);
+  useEffect(() => { void useShared.getState().loadOwned(); }, [overview]);
+  const hasShared = (overview?.shared?.length ?? 0) > 0 || ownedShared.length > 0;
   const ref = useRef<HTMLDivElement>(null);
   const mode = useSession((x) => x.settings.mode);
   const saveSettings = useSession((x) => x.saveSettings);
   const go = (fn: () => void) => () => { setOpen(false); fn(); };
 
   useEffect(() => {
-    if (!open) return;
+    if (!open) { setSharedOpen(false); return; }
     const onDown = (e: MouseEvent) => { if (!ref.current?.contains(e.target as Node)) setOpen(false); };
     const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setOpen(false); };
     window.addEventListener('mousedown', onDown);
@@ -47,6 +55,24 @@ export default function AppMenu() {
           <button className="side-item" role="menuitem" disabled={fetching} onClick={() => void fetchAll()}>
             <RedoIcon size={17} weight="bold" className={fetching ? 'spin' : ''} /><span className="name">Check New Mail</span>
           </button>
+          {hasShared && (
+            <>
+              <button className="side-item" role="menuitem" aria-haspopup="menu" aria-expanded={sharedOpen} onClick={() => setSharedOpen((v) => !v)}>
+                <UsersIcon size={17} /><span className="name">Shared Mailbox</span>
+                <CaretRightIcon size={14} style={{ marginLeft: 'auto', transform: sharedOpen ? 'rotate(90deg)' : undefined, transition: 'transform .15s' }} />
+              </button>
+              {sharedOpen && (
+                <div className="menu-sub" role="menu">
+                  {([['assigned', 'Assigned to me'], ['unassigned', 'Unassigned']] as const).map(([f, label]) => (
+                    <button key={f} className="side-item" role="menuitem"
+                      onClick={go(() => navigate({ page: 'mail', scope: scopeToSlug(scope, overview), folder: f }))}>
+                      <span className="name">{label}</span>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </>
+          )}
           <div className="menu-sep" />
           <button className="side-item" role="menuitem" onClick={go(() => navigate({ page: 'settings', tab: 'general' }))}>
             <SettingsIcon size={17} /><span className="name">Settings</span>

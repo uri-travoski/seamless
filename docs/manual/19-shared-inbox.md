@@ -42,7 +42,7 @@ Viewers can look but not change anything; responders and managers can assign, ch
 If someone's access is removed, their assignments are cleared.
 
 ## Finding things
-In the sidebar, a **Shared** section appears as soon as you have any sharing: **Assigned to me** and **Unassigned**.
+Open the **menu** at the top-right: a **Shared Mailbox** item appears as soon as you have any sharing. Click it to expand **Assigned to me** and **Unassigned**.
 Search operators: `assigned:me`, `assigned:none`, `status:open`, `status:pending`, `status:done`
 (for example `status:pending assigned:me`).
 

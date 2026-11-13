@@ -20,7 +20,6 @@ import {
 import { IconContext } from '@phosphor-icons/react';
 import { api } from '../api/client.ts';
 import { toast } from '../toast.ts';
-import { useShared } from '../state/shared.ts';
 import { useViews } from '../state/views.ts';
 import { ViewGlyph } from './viewIcons.tsx';
 import { PencilSimple, UserPlus } from '@phosphor-icons/react';
@@ -78,9 +77,6 @@ export default function Sidebar({ open, onNavigate, onAddLabel }: { open: boolea
   const isActive = (folder: string, arg?: string) =>
     route.page === 'mail' && route.folder === folder && (arg === undefined || route.arg === arg);
 
-  const ownedShared = useShared((st) => st.ownedShared);
-  useEffect(() => { void useShared.getState().loadOwned(); }, [overview]);
-  const hasShared = (overview?.shared?.length ?? 0) > 0 || ownedShared.length > 0;
 
   const views = useViews((st) => st.views);
   const counts = useViews((st) => st.counts);
@@ -186,17 +182,6 @@ export default function Sidebar({ open, onNavigate, onAddLabel }: { open: boolea
         {tree.map((n) => labelNode(n, 0))}
         {labels.length === 0 && <button className="side-item side-hint" onClick={onAddLabel}><span className="name">+ New label</span></button>}
       </div>
-
-      {hasShared && (
-        <div className="side-section">
-          <div className="side-header"><span>Shared</span></div>
-          {(['assigned', 'unassigned'] as const).map((f) => (
-            <button key={f} className={`side-item ${isActive(f) ? 'active' : ''}`} onClick={() => go(f)}>
-              <FolderIcon className="glyph" /><span className="name">{FOLDER_TITLE[f]}</span>
-            </button>
-          ))}
-        </div>
-      )}
 
       {ownFolders.length > 0 && (
         <div className="side-section">
