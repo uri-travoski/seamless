@@ -25,9 +25,12 @@ import { ViewGlyph } from './viewIcons.tsx';
 import { PencilSimple, UserPlus } from '@phosphor-icons/react';
 import LabelColorPicker from './LabelColorPicker.tsx';
 
+/** Sidebar spam icon: the filled octagon (the top bar uses the outline). */
+const SpamFolderIcon = (p: { className?: string }) => <JunkIcon weight="fill" className={p.className} />;
+
 const FOLDER_ICON: Record<string, ComponentType<{ className?: string }>> = {
   inbox: InboxIcon, starred: StarIcon, drafts: DraftsIcon, scheduled: ScheduledIcon, sent: SentIcon,
-  templates: TemplateIcon, spam: JunkIcon, bin: TrashIcon, archive: ArchiveIcon, review: ReviewIcon,
+  templates: TemplateIcon, spam: SpamFolderIcon, bin: TrashIcon, archive: ArchiveIcon, review: ReviewIcon,
   snoozed: SnoozeIcon, readlater: ReadLaterIcon, waiting: WaitingIcon,
 };
 

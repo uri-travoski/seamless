@@ -394,7 +394,7 @@ export default function MessageList() {
           {inBin
             ? <button className="icon-btn" title={inSpam ? 'Not spam' : 'Restore to Inbox'} onClick={() => void runBulk('inbox')}><RestoreMailIcon /></button>
             : <button className="icon-btn" title="Archive" onClick={() => void runBulk('archive')}><ArchiveIcon /></button>}
-          {!inSpam && <button className="icon-btn" title="Report spam" onClick={() => void runBulk('spam')}><JunkIcon weight="fill" /></button>}
+          {!inSpam && <button className="icon-btn" title="Report spam" onClick={() => void runBulk('spam')}><JunkIcon /></button>}
           <button className="icon-btn" title={inBin ? 'Delete forever' : 'Delete'} onClick={() => void runBulk('delete')}><TrashIcon /></button>
           <span className="sep" />
           {anyUnreadSelected
