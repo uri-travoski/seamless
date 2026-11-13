@@ -59,3 +59,7 @@ If the check finds a problem the migration stops with **Stopped — nothing was 
 **Your old bucket is kept for 14 days and never deleted automatically.** Until then *Switch back to …* copies anything new back to the old bucket and switches to it again. After 14 days *Clean up old storage* appears; it deletes the old copies only after you type the old bucket's name.
 
 If the server's environment names the mail bucket (`S3_*`), that still wins after a restart. Remove those variables to keep the new bucket.
+
+## Database maintenance and orphaned files
+
+Administrators also find **Database maintenance** on this page: the automatic cleanups, previews, **Find orphaned files** (objects in the mail bucket that no message references, older than 7 days, deleted only on your confirmation) and the log. See [Database maintenance](34-database-maintenance.md).

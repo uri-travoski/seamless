@@ -7,6 +7,7 @@ import QuotaBar from './QuotaBar.tsx';
 import RetentionPanel from './RetentionPanel.tsx';
 import { useSession } from '../../state/session.ts';
 import StorageMigration from './StorageMigration.tsx';
+import MaintenancePanel from './MaintenancePanel.tsx';
 import StorageForm, { TestSteps, emptyForm, PROVIDERS, type FormValue, type Role, type TestResult } from './StorageForm.tsx';
 
 interface Target {
@@ -147,6 +148,7 @@ export default function StorageSettings() {
       {isAdmin ? <StorageAdmin /> : <h2>Storage</h2>}
       <MySpace />
       <RetentionPanel />
+      {isAdmin && <MaintenancePanel />}
       {!isAdmin && <ArchiveSettings />}
       {isAdmin && <p className="settings-desc">Moving old mail out of the app to a backup target: see <button className="linklike" onClick={() => navigate({ page: 'settings', tab: 'backup' })}>Archive old mail</button> under Backup.</p>}
     </div>

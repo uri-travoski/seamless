@@ -1,3 +1,4 @@
+import { markBusy } from '../maintenance/busy.ts';
 import { gzipSync, gunzipSync } from 'node:zlib';
 import type pg from 'pg';
 import { pool, q, one, migrate } from '../db.ts';
@@ -122,7 +123,13 @@ export async function dumpDatabase(opts: { query?: QueryFn; transform?: RowTrans
   return { text: lines.join('\n'), counts, rows };
 }
 
-export async function createBackup(opts: { prefix?: string; store?: BlobStore; appVersion?: string; includeEmails?: boolean; mailSource?: (key: string) => Promise<Buffer> } = {}): Promise<BackupManifest> {
+type CreateBackupOpts = { prefix?: string; store?: BlobStore; appVersion?: string; includeEmails?: boolean; mailSource?: (key: string) => Promise<Buffer> };
+export async function createBackup(opts: CreateBackupOpts = {}): Promise<BackupManifest> {
+  const done = markBusy('backup');   // database maintenance waits while a backup runs
+  try { return await createBackupInner(opts); } finally { done(); }
+}
+
+async function createBackupInner(opts: CreateBackupOpts): Promise<BackupManifest> {
   const store = opts.store ?? backupStore;
   const prefix = opts.prefix ?? DEFAULT_PREFIX;
 

@@ -35,5 +35,5 @@ range. Click a row for the full details. Results come 50 to a page.
 
 No. The database refuses any edit or delete of an audit entry, even from the server's own code. The only way entries
 leave is the daily clean-up, which removes entries older than the **retention** (default **730 days**; admins can
-change it at the bottom of the page). The clean-up is recorded as `audit.prune`. The audit log is part of the backup,
+change it at the bottom of the page). The clean-up is recorded as `audit.prune` and runs as the *Audit log* task of [Database maintenance](34-database-maintenance.md). The audit log is part of the backup,
 and a restore brings it back.

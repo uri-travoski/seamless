@@ -3,6 +3,8 @@ import { vi } from 'vitest';
 
 // in-memory S3 stand-in shared by all tests
 export const blobStore = new Map<string, Buffer>();
+/** key → last-modified (epoch ms) for blobs the test wants to look old; others count as just written */
+export const blobAges = new Map<string, number>();
 
 vi.mock('../src/s3.ts', () => {
   // defined inside the factory: vi.mock is hoisted above every top-level const
@@ -27,7 +29,8 @@ vi.mock('../src/s3.ts', () => {
   const mget = (k: string) => get(mp() + k);
   const mlist = async (p: string) => (await list(mp() + p)).map((k) => k.slice(mp().length));
   const mdel = (k: string) => del(mp() + k);
-  const mailStore = { put: mput, get: mget, list: mlist, del: mdel, bucket: 'seamless', ensure: async () => {}, headBucket: async () => {} };
+  const mlistInfo = async (p: string) => (await mlist(p)).map((k) => ({ key: k, size: blobStore.get(mp() + k)?.length ?? 0, modified: blobAges.get(mp() + k) ?? Date.now() }));
+  const mailStore = { put: mput, get: mget, list: mlist, del: mdel, listInfo: mlistInfo, bucket: 'seamless', ensure: async () => {}, headBucket: async () => {} };
   return {
     ensureBucket: async () => {},
     putBlob: mput, getBlob: mget, listKeys: mlist, deleteBlob: mdel,
@@ -67,7 +70,7 @@ export async function resetDb(): Promise<void> {
     await c.query('COMMIT');
   } catch (e) { await c.query('ROLLBACK').catch(() => {}); throw e; } finally { c.release(); }
   await run('TRUNCATE users RESTART IDENTITY CASCADE');
-  await run('TRUNCATE tracking_opens, op_queue, scheduled_sends, jobs, mail_archive_imports, archive_imports, mail_archive_items, mail_archives, archive_schedules, storage_targets, storage_migrations, storage_migration_items RESTART IDENTITY');
+  await run('TRUNCATE tracking_opens, op_queue, scheduled_sends, jobs, mail_archive_imports, archive_imports, mail_archive_items, mail_archives, archive_schedules, storage_targets, storage_migrations, storage_migration_items, maintenance_log, maintenance_settings RESTART IDENTITY');
   await run("DELETE FROM settings WHERE key = 'state' OR key LIKE 'alert:%'");
   await run("DELETE FROM settings WHERE key = 'app_mode'");
   await (await import("../src/mode.ts")).loadMode();

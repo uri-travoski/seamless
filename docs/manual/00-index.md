@@ -46,6 +46,7 @@ In Settings, the **?** at the top right of each tab opens the matching page.
 - [Contacts](32-contacts.md) — auto-save and its switch, autocomplete, groups, merge duplicates, import/export (Google, Outlook, iPhone, Android)
 - [Critical alerts](31-alerts.md) — be told by SMS, Telegram or email when a mailbox stops working; red pinned notifications
 - [Seamless for Android](33-android-app.md) — the phone app: install, sign in, mailbox selector, notifications, Firebase set-up for the administrator
+- [Database maintenance](34-database-maintenance.md) — administrators: automatic cleanups and their schedule, previews, orphaned files, vacuum, the maintenance log
 - [Troubleshooting](10-troubleshooting.md)
 
 ## Integrations
@@ -68,6 +69,6 @@ The Settings menu is grouped. Use the **Search settings…** box at the top to j
 | Organise | Labels, Filters, Rules, Templates, Newsletters, AI |
 | Alerts & look | Notifications, Appearance |
 | Security | Security, Alerts ([details](31-alerts.md)), Encryption, Audit log |
-| Data | Storage (buckets, **Trash & retention**), Backup, Archives ([details](30-viewing-old-mail.md)), Import |
+| Data | Storage (buckets, **Trash & retention**, [**Database maintenance**](34-database-maintenance.md)), Backup, Archives ([details](30-viewing-old-mail.md)), Import |
 | Devices | Contacts, Devices |
 | System | Health, Logs, Users (admins: [details](29-administrator.md)) |

@@ -42,6 +42,8 @@ const ENTRIES: Omit<SettingsEntry, 'tabName'>[] = [
   { label: 'Health checks and alerts', tab: 'health', words: 'status monitor ignore mailbox' },
   { label: 'Logs', tab: 'logs', words: 'errors debug activity' },
   { label: 'Audit log (who did what), audit retention', tab: 'audit', words: 'security history export csv retention keep days' },
+  { label: 'Database maintenance (automatic cleanups, vacuum, log)', tab: 'storage', admin: true, words: 'maintenance cleanup clean up vacuum database prune bloat analyze reindex orphan orphaned files disk space size sessions events notifications logs retention schedule' },
+  { label: 'Reclaim disk space (VACUUM FULL) and find orphaned files', tab: 'storage', admin: true, words: 'vacuum full bloat orphan orphaned files blobs delete disk space maintenance cleanup' },
   { label: 'Storage buckets (mail, backups, spool)', tab: 'storage', admin: true, words: 'r2 b2 s3 minio migrate bucket' },
   { label: 'Archives: open an archive from a bucket and import old mail', tab: 'archives', admin: true, words: 'import archive viewing old mail bucket attach zip viewer second instance read-only' },
   { label: 'Backups and restore', tab: 'backup', admin: true, words: 'export import restore drill mirror archive old mail older than years move copy' },

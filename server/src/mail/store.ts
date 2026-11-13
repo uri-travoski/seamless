@@ -96,7 +96,7 @@ export async function rowToApi(r: MsgRow, viewerId: number = r.user_id): Promise
     // the sent copy's token, plus any per-recipient copies sent alongside it (T1 F-15);
     // proxy/scanner opens are kept apart from the real ones
     const t = await one<{ c: number; auto: number; last: number | null }>(`
-      SELECT COUNT(*) FILTER (WHERE NOT proxied) AS c, COUNT(*) FILTER (WHERE proxied) AS auto,
+      SELECT COALESCE(SUM(n) FILTER (WHERE NOT proxied), 0)::int AS c, COALESCE(SUM(n) FILTER (WHERE proxied), 0)::int AS auto,
              MAX(ts) FILTER (WHERE NOT proxied) AS last
       FROM tracking_opens
       WHERE token = ? OR token IN (SELECT token FROM tracked_sends WHERE group_token = ?)`, [r.tracking_token, r.tracking_token]);
@@ -110,7 +110,7 @@ export async function rowToApi(r: MsgRow, viewerId: number = r.user_id): Promise
   let threadOpenAt: string | null = null;
   if (!r.tracking_token) {
     const ta = await one<{ c: number; last: number | null }>(
-      `SELECT COUNT(t.id) AS c, MAX(t.ts) AS last
+      `SELECT COALESCE(SUM(t.n), 0)::int AS c, MAX(t.ts) AS last
        FROM messages sm JOIN tracking_opens t ON t.token = sm.tracking_token AND NOT t.proxied
        WHERE sm.thread_id = ? AND sm.user_id = ? AND sm.tracking_token IS NOT NULL`, [r.thread_id, r.user_id]);
     if (ta && ta.c > 0) { threadOpenCount = ta.c; threadOpenAt = new Date(ta.last!).toISOString(); }

@@ -1654,6 +1654,39 @@ UPDATE disposable_addresses SET stopped_at = COALESCE(disposed_at, (extract(epoc
 ALTER TABLE push_inboxes ADD COLUMN reject_stopped BOOLEAN NOT NULL DEFAULT false;
 `,
   },
+  {
+    id: 53,
+    // T10.3: database maintenance. maintenance_log = every cleanup run (auto, manual, dry-run); maintenance_settings = per-task
+    // schedule/retention. tracking_opens.n lets old raw open rows be compacted into one summary row per token (totals kept).
+    sql: `
+CREATE TABLE maintenance_log (
+  id BIGSERIAL PRIMARY KEY,
+  task TEXT NOT NULL,
+  trigger TEXT NOT NULL CHECK (trigger IN ('auto','manual')),
+  user_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+  dry_run BOOLEAN NOT NULL DEFAULT false,
+  status TEXT NOT NULL CHECK (status IN ('ok','failed','skipped')),
+  rows_removed BIGINT NOT NULL DEFAULT 0,
+  bytes_freed BIGINT NOT NULL DEFAULT 0,
+  duration_ms INTEGER NOT NULL DEFAULT 0,
+  details JSONB NOT NULL DEFAULT '{}'::jsonb,
+  error TEXT,
+  started_at BIGINT NOT NULL,
+  finished_at BIGINT NOT NULL
+);
+CREATE INDEX maintenance_log_task ON maintenance_log(task, started_at DESC);
+CREATE INDEX maintenance_log_started ON maintenance_log(started_at DESC);
+CREATE TABLE maintenance_settings (
+  task TEXT PRIMARY KEY,
+  enabled BOOLEAN NOT NULL DEFAULT true,
+  interval_hours INTEGER NOT NULL,
+  retention_days INTEGER,
+  auto_delete BOOLEAN NOT NULL DEFAULT false
+);
+ALTER TABLE tracking_opens ADD COLUMN n INTEGER NOT NULL DEFAULT 1;
+CREATE INDEX tracking_opens_ts ON tracking_opens(ts);
+`,
+  },
 ];
 
 /** Run `fn` in one transaction. Events emitted through the client are only turned into

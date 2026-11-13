@@ -49,3 +49,7 @@ https://your-seamless-address/healthz
 
 It needs no sign-in and answers `200` with `{"ok":true,...}` when the server and its database are up, or `503` when the
 database can't be reached. It deliberately reveals nothing else.
+
+## Database cleanups
+
+Health shows a cleanup that keeps failing as a critical alert. The cleanups themselves (old logs, finished jobs, expired tokens, orphaned files, vacuum) and their log live in **Settings → Storage → Database maintenance**: see [Database maintenance](34-database-maintenance.md).

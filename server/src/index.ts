@@ -18,7 +18,7 @@ import { initPush } from './push.ts';
 import { categorizeEmail } from './ai/tasks.ts';
 import { startScheduler, onScheduledSend } from './mail/scheduler.ts';
 import { startJobRunner } from './jobs/runner.ts';
-import { ensureAuditPruneJob } from './audit/prune.ts';
+import { ensureMaintenanceJobs } from './maintenance/engine.ts';
 import { ensureQuotaJob } from './admin/quota.ts';
 import { ensureArchiveScheduleJob } from './archive/schedule.ts';
 import { startHealthAlerts, shouldAlert } from './health/alerts.ts';
@@ -41,8 +41,8 @@ import { startBackupScheduler } from './backup/schedule.ts';
 import { initMailStore } from './backup/mailref.ts';
 import { applyActiveTargets, backupEnvSet } from './storage/targets.ts';
 import { resumeMigrations } from './storage/migrate.ts';
-import { emitEvent, startEventPrune } from './events/emit.ts';
-import { pruneExpiredSessions, sessionToken } from './auth/sessions.ts';
+import { emitEvent } from './events/emit.ts';
+import { sessionToken } from './auth/sessions.ts';
 import { registerSecurityHeaders } from './security/headers.ts';
 
 const pkg = JSON.parse(fs.readFileSync(new URL('../../package.json', import.meta.url), 'utf8')) as { version: string };
@@ -155,7 +155,7 @@ startScheduler();
 startJobRunner();
 ensureQuotaJob().catch((err) => console.error('quota schedule failed:', err?.message ?? err));
 ensureArchiveScheduleJob().catch((err) => console.error('archive schedule failed:', err?.message ?? err));
-ensureAuditPruneJob().catch((err) => console.error('audit prune schedule failed:', err?.message ?? err));
+ensureMaintenanceJobs().catch((err) => console.error('maintenance schedule failed:', err?.message ?? err));   // sessions, audit, events and the rest (T10.3)
 resumeMigrations().catch((err) => console.error('storage migration resume failed:', err?.message ?? err));
 startHealthAlerts();
 startAlertEngine();
@@ -169,8 +169,6 @@ startSafeDelete();
 startContactHarvest();
 startForwarding();
 startBackupScheduler(pkg.version);
-startEventPrune();
-setInterval(() => { void pruneExpiredSessions().catch(() => {}); }, 6 * 3_600_000);
 startImapFacade();
 startSmtpFacade();
 

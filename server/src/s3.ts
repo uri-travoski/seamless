@@ -10,6 +10,8 @@ export interface BlobStore {
   del(key: string): Promise<void>;
   /** Size in bytes, or null when the object does not exist. Optional: the in-memory test store falls back to get(). */
   head?(key: string): Promise<number | null>;
+  /** Like list(), with size and last-modified (epoch ms). Optional: used by the orphan-file finder (T10.3). */
+  listInfo?(prefix: string): Promise<{ key: string; size: number; modified: number }[]>;
 }
 
 export interface S3Config {
@@ -82,6 +84,17 @@ export function makeStore(cfg: S3Config): Store {
       } while (token);
       return keys;
     },
+
+    async listInfo(prefix) {
+      const out: { key: string; size: number; modified: number }[] = [];
+      let token: string | undefined;
+      do {
+        const res = await client.send(new ListObjectsV2Command({ Bucket: cfg.bucket, Prefix: prefix, ContinuationToken: token }));
+        for (const o of res.Contents ?? []) if (o.Key) out.push({ key: o.Key, size: Number(o.Size ?? 0), modified: o.LastModified ? o.LastModified.getTime() : Date.now() });
+        token = res.IsTruncated ? res.NextContinuationToken : undefined;
+      } while (token);
+      return out;
+    },
   };
   return kp ? withKeyPrefix(base, kp) : base;
 }
@@ -95,6 +108,7 @@ export function withKeyPrefix<T extends BlobStore>(inner: T, prefix: string): T 
     del: (k) => inner.del(prefix + k),
     head: inner.head ? (k: string) => inner.head!(prefix + k) : undefined,
     list: async (p) => (await inner.list(prefix + p)).map((k) => k.slice(prefix.length)),
+    listInfo: inner.listInfo ? async (p: string) => (await inner.listInfo!(prefix + p)).map((o) => ({ ...o, key: o.key.slice(prefix.length) })) : undefined,
   };
 }
 
@@ -131,6 +145,7 @@ export const mailStore: BlobStore & { bucket: string; ensure(): Promise<void> } 
   get: (k) => mail.get(k),
   list: (p) => mail.list(p),
   del: (k) => mail.del(k),
+  listInfo: (p) => (mail.listInfo ? mail.listInfo(p) : Promise.reject(new Error('this storage cannot list object ages'))),
 };
 
 /** The backup store is repointable too (a `storage_targets` row with role='backup'). */

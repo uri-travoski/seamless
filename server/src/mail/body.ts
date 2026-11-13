@@ -92,7 +92,7 @@ export function sanitizeEmailHtml(html: string, opts: {
 export async function trackingFor(token: string): Promise<TrackingInfo> {
   const log = await q<{ ts: number; ip: string; ua: string }>(
     'SELECT ts, ip, ua FROM tracking_opens WHERE token = ? ORDER BY ts DESC LIMIT 200', [token]);
-  const count = await one<{ c: number }>('SELECT COUNT(*) AS c FROM tracking_opens WHERE token = ?', [token]);
+  const count = await one<{ c: number }>('SELECT COALESCE(SUM(n), 0)::int AS c FROM tracking_opens WHERE token = ?', [token]);
   return {
     token,
     opens: count?.c ?? 0,
