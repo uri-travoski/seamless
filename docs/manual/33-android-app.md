@@ -118,3 +118,7 @@ Other apps can open Seamless too: tapping an email address (`mailto:` link) or *
 - **Signature:** shown for information; edit it in the web app.
 - **Theme:** match the phone, light or dark.
 - **About:** app version, server address and version, open-source licences, and **Sign out**.
+
+## Privacy policy and the Play Store
+
+Every Seamless server publishes a plain-language privacy policy for the app at `https://<your-server>/privacy` (no sign-in needed). Administrators can add a contact line (name or email) that appears on it: send `PUT /api/mobile/privacy-contact` with `{"contact": "…"}` while signed in as an admin; until then the page says "the administrator of this server". The files for publishing the app on Google Play (listing text, data-safety answers, reviewer notes, checklist, icon and feature graphic) are in `mobile/play/`.

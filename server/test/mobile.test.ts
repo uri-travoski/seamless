@@ -60,7 +60,7 @@ async function newMail(subject = 'Quarterly numbers', body = 'Hi there, '.repeat
 beforeAll(async () => { app = await makeApp(); });
 beforeEach(async () => {
   await resetDb(); resetLimiters();
-  await run("DELETE FROM settings WHERE key IN ('fcm_service_account','app_mode')");
+  await run("DELETE FROM settings WHERE key IN ('fcm_service_account','app_mode','privacy_contact')");
   calls = []; sendStatus = () => ({ status: 200, body: { name: 'x' } });
   clock = 1_800_000_000_000;
   setFcmTestHooks({ fetch: fakeFetch as any, now: () => clock });
@@ -359,5 +359,25 @@ describe('mobile sessions', () => {
     expect(r.loggedIn).toBe(false);
     expect(r.server.name).toBe('Seamless');
     expect(r.server.version).toMatch(/^\d+\.\d+\.\d+/);
+  });
+});
+
+describe('T9.8 privacy page', () => {
+  it('serves a public policy and shows the owner contact (escaped)', async () => {
+    const r = await app.inject({ method: 'GET', url: '/privacy' });
+    expect(r.statusCode).toBe(200);
+    expect(r.headers['content-type']).toContain('text/html');
+    expect(r.body).toContain('privacy policy');
+    expect(r.body).toContain('administrator of this server');
+    const put = await app.inject({ method: 'PUT', url: '/api/mobile/privacy-contact', headers: { cookie }, payload: { contact: 'Sam <sam@example.test>' } });
+    expect(put.statusCode).toBe(200);
+    const r2 = await app.inject({ method: 'GET', url: '/privacy' });
+    expect(r2.body).toContain('Sam &lt;sam@example.test&gt;');
+  });
+  it('only admins may change the contact', async () => {
+    await makeUser('bob@local');
+    const ck = await mobileLogin('bob@local');
+    const put = await app.inject({ method: 'PUT', url: '/api/mobile/privacy-contact', headers: { cookie: ck }, payload: { contact: 'x' } });
+    expect(put.statusCode).toBe(403);
   });
 });

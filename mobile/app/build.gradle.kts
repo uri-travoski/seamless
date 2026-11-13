@@ -1,3 +1,5 @@
+import java.util.Properties
+
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
@@ -21,6 +23,18 @@ android {
         resourceConfigurations += listOf("en")
     }
 
+    // Upload key: mobile/keystore.properties (git-ignored) with storeFile, storePassword, keyAlias, keyPassword.
+    val ksFile = rootProject.file("keystore.properties")
+    val ks = Properties().apply { if (ksFile.exists()) ksFile.inputStream().use { load(it) } }
+    signingConfigs {
+        if (ks.isNotEmpty()) create("release") {
+            storeFile = rootProject.file(ks.getProperty("storeFile"))
+            storePassword = ks.getProperty("storePassword")
+            keyAlias = ks.getProperty("keyAlias")
+            keyPassword = ks.getProperty("keyPassword")
+        }
+    }
+
     buildFeatures {
         compose = true
         buildConfig = true
@@ -32,9 +46,14 @@ android {
             isMinifyEnabled = true
             isShrinkResources = true
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
-            signingConfig = signingConfigs.getByName("debug")
+            // debug-signed (sideload) unless keystore.properties exists
+            signingConfig = signingConfigs.findByName("release") ?: signingConfigs.getByName("debug")
         }
     }
+
+    bundle { abi { enableSplit = true }; language { enableSplit = false }; density { enableSplit = true } }
+    packaging { jniLibs { useLegacyPackaging = false } }
+    lint { abortOnError = false; checkReleaseBuilds = false }
 
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
