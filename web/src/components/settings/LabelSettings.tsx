@@ -162,8 +162,10 @@ export default function LabelSettings() {
 
   const bulkDelete = async () => {
     if (!window.confirm(`Delete ${checked.size} label${checked.size === 1 ? '' : 's'}? They're removed from every message.`)) return;
-    await api.post('/api/labels/delete', { ids: [...checked] });
-    setChecked(new Set());
+    try {
+      await api.post('/api/labels/delete', { ids: [...checked] });
+      setChecked(new Set());
+    } catch (e: any) { toast(e?.message ?? 'Could not delete', 'error'); }
     await refreshLabels();
   };
 
@@ -205,9 +207,11 @@ export default function LabelSettings() {
             <div className="field"><label>Name</label>
               <input className="text-input" value={editing.name} autoFocus onChange={(e) => setEditing({ ...editing, name: e.target.value })} /></div>
             <div className="field"><label>Inside</label>
-              <select className="text-input" value={editing.parentId ?? ''} onChange={(e) => setEditing({ ...editing, parentId: e.target.value ? Number(e.target.value) : null })}>
+              <select className="text-input" value={editing.parentId ?? ''} disabled={!!editing.id && labels.some((x) => x.parentId === editing.id)}
+                title={editing.id && labels.some((x) => x.parentId === editing.id) ? 'This label has sub-labels, so it stays at the top level' : undefined}
+                onChange={(e) => setEditing({ ...editing, parentId: e.target.value ? Number(e.target.value) : null })}>
                 <option value="">— top level —</option>
-                {labels.filter((l) => l.id !== editing.id).map((l) => <option key={l.id} value={l.id}>{l.name}</option>)}
+                {labels.filter((l) => l.id !== editing.id && !l.parentId).map((l) => <option key={l.id} value={l.id}>{l.name}</option>)}
               </select></div>
             <div className="field"><label>Show in sidebar</label>
               <select className="text-input" value={editing.sidebarVisibility} onChange={(e) => setEditing({ ...editing, sidebarVisibility: e.target.value as Editing['sidebarVisibility'] })}>

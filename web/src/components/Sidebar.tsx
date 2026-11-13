@@ -108,12 +108,32 @@ export default function Sidebar({ open, onNavigate, onAddLabel }: { open: boolea
     );
   };
 
+  // drag & drop nesting (one level): drop a label on another top-level label to nest it, or on the LABELS heading to move it back to top level
+  const [dragId, setDragId] = useState<number | null>(null);
+  const [overId, setOverId] = useState<number | 'top' | null>(null);
+  const refreshLabels = useMail((st) => st.refreshLabels);
+  const dragLabel = dragId ? labels.find((x) => x.id === dragId) : undefined;
+  const canDropOn = (target: ApiLabel): boolean => !!dragLabel && dragLabel.id !== target.id && !target.parentId
+    && dragLabel.parentId !== target.id && !labels.some((x) => x.parentId === dragLabel.id);
+  const canDropTop = !!dragLabel && !!dragLabel.parentId;
+  const nestLabel = async (id: number, parentId: number | null) => {
+    setDragId(null); setOverId(null);
+    try { await api.put(`/api/labels/${id}`, { parentId }); await refreshLabels(); }
+    catch (e: any) { toast(e?.message ?? 'Could not move the label', 'error'); }
+  };
+
   const labelNode = (n: LabelNode, depth: number): React.ReactNode => {
     const l = n.label;
     const collapsed = collapsedLabels.has(l.id);
     return (
       <div key={l.id}>
-        <div className={`side-item label-item ${isActive('label', String(l.id)) ? 'active' : ''}`} style={{ paddingLeft: depth * 14 }}>
+        <div className={`side-item label-item ${isActive('label', String(l.id)) ? 'active' : ''} ${dragId === l.id ? 'dragging' : ''} ${overId === l.id ? 'drop-ok' : ''}`} style={{ paddingLeft: depth * 14 }}
+          draggable
+          onDragStart={(e) => { setDragId(l.id); e.dataTransfer.effectAllowed = 'move'; e.dataTransfer.setData('text/plain', String(l.id)); }}
+          onDragEnd={() => { setDragId(null); setOverId(null); }}
+          onDragOver={(e) => { if (canDropOn(l)) { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; if (overId !== l.id) setOverId(l.id); } }}
+          onDragLeave={() => { if (overId === l.id) setOverId(null); }}
+          onDrop={(e) => { if (canDropOn(l) && dragId) { e.preventDefault(); const s2 = new Set(collapsedLabels); s2.delete(l.id); setCollapsedLabels(s2); void nestLabel(dragId, l.id); } }}>
           {n.children.length > 0 ? (
             <button className="label-caret" aria-label={collapsed ? 'Expand' : 'Collapse'}
               onClick={() => { const s = new Set(collapsedLabels); if (collapsed) s.delete(l.id); else s.add(l.id); setCollapsedLabels(s); }}>
@@ -174,7 +194,10 @@ export default function Sidebar({ open, onNavigate, onAddLabel }: { open: boolea
         )}
       </div>
 
-      <div className="side-section">
+      <div className={`side-section labels-section ${overId === 'top' ? 'drop-top' : ''}`}
+        onDragOver={(e) => { if (canDropTop) { e.preventDefault(); if (overId !== 'top') setOverId('top'); } }}
+        onDragLeave={(e) => { if (!e.currentTarget.contains(e.relatedTarget as Node)) setOverId((v) => (v === 'top' ? null : v)); }}
+        onDrop={(e) => { if (canDropTop && dragId) { e.preventDefault(); void nestLabel(dragId, null); } }}>
         <div className="side-header">
           <span>Labels</span>
           <button className="icon-btn side-add" title="New label" aria-label="New label" onClick={onAddLabel}>+</button>

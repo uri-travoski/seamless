@@ -19,6 +19,24 @@ async function wouldCycle(userId: number, id: number, parentId: number | null): 
   return false;
 }
 
+/** Labels nest one level only: the parent must be top level and the label itself must not have sub-labels. */
+async function nestingError(userId: number, id: number | null, parentId: number | null): Promise<string | null> {
+  if (!parentId) return null;
+  const p = await one<{ parent_id: number | null; name: string }>('SELECT parent_id, name FROM labels WHERE id = ? AND user_id = ?', [parentId, userId]);
+  if (p?.parent_id) return `"${p.name}" is already inside another label — labels can only be nested one level`;
+  if (id && await one('SELECT 1 FROM labels WHERE parent_id = ? AND user_id = ?', [id, userId])) {
+    return 'This label has sub-labels, so it cannot be put inside another label (only one level of nesting). Move its sub-labels out first.';
+  }
+  return null;
+}
+
+/** Names of labels in `ids` that still have sub-labels outside `ids` (those parents may not be deleted yet). */
+async function parentsWithChildren(userId: number, ids: number[]): Promise<string[]> {
+  const rows = await q<{ name: string }>(`SELECT DISTINCT p.name FROM labels p JOIN labels c ON c.parent_id = p.id AND c.user_id = p.user_id
+    WHERE p.user_id = ? AND p.id = ANY(?::int[]) AND NOT (c.id = ANY(?::int[]))`, [userId, ids, ids]);
+  return rows.map((r) => r.name);
+}
+
 async function validParent(userId: number, parentId: unknown): Promise<number | null> {
   const p = Number(parentId);
   if (!p) return null;
@@ -30,6 +48,10 @@ export async function mergeLabels(userId: number, sourceId: number, targetId: nu
   if (sourceId === targetId) throw new Error('pick two different labels');
   const both = await q('SELECT id FROM labels WHERE user_id = ? AND id = ANY(?::int[])', [userId, [sourceId, targetId]]);
   if (both.length !== 2) throw new Error('label not found');
+  const tgt = await one<{ parent_id: number | null }>('SELECT parent_id FROM labels WHERE id = ? AND user_id = ?', [targetId, userId]);
+  const srcKids = await one('SELECT 1 FROM labels WHERE parent_id = ? AND user_id = ?', [sourceId, userId]);
+  if (srcKids && (tgt?.parent_id || false)) throw new Error('This label has sub-labels and the label you are merging into is itself nested — only one level of nesting is allowed. Move the sub-labels out first.');
+  if (tgt?.parent_id === sourceId) throw new Error('Cannot merge a parent label into one of its own sub-labels. Move the sub-label out first.');
   return withTransaction(async (c) => {
     const moved = await clientQuery(c, `INSERT INTO message_labels(message_id, label_id)
       SELECT message_id, ? FROM message_labels WHERE label_id = ? ON CONFLICT DO NOTHING RETURNING message_id`, [targetId, sourceId]);
@@ -100,6 +122,7 @@ export function register(app: FastifyInstance): void {
     if (await one('SELECT 1 FROM labels WHERE user_id = ? AND name = ?', [userId, String(b.name).trim()])) {
       return reply.code(400).send({ error: 'a label with that name already exists' });
     }
+    { const bad = await nestingError(userId, null, await validParent(userId, b.parentId)); if (bad) return reply.code(400).send({ error: bad }); }
     const id = await insertId(`INSERT INTO labels(user_id, name, color, description, sort, keep_default, retention_days, protected, auto_mark_read, parent_id, sidebar_visibility)
       VALUES (?,?,?,?,?,?,?,?,?,?,?)`,
       [userId, String(b.name).trim(), b.color ?? '#e05656', b.description ?? '', b.sort ?? 0,
@@ -129,8 +152,10 @@ export function register(app: FastifyInstance): void {
     }
   });
 
-  app.post('/api/labels/delete', async (req) => {
+  app.post('/api/labels/delete', async (req, reply) => {
     const ids = (((req.body as any)?.ids ?? []) as number[]).map(Number).filter(Boolean);
+    const blocked = ids.length ? await parentsWithChildren(uid(req), ids) : [];
+    if (blocked.length) return reply.code(409).send({ error: `${blocked.map((n) => `"${n}"`).join(', ')} still ha${blocked.length === 1 ? 's' : 've'} sub-labels. Delete or move the sub-labels first.`, blocked });
     const n = ids.length ? await run('DELETE FROM labels WHERE user_id = ? AND id = ANY(?::int[])', [uid(req), ids]) : 0;
     await changed(uid(req));
     return { deleted: n };
@@ -144,6 +169,7 @@ export function register(app: FastifyInstance): void {
     if (!cur) return reply.code(404).send({ error: 'not found' });
     const parentId = b.parentId === undefined ? cur.parent_id : await validParent(userId, b.parentId);
     if (await wouldCycle(userId, id, parentId)) return reply.code(400).send({ error: 'a label cannot be nested inside itself' });
+    if (parentId !== cur.parent_id) { const bad = await nestingError(userId, id, parentId); if (bad) return reply.code(400).send({ error: bad }); }
     await run(`UPDATE labels SET name=?, color=?, description=?, sort=?, keep_default=?, retention_days=?, protected=?, auto_mark_read=?,
                parent_id=?, sidebar_visibility=? WHERE id=? AND user_id=?`,
       [b.name ?? cur.name, b.color ?? cur.color, b.description ?? cur.description ?? '', b.sort ?? cur.sort ?? 0,
@@ -157,8 +183,11 @@ export function register(app: FastifyInstance): void {
     return { ok: true };
   });
 
-  app.delete('/api/labels/:id', async (req) => {
-    await run('DELETE FROM labels WHERE id = ? AND user_id = ?', [Number((req.params as any).id), uid(req)]);
+  app.delete('/api/labels/:id', async (req, reply) => {
+    const id = Number((req.params as any).id);
+    const blocked = await parentsWithChildren(uid(req), [id]);
+    if (blocked.length) return reply.code(409).send({ error: `"${blocked[0]}" still has sub-labels. Delete or move the sub-labels first.`, blocked });
+    await run('DELETE FROM labels WHERE id = ? AND user_id = ?', [id, uid(req)]);
     await changed(uid(req));
     return { ok: true };
   });
