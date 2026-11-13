@@ -48,6 +48,8 @@ export {
   CaretRight as CaretRightIcon,
   Star as StarIcon,
   Eye as EyeIcon,
+  EyeSlash as EyeSlashIcon,
+  DotsThree as MoreToolsIcon,
   Paperclip as AttachIcon,
   Envelope as EnvelopeIcon,
   EnvelopeOpen as EnvelopeOpenIcon,

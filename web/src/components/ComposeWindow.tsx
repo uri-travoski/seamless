@@ -1,6 +1,5 @@
 import { useSession } from '../state/session.ts';
 import { Fragment, useCallback, useEffect, useRef, useState } from 'react';
-import { createDisposableAddress } from './settings/DisposableSettings.tsx';
 import type { ReactNode } from 'react';
 import { useEditor, EditorContent } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
@@ -25,7 +24,7 @@ import { toast, countdownToast } from '../toast.ts';
 import {
   MinimizeIcon, MaximizeIcon, RestoreIcon, CloseIcon, UndoIcon, RedoIcon, BoldIcon, ItalicIcon,
   UnderlineIcon, StrikethroughIcon, HighlightIcon, BulletListIcon, NumberedListIcon,
-  AlignLeftIcon, AlignCenterIcon, AlignRightIcon, LinkIcon, ImageIcon, ClearFormatIcon, AttachIcon, SparkleIcon, EyeIcon, TrashIcon,
+  AlignLeftIcon, AlignCenterIcon, AlignRightIcon, LinkIcon, ImageIcon, ClearFormatIcon, AttachIcon, SparkleIcon, EyeIcon, EyeSlashIcon, MoreToolsIcon, TrashIcon,
   ScheduledIcon, CaretDownIcon, TemplateIcon, KebabIcon, AlarmIcon,
 } from '../icons.tsx';
 import { IconContext } from '@phosphor-icons/react';
@@ -78,27 +77,16 @@ export default function ComposeWindow({ draft }: { draft: Draft }) {
   const close = useCompose((s) => s.close);
   const identities = useCompose((s) => s.identities);
   const businesses = useCompose((s) => s.businesses);
-  const [showCcBcc, setShowCcBcc] = useState(draft.cc.length > 0 || draft.bcc.length > 0);
+  const [showCc, setShowCc] = useState(draft.cc.length > 0);
+  const [showBcc, setShowBcc] = useState(draft.bcc.length > 0);
+  const [alignOpen, setAlignOpen] = useState(false);
+  const [toolsMore, setToolsMore] = useState(false);
   const viewingMode = useSession((s) => s.mode === 'viewing');
   const [sending, setSending] = useState(false);
   const [aiBusy, setAiBusy] = useState(false);
   const [scheduleOpen, setScheduleOpen] = useState(false);
   const [customDt, setCustomDt] = useState('');
   const fileRef = useRef<HTMLInputElement>(null);
-  /** Sign-up forms: mint a throw-away address on the first own domain and send from it. */
-  const makeDisposable = async () => {
-    try {
-      const { domains } = await api.get<{ domains: { domain: string }[] }>('/api/disposable');
-      if (!domains.length) { toast('Set up an own-domain mailbox first (Settings > Mailboxes)', 'error'); return; }
-      const label = (draft.subject || '').trim().slice(0, 60);
-      const d = await createDisposableAddress({ domain: domains[0].domain, generator: 'words', label });
-      await useCompose.getState().loadIdentities();
-      const identity = useCompose.getState().identities.find((i) => i.email === d.address) ?? null;
-      void changeIdentity(identity);
-      void navigator.clipboard?.writeText(d.address).catch(() => {});
-      toast(`Sending from ${d.address} (copied)`);
-    } catch (e: any) { toast(e?.message ?? 'Could not create an address', 'error'); }
-  };
   const templates = useTemplates((s) => s.list);
   const [tplOpen, setTplOpen] = useState(false);
   const [tplFilter, setTplFilter] = useState('');
@@ -349,6 +337,10 @@ export default function ComposeWindow({ draft }: { draft: Draft }) {
     );
   }
 
+  const cryptoActive = !!(draft.pgpSign || draft.pgpEncrypt || draft.smimeSign || draft.smimeEncrypt);
+  const cryptoShown = toolsMore || cryptoActive;
+  const tracked = draft.track && !cryptoActive;
+
   const tb = (active: boolean, title: string, glyph: ReactNode, run: () => void) => (
     <button className={`icon-btn ${active ? 'active' : ''}`} title={title}
       onMouseDown={(e) => e.preventDefault()} onClick={run}>{glyph}</button>
@@ -390,13 +382,12 @@ export default function ComposeWindow({ draft }: { draft: Draft }) {
                 return g.label ? <optgroup key={g.key} label={g.label}>{opts}</optgroup> : <Fragment key={g.key}>{opts}</Fragment>;
               })}
           </select>
-          <button className="cc-toggle" title="Create a throw-away address on your own domain and send from it" onClick={() => void makeDisposable()}>Use a disposable address</button>
-          <div style={{ flex: 1 }} />
-          {!showCcBcc && <button className="cc-toggle" onClick={() => setShowCcBcc(true)}>Cc / Bcc</button>}
+          {!showCc && <button className="cc-toggle" onClick={() => setShowCc(true)}>Cc</button>}
+          {!showBcc && <button className="cc-toggle" onClick={() => setShowBcc(true)}>Bcc</button>}
         </div>
         <AddressFieldWrapper draft={draft} field="to" label="To" autoFocus={!draft.replyToEmailId} />
-        {showCcBcc && <AddressFieldWrapper draft={draft} field="cc" label="Cc" />}
-        {showCcBcc && <AddressFieldWrapper draft={draft} field="bcc" label="Bcc" />}
+        {showCc && <AddressFieldWrapper draft={draft} field="cc" label="Cc" />}
+        {showBcc && <AddressFieldWrapper draft={draft} field="bcc" label="Bcc" />}
         <div className="compose-row">
           <span className="lbl">Subj</span>
           <input value={draft.subject} onChange={(e) => update(draft.key, { subject: e.target.value })} placeholder="Subject" />
@@ -416,9 +407,24 @@ export default function ComposeWindow({ draft }: { draft: Draft }) {
           {tb(!!editor?.isActive('bulletList'), 'Bullet list', <BulletListIcon />, () => editor?.chain().focus().toggleBulletList().run())}
           {tb(!!editor?.isActive('orderedList'), 'Numbered list', <NumberedListIcon />, () => editor?.chain().focus().toggleOrderedList().run())}
           <span className="sep" />
-          {tb(!!editor?.isActive({ textAlign: 'left' }), 'Align left', <AlignLeftIcon />, () => editor?.chain().focus().setTextAlign('left').run())}
-          {tb(!!editor?.isActive({ textAlign: 'center' }), 'Center', <AlignCenterIcon />, () => editor?.chain().focus().setTextAlign('center').run())}
-          {tb(!!editor?.isActive({ textAlign: 'right' }), 'Align right', <AlignRightIcon />, () => editor?.chain().focus().setTextAlign('right').run())}
+          <div className="label-menu">
+            {(() => {
+              const cur = editor?.isActive({ textAlign: 'center' }) ? 'center' : editor?.isActive({ textAlign: 'right' }) ? 'right' : 'left';
+              const Cur = cur === 'center' ? AlignCenterIcon : cur === 'right' ? AlignRightIcon : AlignLeftIcon;
+              return (
+                <button className={`icon-btn align-btn ${alignOpen ? 'active' : ''}`} title="Alignment" aria-haspopup="menu" aria-expanded={alignOpen}
+                  onMouseDown={(e) => e.preventDefault()} onClick={() => setAlignOpen((v) => !v)}><Cur /><CaretDownIcon size={9} /></button>
+              );
+            })()}
+            {alignOpen && (
+              <div className="dropdown align-pop" role="menu">
+                {([['left', 'Align left', AlignLeftIcon], ['center', 'Center', AlignCenterIcon], ['right', 'Align right', AlignRightIcon]] as const).map(([v, label, Icon]) => (
+                  <button key={v} className={`icon-btn ${editor?.isActive({ textAlign: v }) ? 'active' : ''}`} title={label} aria-label={label} role="menuitem"
+                    onMouseDown={(e) => e.preventDefault()} onClick={() => { editor?.chain().focus().setTextAlign(v).run(); setAlignOpen(false); }}><Icon /></button>
+                ))}
+              </div>
+            )}
+          </div>
           <span className="sep" />
           {tb(!!editor?.isActive('link'), 'Link', <LinkIcon />, () => {
             if (editor?.isActive('link')) { editor.chain().focus().unsetLink().run(); return; }
@@ -438,35 +444,10 @@ export default function ComposeWindow({ draft }: { draft: Draft }) {
             input.click();
           })}
           {tb(false, 'Clear formatting', <ClearFormatIcon />, () => editor?.chain().focus().clearNodes().unsetAllMarks().run())}
+          <button className={`icon-btn ${cryptoShown ? 'active' : ''}`} title={cryptoShown ? 'Hide signing and encryption' : 'More: signing and encryption'} aria-pressed={cryptoShown}
+            onMouseDown={(e) => e.preventDefault()} onClick={() => setToolsMore((v) => !v)}><MoreToolsIcon /></button>
+          {cryptoShown && (<>
           <span className="sep" />
-          <div className="label-menu">
-            <button className={`icon-btn ${tplOpen ? 'active' : ''}`} title="Insert template (or type ;shortcut)"
-              onMouseDown={(e) => e.preventDefault()} onClick={() => setTplOpen((v) => !v)}><TemplateIcon /></button>
-            {tplOpen && (
-              <div className="dropdown tpl-pop">
-                <input className="text-input compact" type="search" name="seamless-template-filter" {...NO_AUTOFILL} autoFocus placeholder="Find a template…" value={tplFilter} onChange={(e) => setTplFilter(e.target.value)} />
-                {templates.length === 0 && <div className="menu-empty">No templates yet — make one with “Save as template” or in Templates.</div>}
-                {Object.entries(templates
-                  .filter((t) => `${t.name} ${t.category} ${t.shortcut ?? ''}`.toLowerCase().includes(tplFilter.toLowerCase()))
-                  .reduce<Record<string, ApiTemplate[]>>((acc, t) => { (acc[t.category || 'General'] ??= []).push(t); return acc; }, {}))
-                  .map(([cat, list]) => (
-                    <div key={cat}>
-                      <div className="switch-head">{cat}</div>
-                      {list.map((t) => (
-                        <button key={t.id} className="side-item" onClick={() => { setTplOpen(false); setTplFilter(''); void insertTemplate(t); }}>
-                          <span className="name">{t.name}</span>{t.shortcut && <code className="tpl-key">{t.shortcut}</code>}
-                        </button>
-                      ))}
-                    </div>
-                  ))}
-              </div>
-            )}
-          </div>
-          <button className={`icon-btn track-eye ${draft.track ? 'active' : ''}`} aria-pressed={draft.track}
-            title={draft.track ? 'Open tracking ON — you will see when it is opened (click to turn off)' : 'Open tracking OFF (click to turn on)'}
-            onMouseDown={(e) => e.preventDefault()} onClick={() => update(draft.key, { track: !draft.track })}>
-            <EyeIcon weight={draft.track ? 'fill' : 'regular'} />
-          </button>
           <button className={`icon-btn pgp-toggle ${draft.pgpSign ? 'active' : ''}`} aria-pressed={!!draft.pgpSign} disabled={!pgpInfo?.canSign && !draft.pgpSign}
             title={pgpInfo && !pgpInfo.canSign ? (pgpInfo.signReason ?? 'Signing is not available') : draft.pgpSign ? 'OpenPGP signature ON (click to turn off)' : 'Sign with OpenPGP'}
             onMouseDown={(e) => e.preventDefault()} onClick={() => update(draft.key, { pgpSign: !draft.pgpSign, ...(!draft.pgpSign ? { smimeSign: false, smimeEncrypt: false } : {}) })}>
@@ -488,6 +469,7 @@ export default function ComposeWindow({ draft }: { draft: Draft }) {
               onMouseDown={(e) => e.preventDefault()} onClick={() => update(draft.key, { smimeEncrypt: !draft.smimeEncrypt, ...(!draft.smimeEncrypt ? { pgpSign: false, pgpEncrypt: false } : {}) })}>
               <LockKeyIcon weight={draft.smimeEncrypt ? 'fill' : 'regular'} />
             </button>
+          </>)}
           </>)}
         </div>
 
@@ -528,6 +510,30 @@ export default function ComposeWindow({ draft }: { draft: Draft }) {
           </div>
           <button className="icon-btn" title="Attach files" onClick={() => fileRef.current?.click()}><AttachIcon /></button>
           <input ref={fileRef} type="file" multiple hidden onChange={(e) => { void attach(e.target.files); e.target.value = ''; }} />
+          <div className="label-menu">
+            <button className={`icon-btn ${tplOpen ? 'active' : ''}`} title="Insert template (or type ;shortcut)"
+              onMouseDown={(e) => e.preventDefault()} onClick={() => setTplOpen((v) => !v)}><TemplateIcon /></button>
+            {tplOpen && (
+              <div className="dropdown up tpl-pop">
+                <input className="text-input compact" type="search" name="seamless-template-filter" {...NO_AUTOFILL} autoFocus placeholder="Find a template…" value={tplFilter} onChange={(e) => setTplFilter(e.target.value)} />
+                {templates.length === 0 && <div className="menu-empty">No templates yet — make one with “Save as template” or in Templates.</div>}
+                {Object.entries(templates
+                  .filter((t) => `${t.name} ${t.category} ${t.shortcut ?? ''}`.toLowerCase().includes(tplFilter.toLowerCase()))
+                  .reduce<Record<string, ApiTemplate[]>>((acc, t) => { (acc[t.category || 'General'] ??= []).push(t); return acc; }, {}))
+                  .map(([cat, list]) => (
+                    <div key={cat}>
+                      <div className="switch-head">{cat}</div>
+                      {list.map((t) => (
+                        <button key={t.id} className="side-item" onClick={() => { setTplOpen(false); setTplFilter(''); void insertTemplate(t); }}>
+                          <span className="name">{t.name}</span>{t.shortcut && <code className="tpl-key">{t.shortcut}</code>}
+                        </button>
+                      ))}
+                    </div>
+                  ))}
+              </div>
+            )}
+          </div>
+
           {draft.replyToEmailId && (
             <button className="btn ghost" disabled={aiBusy} onClick={aiDraft}><SparkleIcon /> {aiBusy ? 'Drafting…' : 'AI draft'}</button>
           )}
@@ -535,7 +541,12 @@ export default function ComposeWindow({ draft }: { draft: Draft }) {
           {draft.followupDays && <span className="track-state" title="You will be reminded if nobody replies"><AlarmIcon size={14} /> Remind in {draft.followupDays}d</span>}
           {(draft.smimeSign || draft.smimeEncrypt) && <span className="track-state" title="S/MIME"><LockIcon weight="fill" size={14} /> S/MIME {draft.smimeEncrypt ? 'encrypted' : ''}{draft.smimeEncrypt && draft.smimeSign ? ' + ' : ''}{draft.smimeSign ? 'signed' : ''}</span>}
           {(draft.pgpSign || draft.pgpEncrypt) && <span className="track-state" title="OpenPGP (PGP/MIME)"><LockIcon weight="fill" size={14} /> {draft.pgpEncrypt ? 'Encrypted' : ''}{draft.pgpEncrypt && draft.pgpSign ? ' + ' : ''}{draft.pgpSign ? 'Signed' : ''}</span>}
-          {draft.track && !draft.pgpSign && !draft.pgpEncrypt && !draft.smimeSign && !draft.smimeEncrypt && <span className="track-state" title="Open tracking is on for this message"><EyeIcon weight="fill" size={14} /> Tracked{draft.perRecipientTracking ? ' per recipient' : ''}</span>}
+          <button className={`track-btn ${tracked ? 'on' : 'off'}`} aria-pressed={tracked} disabled={cryptoActive}
+            title={cryptoActive ? 'Encrypted or signed messages are never tracked' : tracked ? `Open tracking is ON${draft.perRecipientTracking ? ' (each recipient separately)' : ''} — click to turn it off` : 'Open tracking is OFF — click to turn it on'}
+            onMouseDown={(e) => e.preventDefault()} onClick={() => update(draft.key, { track: !draft.track })}>
+            {tracked ? <EyeIcon weight="fill" size={15} /> : <EyeSlashIcon size={15} />}
+            <span>{tracked ? 'Tracked' : 'Not Tracked'}</span>
+          </button>
           <div className="label-menu">
             <button className={`icon-btn ${moreOpen ? 'active' : ''}`} title="More options" onClick={() => setMoreOpen((v) => !v)}><KebabIcon /></button>
             {moreOpen && (
