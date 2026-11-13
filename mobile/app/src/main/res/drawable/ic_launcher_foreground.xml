@@ -1,0 +1,13 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp" android:height="108dp" android:viewportWidth="108" android:viewportHeight="108">
+    <!-- envelope from gemini-svg.svg, fitted inside the circular mask (58dp wide), centred, no background -->
+    <group android:scaleX="0.1706" android:scaleY="0.1706" android:translateX="10.3" android:translateY="10.3">
+        <clip-path android:pathData="M118,136H394a32,32 0 0 1 32,32V344a32,32 0 0 1 -32,32H118a32,32 0 0 1 -32,-32V168a32,32 0 0 1 32,-32z" />
+        <path android:fillColor="#9EB3C4" android:pathData="M86,136H426V376H86z" />
+        <path android:fillColor="#E2EBF2" android:pathData="M86,136L256,266L86,376z" />
+        <path android:fillColor="#CBD8E3" android:pathData="M426,136L256,266L426,376z" />
+        <path android:fillColor="#FFFFFF" android:pathData="M76,382L236,256Q256,240 276,256L436,382z" />
+        <path android:fillColor="#9EB3C4" android:pathData="M76,130L234,268Q256,286 278,268L436,130L436,146L280,282Q256,302 232,282L76,146z" />
+        <path android:fillColor="#FFFFFF" android:pathData="M76,130L236,262Q256,278 276,262L436,130z" />
+    </group>
+</vector>
