@@ -169,6 +169,59 @@ class Api(
     fun saveMutedAccounts(baseUrl: String, ids: List<Int>): ApiResult<Unit> =
         call(baseUrl, "/api/notification-prefs", buildJsonObject { put("mutedAccountIds", JsonArray(ids.map { JsonPrimitive(it) })) }.toString(), method = "PUT") { }
 
+    // ---- conversation (T9.5) ----
+
+    /** Ids of every message in the thread, oldest first as the server returns them. */
+    fun threadEmailIds(baseUrl: String, threadId: String): ApiResult<List<String>> {
+        val body = buildJsonObject { put("ids", JsonArray(listOf(JsonPrimitive(threadId)))) }
+        return jmapRaw(baseUrl, "Thread/get", body).map { v ->
+            v["list"]?.jsonArray?.firstOrNull()?.jsonObject?.get("emailIds")?.jsonArray?.map { it.jsonPrimitive.content }.orEmpty()
+        }
+    }
+
+    fun emailsByIds(baseUrl: String, ids: List<String>): ApiResult<List<ApiEmail>> {
+        if (ids.isEmpty()) return ApiResult.Ok(emptyList())
+        return jmapRaw(baseUrl, "Email/get", buildJsonObject { put("ids", JsonArray(ids.map { JsonPrimitive(it) })) })
+            .map { v -> v["list"]?.jsonArray?.map { json.decodeFromJsonElement<ApiEmail>(it) }.orEmpty() }
+    }
+
+    fun body(baseUrl: String, id: String, remote: Boolean) =
+        getJson(baseUrl, "/api/message/$id/body" + if (remote) "?remote=1" else "") { json.decodeFromString<ApiBody>(it) }
+
+    fun why(baseUrl: String, id: String) = getJson(baseUrl, "/api/message/$id/why") { json.decodeFromString<ApiWhy>(it) }
+
+    /** The correction sheet: `labelId` null = no label. Returns the correction id (for Undo). */
+    fun correct(baseUrl: String, id: String, labelId: Int?, remember: Boolean): ApiResult<Int> =
+        call(baseUrl, "/api/message/$id/correct", buildJsonObject {
+            put("labelId", labelId?.let { JsonPrimitive(it) } ?: JsonNull); put("remember", remember)
+        }.toString()) { json.parseToJsonElement(it).jsonObject["correctionId"]?.jsonPrimitive?.intOrNull ?: 0 }
+
+    fun undoCorrection(baseUrl: String, correctionId: Int): ApiResult<Unit> = call(baseUrl, "/api/corrections/$correctionId/undo", "{}") { }
+
+    /** partstat = ACCEPTED | DECLINED | TENTATIVE, like the web invite card. */
+    fun rsvp(baseUrl: String, inviteId: Int, partstat: String): ApiResult<Unit> =
+        call(baseUrl, "/api/invites/$inviteId/rsvp", buildJsonObject { put("partstat", partstat) }.toString()) { }
+
+    /** Streams an attachment into `sink` (a SAF document or a cache file) – no storage permission needed. Returns bytes written. */
+    fun downloadAttachment(baseUrl: String, emailId: String, partId: String, sink: java.io.OutputStream): ApiResult<Long> {
+        val req = Request.Builder().url("$baseUrl/api/blob/$emailId/$partId?download=1")
+            .header("X-Seamless-Client", "android/$appVersion").header("X-Seamless-Device", deviceName).build()
+        return try {
+            client.newCall(req).execute().use { res ->
+                when {
+                    res.isSuccessful -> ApiResult.Ok(res.body!!.byteStream().use { it.copyTo(sink) })
+                    res.code == 401 -> { jar.clear(); onUnauthorized(); ApiResult.Unauthorized }
+                    else -> ApiResult.Failed(res.code, "Couldn't download that file (error ${res.code}).")
+                }
+            }
+        } catch (e: IOException) { ApiResult.Network(describe(e)) }
+    }
+
+    /** Fetches a same-server resource for the message WebView (inline images) with the app's own cookies. */
+    fun fetchForWebView(url: String): okhttp3.Response? = try {
+        client.newCall(Request.Builder().url(url).header("X-Seamless-Client", "android/$appVersion").build()).execute()
+    } catch (_: Exception) { null }
+
     fun identities(baseUrl: String) = getJson(baseUrl, "/api/identities") { json.decodeFromString<List<ApiIdentity>>(it) }
 
     private fun <T> call(baseUrl: String, path: String, body: String?, isLogin: Boolean = false, method: String? = null, parse: (String) -> T): ApiResult<T> {

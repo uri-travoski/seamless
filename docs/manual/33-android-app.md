@@ -53,6 +53,20 @@ To turn push off, press **Turn off** in the same place.
 
 Opening a message arrives in a later update.
 
+## Reading a conversation
+
+Tap a message to open it. The subject sits at the top with its label chips (tap a chip to see that label). Older read messages are collapsed to one line; the newest and any unread ones are open. Tap the sender row to collapse or expand, and "to me ⌄" for the full From / To / Date.
+
+- **Toolbar:** archive, delete, mark unread, labels (tick or untick labels, or type a new one and tap Create), snooze, and ⋮ for Move and Report spam. The star is on each message.
+- **Pictures:** remote images are hidden. "Show images" loads them for this message; "Always from this sender" remembers the sender on this phone only. Inline pictures in the message always show.
+- **Links:** tapping a link first shows the real address. Open it or Cancel. Links to files on the phone and other unusual kinds are blocked. JavaScript never runs in messages.
+- **Zoom:** pinch to zoom; text reflows to the screen width. Dark mode follows the app theme.
+- **Attachments:** tap one to "Save to…" (you choose where, no storage permission needed) or "Open with…".
+- **Invitations:** a card with Accept / Maybe / Decline, as in the web app.
+- **Warnings and badges:** the phishing warning from the server, and read-only OpenPGP / S-MIME badges.
+- **"Filed by AI · why?"** shows how the message was filed; "Wrong? Fix it" lets you pick the right label (Undo is offered).
+- A message is marked read about 1.5 seconds after you open it. Reply, Reply all and Forward are at the bottom (writing mail arrives in the next app update; they are off in Viewing mode).
+
 ## Troubleshooting
 
 - **"Mobile push is not set up yet"** when pressing the test button — the key has not been saved (step 4).

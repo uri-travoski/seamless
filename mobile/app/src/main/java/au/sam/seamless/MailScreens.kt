@@ -56,6 +56,7 @@ fun HomeScreen(vm: AppViewModel) {
         Overlay.Labels -> { LabelsScreen(mail) { vm.overlay = Overlay.None }; return }
         Overlay.None -> {}
     }
+    Box(Modifier.fillMaxSize()) {
     ModalNavigationDrawer(
         drawerState = drawer,
         gesturesEnabled = !mail.searchOpen,
@@ -65,6 +66,8 @@ fun HomeScreen(vm: AppViewModel) {
         },
     ) {
         MailHome(mail, onMenu = { scope.launch { drawer.open() } })
+    }
+    mail.conversation?.let { conv -> ConversationScreen(mail, conv, vm.apiClient, vm.session) }
     }
     if (help) HelpDialog(vm.session.serverUrl) { help = false }
 }

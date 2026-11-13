@@ -28,7 +28,9 @@ import kotlinx.serialization.Serializable
     val sender: String get() = from.firstOrNull()?.let { it.name.ifBlank { it.email } } ?: "(unknown sender)"
 }
 
-@Serializable data class ApiRisk(val level: String = "medium")
+@Serializable data class ApiRiskReason(val code: String = "", val severity: String = "medium", val text: String = "")
+
+@Serializable data class ApiRisk(val level: String = "medium", val reasons: List<ApiRiskReason> = emptyList())
 
 /** One page of a list: the total match count plus the rows, in the server's order. */
 data class EmailPage(val total: Int, val emails: List<ApiEmail>)

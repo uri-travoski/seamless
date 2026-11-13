@@ -163,8 +163,18 @@ class MailViewModel(
     fun clearRecent() { session.recentSearches = emptyList(); recent = emptyList() }
     fun applyOptions(o: SearchOptions) { val q = o.toQuery(); if (q.isNotEmpty()) runSearch(q) }
 
-    /** Reading a conversation arrives with T9.5; until then a tap says so. */
-    fun open(@Suppress("UNUSED_PARAMETER") e: ApiEmail) { snacks.tryEmit(Snack("Reading mail arrives in the next update.")) }
+    // ---- conversation (T9.5) ----
+    var conversation by mutableStateOf<ConversationViewModel?>(null); private set
+
+    fun open(e: ApiEmail) {
+        val mine = (overview?.mailboxes?.map { it.email.lowercase() }.orEmpty() + listOf(session.email.lowercase())).toSet()
+        conversation = ConversationViewModel(api, session, this, scope, e, close = { conversation = null }, myEmails = { mine }).also { it.start() }
+    }
+
+    /** Reply / reply-all / forward: the compose screen arrives with T9.6. */
+    fun compose(@Suppress("UNUSED_PARAMETER") kind: String, @Suppress("UNUSED_PARAMETER") e: ApiEmail) {
+        snacks.tryEmit(Snack(if (viewingMode) "Viewing mode: sending is off on this server." else "Writing mail arrives in the next update."))
+    }
 
     // ---- labels (T9.4): same API as the web app ----
     /** Create (id == null) or change a label. `done` gets null on success or a sentence to show. */

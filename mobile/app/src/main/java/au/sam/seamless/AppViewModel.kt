@@ -16,6 +16,7 @@ enum class Overlay { None, Settings, Labels }
 class AppViewModel(private val app: SeamlessApp) : ViewModel() {
     private val api get() = app.api
     val session get() = app.session
+    val apiClient: Api get() = app.api
 
     var screen by mutableStateOf(if (session.hasSession) Screen.Splash else Screen.Login); private set
     var step by mutableStateOf(LoginStep.Address); private set

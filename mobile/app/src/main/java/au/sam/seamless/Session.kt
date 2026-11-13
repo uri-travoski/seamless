@@ -66,6 +66,11 @@ class Session(private val store: KeyValueStore, val jar: PersistentCookieJar) {
         get() = store.get("defaultFrom").orEmpty()
         set(v) = store.put("defaultFrom", v)
 
+    /** Senders whose remote images always load (kept on this phone). Lower-case addresses. */
+    var imageSenders: Set<String>
+        get() = store.get("imageSenders")?.split('\n')?.filter { it.isNotBlank() }?.toSet().orEmpty()
+        set(v) = store.put("imageSenders", v.joinToString("\n"))
+
     val hasSession: Boolean get() = serverUrl.isNotEmpty() && jar.hasCookies()
 
     /** Forget the sign-in but keep the address, so the login screen is pre-filled. */
