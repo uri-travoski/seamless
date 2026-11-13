@@ -65,6 +65,17 @@ class AppViewModel(private val app: SeamlessApp) : ViewModel() {
     /** Re-tell the server about this phone after a notification switch changed. */
     fun pushPrefsChanged() { PushRegistrar.register(app) }
 
+    // ---- app lock ----
+    var locked by mutableStateOf(session.lock.enabled && session.hasSession); private set
+    private var leftAt = 0L
+    /** Seconds in the background before the lock comes back. */
+    private val relockAfterMs = 30_000L
+    fun onBackgrounded() { leftAt = System.currentTimeMillis() }
+    fun onForegrounded() { if (session.lock.enabled && leftAt != 0L && System.currentTimeMillis() - leftAt >= relockAfterMs) locked = true; leftAt = 0L }
+    fun unlock() { locked = false }
+    /** Called after the PIN was set or removed in Settings. */
+    fun lockChanged() { if (!session.lock.enabled) locked = false }
+
     private var mfaToken = ""
     private var checkedUrl = ""
 
@@ -175,6 +186,7 @@ class AppViewModel(private val app: SeamlessApp) : ViewModel() {
 
     fun logout() {
         val url = session.serverUrl
+        session.lock.remove(); locked = false
         viewModelScope.launch {
             withContext(Dispatchers.IO) {
                 PushRegistrar.unregister(app, url)   // while the cookie still works

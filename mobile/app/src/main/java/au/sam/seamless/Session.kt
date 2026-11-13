@@ -12,6 +12,9 @@ class PrefsStore(private val p: SharedPreferences) : KeyValueStore {
 
 /** What is remembered between launches: the server address, who is signed in, and (via the jar) the cookie. */
 class Session(private val store: KeyValueStore, val jar: PersistentCookieJar) {
+    /** PIN / fingerprint lock; belongs to this phone, so it survives a sign-out caused by the server. */
+    val lock = AppLock(store)
+
     var serverUrl: String
         get() = store.get("server").orEmpty()
         set(v) = store.put("server", v)

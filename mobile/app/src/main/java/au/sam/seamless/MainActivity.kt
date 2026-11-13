@@ -1,14 +1,14 @@
 package au.sam.seamless
 
 import android.os.Bundle
-import androidx.activity.ComponentActivity
+import androidx.fragment.app.FragmentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.viewModels
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 
-class MainActivity : ComponentActivity() {
+class MainActivity : FragmentActivity() {
     private val vm: AppViewModel by viewModels {
         object : ViewModelProvider.Factory {
             @Suppress("UNCHECKED_CAST")
@@ -25,9 +25,24 @@ class MainActivity : ComponentActivity() {
             val density = androidx.compose.ui.platform.LocalDensity.current
             val scaled = androidx.compose.ui.unit.Density(density.density, density.fontScale * (TEXT_BASE_PX + vm.textDelta) / TEXT_BASE_PX)
             androidx.compose.runtime.CompositionLocalProvider(androidx.compose.ui.platform.LocalDensity provides scaled) {
-                SeamlessTheme(dark) { AppRoot(vm) }
+                SeamlessTheme(dark) { AppRoot(vm, onBiometric = ::askFingerprint) }
             }
         }
+    }
+
+    override fun onStop() { super.onStop(); vm.onBackgrounded() }
+    override fun onStart() { super.onStart(); vm.onForegrounded() }
+
+    /** Fingerprint / face prompt that opens the lock screen. The PIN always stays available as the fallback. */
+    private fun askFingerprint() {
+        if (!vm.session.lock.biometric || !Biometrics.available(this)) return
+        val prompt = androidx.biometric.BiometricPrompt(this, androidx.core.content.ContextCompat.getMainExecutor(this),
+            object : androidx.biometric.BiometricPrompt.AuthenticationCallback() {
+                override fun onAuthenticationSucceeded(result: androidx.biometric.BiometricPrompt.AuthenticationResult) { vm.session.lock.biometricOk(); vm.unlock() }
+            })
+        prompt.authenticate(androidx.biometric.BiometricPrompt.PromptInfo.Builder()
+            .setTitle("Unlock Seamless").setNegativeButtonText("Use PIN")
+            .setAllowedAuthenticators(androidx.biometric.BiometricManager.Authenticators.BIOMETRIC_STRONG).build())
     }
 
     override fun onNewIntent(intent: android.content.Intent) {

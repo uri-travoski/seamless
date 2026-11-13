@@ -26,8 +26,9 @@ import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.launch
 
 @Composable
-fun AppRoot(vm: AppViewModel) {
+fun AppRoot(vm: AppViewModel, onBiometric: () -> Unit = {}) {
     Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
+        if (vm.locked && vm.screen != Screen.Login) { LockScreen(vm, onBiometric); return@Surface }
         when (vm.screen) {
             Screen.Splash -> SplashScreen(vm)
             Screen.Login -> LoginScreen(vm)

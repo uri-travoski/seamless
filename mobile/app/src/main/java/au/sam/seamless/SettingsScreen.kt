@@ -32,6 +32,7 @@ fun SettingsScreen(vm: AppViewModel, mail: MailViewModel, onBack: () -> Unit) {
     LaunchedEffect(vm) { vm.messages.collect { snackbar.showSnackbar(it) } }
     var dialog by remember { mutableStateOf<String?>(null) }
     var confirmSignOut by remember { mutableStateOf(false) }
+    var pinFlow by remember { mutableStateOf<String?>(null) }
 
     Scaffold(
         topBar = { TopAppBar(title = { Text("Settings") }, navigationIcon = { IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back") } }) },
@@ -85,6 +86,19 @@ fun SettingsScreen(vm: AppViewModel, mail: MailViewModel, onBack: () -> Unit) {
             Header("Appearance")
             ClickRow("Theme", ThemeChoice.of(st.theme).title) { dialog = "theme" }
             TextSizeRow(st.textDelta, onSmaller = { st.changeTextSize(-1) }, onBigger = { st.changeTextSize(1) }, onReset = { st.setTextSize(0) })
+
+            Header("Security")
+            var lockTick by remember { mutableIntStateOf(0) }
+            val lock = vm.session.lock
+            val on = lockTick >= 0 && lock.enabled
+            if (!on) ClickRow("App lock", "Ask for a 6-digit PIN (or fingerprint) when the app is opened") { pinFlow = "set" }
+            else {
+                InfoRow("App lock", "On – 6-digit PIN")
+                if (Biometrics.available(ctx)) SwitchRow("Unlock with fingerprint", "The PIN still works as a backup", lock.biometric && lockTick >= 0) { lock.biometric = it; lockTick++ }
+                ClickRow("Change PIN", null) { pinFlow = "verifyChange" }
+                ClickRow("Turn off app lock", null) { pinFlow = "verifyOff" }
+            }
+            pinFlow?.let { mode -> PinFlowDialog(mode, lock, onClose = { pinFlow = null; lockTick++; vm.lockChanged() }, onSwitch = { pinFlow = it }) }
 
             Header("About")
             InfoRow("App version", BuildConfig.VERSION_NAME)
@@ -213,5 +227,37 @@ private fun <T> ChoiceDialog(title: String, options: List<T>, current: T, label:
         },
         confirmButton = {},
         dismissButton = { TextButton(onClick = onClose) { Text("Cancel") } },
+    )
+}
+
+/** Set, change or remove the PIN. "set" asks twice; the two "verify" modes ask for the current PIN first. */
+@Composable
+private fun PinFlowDialog(mode: String, lock: AppLock, onClose: () -> Unit, onSwitch: (String) -> Unit) {
+    var first by remember(mode) { mutableStateOf<String?>(null) }
+    var pin by remember(mode) { mutableStateOf("") }
+    var message by remember(mode) { mutableStateOf<String?>(null) }
+    val setting = mode == "set"
+    AlertDialog(
+        onDismissRequest = onClose,
+        confirmButton = {},
+        dismissButton = { TextButton(onClick = onClose) { Text("Cancel") } },
+        text = {
+            PinPad(
+                title = when { !setting -> "Enter your current PIN"; first == null -> "Choose a 6-digit PIN"; else -> "Enter it again" },
+                message = message, pin = pin, onChange = { pin = it },
+                onComplete = { p ->
+                    pin = ""
+                    if (!setting) {
+                        when (val r = lock.verify(p)) {
+                            PinResult.Ok -> if (mode == "verifyOff") { lock.remove(); onClose() } else onSwitch("set")
+                            is PinResult.Wrong -> message = "Wrong PIN."
+                            is PinResult.Locked -> message = "Too many tries. Wait ${r.seconds} s."
+                        }
+                    } else if (first == null) { first = p; message = null }
+                    else if (first == p) { lock.setPin(p); onClose() }
+                    else { first = null; message = "The PINs did not match. Start again." }
+                },
+            )
+        },
     )
 }
