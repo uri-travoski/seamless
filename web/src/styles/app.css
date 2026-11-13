@@ -1512,7 +1512,7 @@ mark[data-ai-pending], mark[data-unknown-var] { outline: 1px dashed var(--md-bor
 .topbar .adv-search .adv-checks.col select.text-input { width: auto; margin-left: 6px; }
 
 /* sidebar labels: text 15% smaller than the app's normal text, colour square 10% smaller with 5% less rounding — every theme */
-.sidebar .side-item.label-item { font-size: 0.8164em; }
+.sidebar .side-item.label-item { font-size: calc(0.8164em + 0.5px); }
 .sidebar .side-item.label-item .label-dot { width: 8.91px !important; height: 8.91px !important; border-radius: 2.85px; }
 .list-toolbar .row-check.master.always { margin-left: 8px; opacity: 1; visibility: visible; flex: 0 0 auto; }
 
