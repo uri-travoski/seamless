@@ -2,11 +2,11 @@
 
 A small Android app for your Seamless server. It looks and feels like the Gmail app, but it works with all your mailboxes at once and with the same email address and password you use on the web. Everything (mail, labels, mailbox groups, settings) comes from the server after you sign in; the only thing the app asks for is the server address.
 
-> The app is being built step by step. This page describes the server side that is ready now (sign-in, phones list, push) and what the app does; screens are added as they land. Right now the app can connect to your server and sign in; the mailbox itself arrives in the next updates.
+> Version 1.0.0. Screenshots are not included in this manual; the screens follow the Gmail app closely.
 
 ## Install
 
-1. Get the APK file from your administrator (or build it from the `mobile/` folder of the project).
+1. Get the APK file from your administrator, or open `http://<server>/downloads/seamless.apk` on the phone (the administrator makes this work by setting the environment variable `SEAMLESS_APK_PATH` to the APK file on the server; with it unset the address shows "not configured"). You can also build it from the `mobile/` folder (see `mobile/README.md`), or install it from a computer with `adb install seamless-1.0.0.apk`.
 2. Copy it to your phone and open it. Android asks once to allow installing from that source.
 3. Open **Seamless** and type the server address, for example `https://mail.example.com`. A server on your home network can use `http://192.168.x.x:4900`; anywhere else the address must start with `https://`.
 

@@ -1,6 +1,9 @@
 /** T9.1 Android app support: devices, config, FCM v1 sender (fake Google), what is pushed, sessions. */
 import { describe, it, expect, beforeEach, afterEach, beforeAll } from 'vitest';
 import crypto from 'node:crypto';
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
 import { resetDb, makeUser, makeAccount, makeMailbox, ingest, rawEmail, TEST_USER } from './helpers.ts';
 import { q, one, run, getSetting } from '../src/db.ts';
 import { makeApp, login, resetLimiters } from './app.ts';
@@ -379,5 +382,21 @@ describe('T9.8 privacy page', () => {
     const ck = await mobileLogin('bob@local');
     const put = await app.inject({ method: 'PUT', url: '/api/mobile/privacy-contact', headers: { cookie: ck }, payload: { contact: 'x' } });
     expect(put.statusCode).toBe(403);
+  });
+});
+
+describe('T9.9 apk download', () => {
+  it('is 404 without a configured file and serves the file (public) when set', async () => {
+    delete process.env.SEAMLESS_APK_PATH;
+    expect((await app.inject({ method: 'GET', url: '/downloads/seamless.apk' })).statusCode).toBe(404);
+    const f = path.join(os.tmpdir(), `seamless-t9-${process.pid}.apk`);
+    fs.writeFileSync(f, 'PK-fake-apk');
+    process.env.SEAMLESS_APK_PATH = f;
+    try {
+      const r = await app.inject({ method: 'GET', url: '/downloads/seamless.apk' });
+      expect(r.statusCode).toBe(200);
+      expect(r.headers['content-type']).toBe('application/vnd.android.package-archive');
+      expect(r.body).toBe('PK-fake-apk');
+    } finally { delete process.env.SEAMLESS_APK_PATH; fs.rmSync(f, { force: true }); }
   });
 });

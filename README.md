@@ -4,6 +4,7 @@ Self-hosted, AI-native webmail. Multi-user, unified inbox across many IMAP accou
 
 ## Features
 
+- **Android app** — a Gmail-style app in `mobile/` (Kotlin + Compose, ~2 MB): all mailboxes at once, search, read, reply, labels, notifications (Firebase push or 15-minute background check), critical-alert banner. See `mobile/README.md` and the manual page *Seamless for Android*.
 - **Mailbox categories + switcher** — group mailboxes into Work / Personal / Disposable (or your own) and switch Unified ⇄ category ⇄ single mailbox from the top-right; every list, count and search follows the scope.
 - **VIP senders** — mark an address or domain as VIP: ★ badge, never auto-archived/deleted by rules, AI or retention, always notifies (even in quiet hours), `is:vip` search.
 - **Notifications centre** — bell with the latest six, a filterable paginated page, per-type in-app / push settings, mailbox mutes, quiet hours. Built on an internal event bus.

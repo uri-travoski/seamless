@@ -7,6 +7,7 @@ import { categoryOverview } from '../mail/categories.ts';
 import { currentMode, modeLocked } from '../mode.ts';
 import { saveServiceAccount, clearServiceAccount, fcmStatus, pushConfigured } from '../push/fcm.ts';
 import { pushTest } from '../push/mobile.ts';
+import fs from 'node:fs';
 
 export const MIN_VERSION_KEY = 'mobile_min_version';
 export const PRIVACY_CONTACT_KEY = 'privacy_contact';
@@ -36,6 +37,12 @@ export function privacyPage(contact: string): string {
 }
 
 export function register(app: FastifyInstance): void {
+  // Public APK download so a phone on the LAN can fetch the app: set SEAMLESS_APK_PATH to the file. Read per request.
+  app.get('/downloads/seamless.apk', async (_req, reply) => {
+    const file = process.env.SEAMLESS_APK_PATH;
+    if (!file || !fs.existsSync(file) || !fs.statSync(file).isFile()) return reply.code(404).type('text/plain').send('No app file is configured on this server.');
+    return reply.type('application/vnd.android.package-archive').header('content-disposition', 'attachment; filename="seamless.apk"').send(fs.createReadStream(file));
+  });
   app.get('/privacy', async (_req, reply) => reply.type('text/html; charset=utf-8').send(privacyPage((await getSetting(PRIVACY_CONTACT_KEY)) ?? '')));
   app.put('/api/mobile/privacy-contact', async (req, reply) => {
     if (!isAdmin(req)) return reply.code(403).send({ error: 'admins only' });
