@@ -1,6 +1,15 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
-  <rect width="24" height="24" rx="5" fill="#1f2c46"/>
-  <g transform="translate(2.4 2.4) scale(0.8)">
-    <path fill="#ffffff" d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10h5v-2h-5c-4.34 0-8-3.66-8-8s3.66-8 8-8 8 3.66 8 8v1.43c0 .79-.71 1.57-1.5 1.57s-1.5-.78-1.5-1.57V12c0-2.76-2.24-5-5-5s-5 2.24-5 5 2.24 5 5 5c1.38 0 2.64-.56 3.54-1.47.65.89 1.77 1.47 2.96 1.47 1.97 0 3.5-1.6 3.5-3.57V12c0-5.52-4.48-10-10-10m0 13c-1.66 0-3-1.34-3-3s1.34-3 3-3 3 1.34 3 3-1.34 3-3 3"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="86 136 340 240">
+  <defs>
+    <clipPath id="env-clip-standalone">
+      <rect x="86" y="136" width="340" height="240" rx="32" />
+    </clipPath>
+  </defs>
+  <g clip-path="url(#env-clip-standalone)">
+    <rect x="86" y="136" width="340" height="240" fill="#9EB3C4" />
+    <path d="M 86 136 L 256 266 L 86 376 Z" fill="#E2EBF2" />
+    <path d="M 426 136 L 256 266 L 426 376 Z" fill="#CBD8E3" />
+    <path d="M 76 382 L 236 256 Q 256 240 276 256 L 436 382 Z" fill="#FFFFFF" />
+    <path d="M 76 130 L 234 268 Q 256 286 278 268 L 436 130 L 436 146 L 280 282 Q 256 302 232 282 L 76 146 Z" fill="#9EB3C4" />
+    <path d="M 76 130 L 236 262 Q 256 278 276 262 L 436 130 Z" fill="#FFFFFF" />
   </g>
 </svg>

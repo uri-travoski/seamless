@@ -18,8 +18,8 @@ android {
         applicationId = "au.sam.seamless"
         minSdk = 26
         targetSdk = 36
-        versionCode = 5
-        versionName = "1.2.0"
+        versionCode = 6
+        versionName = "1.2.1"
         // "Check for updates" (GitHub) is for sideloaded builds; build the Play bundle with -PplayStore to hide it
         buildConfigField("boolean", "GITHUB_UPDATES", (!project.hasProperty("playStore")).toString())
         resourceConfigurations += listOf("en")
