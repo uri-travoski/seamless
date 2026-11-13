@@ -159,7 +159,7 @@ class ComposeTest {
         c.setInput("to", "an")
         waitFor("suggestions") { c.suggestions.isNotEmpty() }
         assertEquals("ann@demo.test", c.suggestions[0].email)
-        c.addAddress("to", c.suggestions[0])
+        c.addSuggestion("to", c.suggestions[0])
         c.subject = "Hello"; c.text = TextFieldValue("Hi **Ann**")
         c.addAttachment("content://file1")
         waitFor("upload") { c.attachments[0].state == UploadState.Done }

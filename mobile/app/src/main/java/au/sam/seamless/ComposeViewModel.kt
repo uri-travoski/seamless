@@ -63,7 +63,7 @@ class ComposeViewModel(
     var error by mutableStateOf<String?>(null)
     var notice by mutableStateOf<String?>(null)
     var focusField by mutableStateOf("to")
-    var suggestions by mutableStateOf<List<ApiAddress>>(emptyList()); private set
+    var suggestions by mutableStateOf<List<ApiContactSuggestion>>(emptyList()); private set
     var suggestFor by mutableStateOf("to"); private set
     var confirmNoSubject by mutableStateOf(false)
     var confirmDiscard by mutableStateOf(false)
@@ -205,17 +205,25 @@ class ComposeViewModel(
         if (v.any { it == ',' || it == ';' || it == '\n' } || (v.endsWith(" ") && ComposeLogic.parseAddress(v.trim()) != null)) { commit(field); return }
         suggestJob?.cancel()
         val term = v.trim()
-        if (term.length < 2) { suggestions = emptyList(); return }
+        if (term.isEmpty()) { suggestions = emptyList(); return }
         suggestJob = scope.launch {
             delay(180)
             val r = withContext(Dispatchers.IO) { api.suggestContacts(base, term) }
-            if (r is ApiResult.Ok && inputOf(field).trim() == term) suggestions = r.value.map { ApiAddress(name = it.name, email = it.email) }.filter { ComposeLogic.isEmail(it.email) }.take(6)
+            if (r is ApiResult.Ok && inputOf(field).trim() == term) suggestions = r.value.filter { if (it.type == "group") it.members.any { m -> ComposeLogic.isEmail(m.email) } else ComposeLogic.isEmail(it.email) }.take(8)
             else if (r !is ApiResult.Ok) suggestions = emptyList()
         }
     }
 
     private fun listFor(field: String) = when (field) { "to" -> to; "cc" -> cc; else -> bcc }
     private fun setList(field: String, v: List<ApiAddress>) { when (field) { "to" -> to = v; "cc" -> cc = v; else -> bcc = v } }
+
+    fun addSuggestion(field: String, s: ApiContactSuggestion) {
+        if (s.type == "group") {
+            setList(field, ComposeLogic.dedupe(listFor(field) + s.members.filter { ComposeLogic.isEmail(it.email) }))
+            when (field) { "to" -> toInput = ""; "cc" -> ccInput = ""; else -> bccInput = "" }
+            suggestions = emptyList()
+        } else addAddress(field, ApiAddress(name = s.name, email = s.email))
+    }
 
     fun addAddress(field: String, a: ApiAddress) {
         setList(field, ComposeLogic.dedupe(listFor(field) + a))

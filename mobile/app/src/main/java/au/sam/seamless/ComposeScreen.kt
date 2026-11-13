@@ -221,8 +221,9 @@ private fun AddressRow(label: String, field: String, c: ComposeViewModel, traili
         if (c.suggestFor == field && c.suggestions.isNotEmpty() && c.inputOf(field).isNotBlank()) {
             Column(Modifier.fillMaxWidth().background(MaterialTheme.colorScheme.surfaceContainerHigh)) {
                 c.suggestions.forEach { s ->
-                    Column(Modifier.fillMaxWidth().heightIn(min = 48.dp).clickable { c.addAddress(field, s) }.padding(horizontal = 16.dp, vertical = 6.dp), verticalArrangement = Arrangement.Center) {
-                        if (s.name.isNotBlank()) { Text(s.name, maxLines = 1, overflow = TextOverflow.Ellipsis); Text(s.email, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis) }
+                    Column(Modifier.fillMaxWidth().heightIn(min = 48.dp).clickable { c.addSuggestion(field, s) }.padding(horizontal = 16.dp, vertical = 6.dp), verticalArrangement = Arrangement.Center) {
+                        if (s.type == "group") { Text("${s.name} (group)", maxLines = 1, overflow = TextOverflow.Ellipsis); Text("${s.members.size} contacts", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
+                        else if (s.name.isNotBlank()) { Text(s.name, maxLines = 1, overflow = TextOverflow.Ellipsis); Text(s.email, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis) }
                         else Text(s.email, maxLines = 1, overflow = TextOverflow.Ellipsis)
                     }
                 }

@@ -95,4 +95,4 @@ data class EmailPage(val total: Int, val emails: List<ApiEmail>)
 
 @Serializable data class UndoRequest(val undoToken: String)
 
-@Serializable data class ApiContactSuggestion(val name: String = "", val email: String = "")
+@Serializable data class ApiContactSuggestion(val type: String = "contact", val name: String = "", val email: String = "", val org: String? = null, val members: List<ApiAddress> = emptyList())
