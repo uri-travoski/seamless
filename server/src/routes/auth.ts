@@ -4,7 +4,7 @@ import type { FastifyInstance, FastifyRequest } from 'fastify';
 import { one, run, insertId, setSetting, getSetting } from '../db.ts';
 import { hasVerifiedChannel } from '../alerts/store.ts';
 import { hashPassword, verifyPassword } from '../crypto.ts';
-import { makeSession, isAdmin, uid, type SessionUser } from './util.ts';
+import { makeSession, isAdmin, uid, pkgVersion, type SessionUser } from './util.ts';
 import { authLimiter } from '../security/ratelimit.ts';
 import { sessionToken, clearSessionCookie, listSessions, revokeSession, revokeOtherSessions } from '../auth/sessions.ts';
 import {
@@ -34,7 +34,7 @@ export function register(app: FastifyInstance): void {
   app.get('/api/me', async (req) => {
     const anyUser = await one('SELECT 1 FROM users LIMIT 1');
     const su = (req as any).sessionUser as SessionUser | null;
-    const mode = { mode: currentMode(), modeLocked: modeLocked() };
+    const mode = { mode: currentMode(), modeLocked: modeLocked(), server: { name: 'Seamless', version: pkgVersion } };
     if (!su) return { needsSetup: !anyUser, loggedIn: false, settings: {}, ...mode };
     const user = await one<{ id: number; email: string; name: string; role: string; settings_json: string; must_change_password: boolean }>(
       'SELECT id, email, name, role, settings_json, must_change_password FROM users WHERE id = ?', [su.userId]);

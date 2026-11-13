@@ -325,4 +325,11 @@ describe('mobile sessions', () => {
     expect(list.every((s: any) => s.label === '')).toBe(true);
     expect(await one("SELECT 1 FROM sessions WHERE client <> ''")).toBeUndefined();
   });
+
+  it('/api/me tells a signed-out app the server name and version (login screen "Check")', async () => {
+    const r = (await app.inject({ method: 'GET', url: '/api/me' })).json();
+    expect(r.loggedIn).toBe(false);
+    expect(r.server.name).toBe('Seamless');
+    expect(r.server.version).toMatch(/^\d+\.\d+\.\d+/);
+  });
 });

@@ -2,7 +2,7 @@
 
 A small Android app for your Seamless server. It looks and feels like the Gmail app, but it works with all your mailboxes at once and with the same email address and password you use on the web. Everything (mail, labels, mailbox groups, settings) comes from the server after you sign in; the only thing the app asks for is the server address.
 
-> The app is being built step by step. This page describes the server side that is ready now (sign-in, phones list, push) and what the app does; screens are added as they land.
+> The app is being built step by step. This page describes the server side that is ready now (sign-in, phones list, push) and what the app does; screens are added as they land. Right now the app can connect to your server and sign in; the mailbox itself arrives in the next updates.
 
 ## Install
 
@@ -12,7 +12,7 @@ A small Android app for your Seamless server. It looks and feels like the Gmail 
 
 ## Signing in
 
-Use your Seamless email and password. If you turned on two-factor sign-in you are asked for the 6-digit code (or a recovery code) too. The phone stays signed in for **90 days after you last used it** — every time you open the app the clock restarts.
+On first launch type the server address and press **Check**: the app shows the server's name and version so you know it is the right one. Then use your Seamless email and password. A wrong password or an unreachable server gives a plain-words message. Open the menu (top left) and choose **Log out** to sign the phone out. If you turned on two-factor sign-in you are asked for the 6-digit code (or a recovery code) too. The phone stays signed in for **90 days after you last used it** — every time you open the app the clock restarts.
 
 Your phone shows up in **Settings → Security → Where you're signed in** as *Seamless for Android — your phone's name*. Press **Sign out** there and the phone is signed out immediately (the app returns to its sign-in screen and stops getting notifications). Signing out inside the app does the same.
 
