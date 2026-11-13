@@ -19,10 +19,30 @@ class Session(private val store: KeyValueStore, val jar: PersistentCookieJar) {
         get() = store.get("email").orEmpty()
         set(v) = store.put("email", v)
 
+    var lastUser: String
+        get() = store.get("lastUser").orEmpty()
+        set(v) = store.put("lastUser", v)
+
+    /** Which mailbox/category the list shows; survives restarts. */
+    var scope: String
+        get() = store.get("scope") ?: "unified"
+        set(v) = store.put("scope", v)
+
+    var recentSearches: List<String>
+        get() = store.get("recent")?.split('\n')?.filter { it.isNotBlank() }.orEmpty()
+        set(v) = store.put("recent", v.joinToString("\n"))
+
+    /** Newest first, no duplicates, at most 10. */
+    fun addRecentSearch(q: String) {
+        val t = q.trim().replace('\n', ' ')
+        if (t.isEmpty()) return
+        recentSearches = (listOf(t) + recentSearches.filter { !it.equals(t, true) }).take(10)
+    }
+
     val hasSession: Boolean get() = serverUrl.isNotEmpty() && jar.hasCookies()
 
     /** Forget the sign-in but keep the address, so the login screen is pre-filled. */
-    fun clear() { jar.clear() }
+    fun clear() { jar.clear(); store.put("recent", null) }
 
     companion object {
         fun create(ctx: Context): Session {

@@ -1,6 +1,6 @@
 package au.sam.seamless
 
-import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.*
 import kotlinx.serialization.encodeToString
 import okhttp3.Interceptor
 import okhttp3.MediaType.Companion.toMediaType
@@ -31,6 +31,15 @@ class PrivateHttpInterceptor(private val allowEmulatorHost: Boolean) : Intercept
         }
         return chain.proceed(chain.request())
     }
+}
+
+const val PAGE_SIZE = 50
+
+fun <T, R> ApiResult<T>.map(f: (T) -> R): ApiResult<R> = when (this) {
+    is ApiResult.Ok -> ApiResult.Ok(f(value))
+    is ApiResult.Failed -> this
+    is ApiResult.Network -> this
+    ApiResult.Unauthorized -> ApiResult.Unauthorized
 }
 
 class Api(
@@ -70,6 +79,56 @@ class Api(
     fun logout(baseUrl: String): ApiResult<Unit> = call(baseUrl, "/api/logout", "{}", isLogin = true) { }
 
     fun mobileConfig(baseUrl: String): ApiResult<MobileConfig> = call(baseUrl, "/api/mobile/config", null) { json.decodeFromString<MobileConfig>(it) }
+
+    // ---- mailbox (T9.3) ----
+
+    private fun <T> getJson(baseUrl: String, path: String, parse: (String) -> T) = call(baseUrl, path, null, parse = parse)
+
+    private fun jmapRaw(baseUrl: String, name: String, args: JsonObject): ApiResult<JsonObject> {
+        val body = buildJsonObject {
+            put("using", JsonArray(listOf(JsonPrimitive("urn:ietf:params:jmap:core"), JsonPrimitive("urn:ietf:params:jmap:mail"))))
+            put("methodCalls", JsonArray(listOf(JsonArray(listOf(JsonPrimitive(name), args, JsonPrimitive("a"))))))
+        }.toString()
+        return call(baseUrl, "/jmap/api", body) { text ->
+            val first = json.parseToJsonElement(text).jsonObject["methodResponses"]!!.jsonArray[0].jsonArray
+            if (first[0].jsonPrimitive.content == "error") throw IOException("jmap error")
+            first[1].jsonObject
+        }
+    }
+
+    /** One page of mail for `filter` (the same filter object the web app sends), rows in the server's order. */
+    fun emailPage(baseUrl: String, filter: JsonObject, position: Int, limit: Int = PAGE_SIZE): ApiResult<EmailPage> {
+        val q = jmapRaw(baseUrl, "Email/query", buildJsonObject { put("filter", filter); put("position", position); put("limit", limit) })
+        if (q !is ApiResult.Ok) return q.map { EmailPage(0, emptyList()) }
+        val ids = q.value["ids"]?.jsonArray?.map { it.jsonPrimitive.content }.orEmpty()
+        val total = q.value["total"]?.jsonPrimitive?.intOrNull ?: ids.size
+        if (ids.isEmpty()) return ApiResult.Ok(EmailPage(total, emptyList()))
+        val g = jmapRaw(baseUrl, "Email/get", buildJsonObject { put("ids", JsonArray(ids.map { JsonPrimitive(it) })) })
+        if (g !is ApiResult.Ok) return g.map { EmailPage(0, emptyList()) }
+        val byId = g.value["list"]?.jsonArray?.map { json.decodeFromJsonElement<ApiEmail>(it) }.orEmpty().associateBy { it.id }
+        return ApiResult.Ok(EmailPage(total, ids.mapNotNull { byId[it] }))
+    }
+
+    fun mailboxes(baseUrl: String, scope: String): ApiResult<List<ApiMailbox>> {
+        val args = buildJsonObject { if (scope != "unified") put("scope", scope) }
+        return jmapRaw(baseUrl, "Mailbox/get", args).map { v -> v["list"]?.jsonArray?.map { json.decodeFromJsonElement<ApiMailbox>(it) }.orEmpty() }
+    }
+
+    fun categories(baseUrl: String) = getJson(baseUrl, "/api/categories") { json.decodeFromString<ApiCategoryOverview>(it) }
+    fun accounts(baseUrl: String) = getJson(baseUrl, "/api/accounts") { json.decodeFromString<List<ApiAccountStatus>>(it) }
+    fun labels(baseUrl: String, scope: String = "unified") =
+        getJson(baseUrl, "/api/labels" + if (scope != "unified") "?scope=$scope" else "") { json.decodeFromString<List<ApiLabel>>(it) }
+    fun views(baseUrl: String) = getJson(baseUrl, "/api/views") { json.decodeFromString<List<ApiSavedView>>(it) }
+    fun alerts(baseUrl: String) = getJson(baseUrl, "/api/alerts/summary") { json.decodeFromString<AlertSummary>(it) }
+    fun suggestContacts(baseUrl: String, q: String) =
+        getJson(baseUrl, "/api/contacts/suggest?q=" + java.net.URLEncoder.encode(q, "UTF-8")) { json.decodeFromString<List<ApiContactSuggestion>>(it) }
+    fun mode(baseUrl: String) = getJson(baseUrl, "/api/mode") { json.decodeFromString<ModeResponse>(it) }
+
+    fun bulk(baseUrl: String, ids: List<String>, action: String, value: kotlinx.serialization.json.JsonElement? = null): ApiResult<BulkResult> =
+        call(baseUrl, "/api/bulk", json.encodeToString(BulkRequest(ids, action, value))) { json.decodeFromString<BulkResult>(it) }
+
+    fun undo(baseUrl: String, token: String): ApiResult<Unit> =
+        call(baseUrl, "/api/bulk/undo", json.encodeToString(UndoRequest(token))) { }
 
     private fun <T> call(baseUrl: String, path: String, body: String?, isLogin: Boolean = false, parse: (String) -> T): ApiResult<T> {
         val req = Request.Builder().url(baseUrl + path)

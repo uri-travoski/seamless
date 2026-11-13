@@ -41,6 +41,18 @@ Push goes through Google's Firebase Cloud Messaging. It is free and needs a Goog
 
 To turn push off, press **Turn off** in the same place.
 
+## The mailbox on the phone
+
+- **Top bar:** the menu button, a **Search mail** pill, and a round button at the right showing the mailbox you are looking at. Tap it to choose **All mailboxes**, a **category**, or one **mailbox**. Unread counts are shown, and a red dot marks a mailbox that has a sync problem. The phone remembers your choice.
+- **Chips** under the bar: All, Unread, Attachments, plus your pinned smart views.
+- **The list:** unread mail is bold; you see the sender, subject, a preview, the time, the star, a paperclip for attachments and your labels. When the list mixes mailboxes, a small coloured dot shows which one a message came to. Pull down to refresh; more mail loads as you scroll (50 at a time).
+- **Swipe** a row right to archive it, left to delete it. A bar at the bottom offers **Undo**.
+- **Long-press** a row to select several. The top bar then offers Archive, Delete, Mark read/unread, and a menu with Label, Snooze, Move and Select all.
+- **Search:** tap the pill. You get recent searches, suggestions from your contacts and labels, and the same operators as the web app (`from:`, `has:attachment`, `label:` and so on). The tune button opens **Search options** (from, to, subject, words, size, dates). The number of results is shown above the list.
+- **Banners:** a red banner appears at the top when a critical alert is open; tap it for details and a **Fix it** link. A grey notice appears when the server is in Viewing mode.
+
+Opening a message arrives in a later update.
+
 ## Troubleshooting
 
 - **"Mobile push is not set up yet"** when pressing the test button — the key has not been saved (step 4).

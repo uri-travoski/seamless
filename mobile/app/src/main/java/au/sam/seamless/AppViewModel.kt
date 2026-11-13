@@ -31,6 +31,7 @@ class AppViewModel(private val app: SeamlessApp) : ViewModel() {
     var userEmail by mutableStateOf(session.email); private set
     var splashError by mutableStateOf<String?>(null); private set
     var notice by mutableStateOf<String?>(null)
+    var mail by mutableStateOf<MailViewModel?>(null); private set
 
     private var mfaToken = ""
     private var checkedUrl = ""
@@ -54,7 +55,7 @@ class AppViewModel(private val app: SeamlessApp) : ViewModel() {
         splashError = null; screen = Screen.Splash
         io({ api.me(session.serverUrl) }) { r ->
             when (r) {
-                is ApiResult.Ok -> if (r.value.loggedIn) { userEmail = r.value.user?.email ?: session.email; screen = Screen.Home }
+                is ApiResult.Ok -> if (r.value.loggedIn) { userEmail = r.value.user?.email ?: session.email; enterHome() }
                                    else signedOut(null)
                 is ApiResult.Unauthorized -> {} // onUnauthorized already moved us to Login
                 is ApiResult.Network -> splashError = r.message
@@ -120,7 +121,14 @@ class AppViewModel(private val app: SeamlessApp) : ViewModel() {
 
     private fun finishLogin(url: String) {
         session.serverUrl = url; session.email = email.trim()
+        if (!email.trim().equals(session.lastUser, true)) session.scope = MailQuery.UNIFIED
+        session.lastUser = email.trim()
         userEmail = email.trim(); password = ""; code = ""; useRecovery = false
+        enterHome()
+    }
+
+    private fun enterHome() {
+        mail = MailViewModel(api, session, viewModelScope).also { it.start() }
         screen = Screen.Home
     }
 
@@ -133,7 +141,7 @@ class AppViewModel(private val app: SeamlessApp) : ViewModel() {
     }
 
     private fun signedOut(message: String?) {
-        session.clear()
+        session.clear(); mail = null
         password = ""; code = ""; mfaToken = ""
         checkedUrl = session.serverUrl; address = session.serverUrl
         step = if (address.isNotEmpty()) LoginStep.Password else LoginStep.Address
