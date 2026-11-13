@@ -10,6 +10,7 @@ import { ingestLocal } from '../../mail/localbox.ts';
 import { syncManager, type NewMailEvent } from '../../imap/sync.ts';
 import { dropIfDisposed, matchAddress, clean } from '../../mail/disposable.ts';
 import { simpleParser } from 'mailparser';
+import { normalizePolicy, isBlockedAddress, countDropped, quarantineMail, NO_ADDRESS } from '../../mail/unknown.ts';
 
 export const MAX_INGEST_BYTES = 30 * 1024 * 1024;
 export const SKEW_MS = 5 * 60_000;
@@ -28,7 +29,7 @@ export function signatureValid(secret: string, timestamp: string, signature: str
 
 export interface PushInboxRow {
   token: string; account_id: number; secret_enc: string; domains: string[]; catch_all: boolean;
-  unknown_policy: string; created_at: string;
+  unknown_policy: string; domain_policies: Record<string, string>; source_account_id: number | null; created_at: string;
 }
 
 export const getInbox = (token: string) => one<PushInboxRow>('SELECT * FROM push_inboxes WHERE token = ?', [token]);
@@ -49,7 +50,7 @@ export async function rotateSecret(token: string): Promise<string> {
 
 export const inboxSecret = (row: PushInboxRow) => decrypt(row.secret_enc);
 
-export type IngestOutcome = { status: 202; id: number } | { status: 200; dropped: true; reason: 'disposed' | 'unknown' } | { status: 200; id: number | null; duplicate: true } | { status: 500; error: string };
+export type IngestOutcome = { status: 202; id: number } | { status: 200; dropped: true; reason: 'disposed' | 'unknown' } | { status: 200; quarantined: true } | { status: 200; id: number | null; duplicate: true } | { status: 500; error: string };
 
 /** Store one pushed message (already authenticated). Duplicate = same Message-ID + same bytes. */
 export async function ingestPush(inbox: PushInboxRow, raw: Buffer, rcpt: string | null): Promise<IngestOutcome> {
@@ -62,12 +63,21 @@ export async function ingestPush(inbox: PushInboxRow, raw: Buffer, rcpt: string 
     candidates.push(h('delivered-to'), h('x-original-to'), ...((Array.isArray(p?.to) ? p!.to : p?.to ? [p.to] : []).flatMap((a: any) => a.value.map((v: any) => v.address))));
   }
   if (await dropIfDisposed(inbox.account_id, candidates)) return { status: 200, dropped: true, reason: 'disposed' };
-  if (inbox.unknown_policy === 'reject' && rcpt) {
-    const addr = clean(rcpt);
+  // an address on one of this inbox's domains that is neither the mailbox nor a disposable address: per-domain policy
+  const viaCatchAll = inbox.source_account_id != null;
+  const addr = rcpt ? clean(rcpt) : '';
+  const domain = addr.split('@')[1] ?? '';
+  if ((rcpt && inbox.domains.includes(domain)) || (viaCatchAll && !rcpt)) {
     const own = await one<{ email: string; aliases: string }>('SELECT email, aliases FROM accounts WHERE id = ?', [inbox.account_id]);
-    const mine = own && (own.email.toLowerCase() === addr || (JSON.parse(own.aliases) as string[]).some((a) => a.toLowerCase() === addr));
-    if (!mine && inbox.domains.includes(addr.split('@')[1] ?? '') && !(await matchAddress(inbox.account_id, [addr]))) {
-      return { status: 200, dropped: true, reason: 'unknown' };
+    const mine = !!rcpt && !!own && (own.email.toLowerCase() === addr || (JSON.parse(own.aliases) as string[]).some((a) => a.toLowerCase() === addr));
+    if (!mine && !(rcpt && await matchAddress(inbox.account_id, [addr]))) {
+      if (rcpt && await isBlockedAddress(inbox.account_id, addr)) { await countDropped(inbox.account_id, addr); return { status: 200, dropped: true, reason: 'unknown' }; }
+      const policy = normalizePolicy(inbox.domain_policies?.[domain] ?? inbox.unknown_policy);
+      if (policy === 'drop') return { status: 200, dropped: true, reason: 'unknown' };
+      if (policy === 'quarantine') {
+        try { await quarantineMail(inbox.account_id, addr || NO_ADDRESS, domain, raw); return { status: 200, quarantined: true }; }
+        catch (err: any) { return { status: 500, error: String(err?.message ?? err) }; }
+      }
     }
   }
   const head = raw.subarray(0, 16384).toString('latin1');

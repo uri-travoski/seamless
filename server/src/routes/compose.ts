@@ -104,7 +104,7 @@ export function register(app: FastifyInstance): void {
     if (!row) return reply.code(404).send({ error: 'not found' });
     const disposables = await q<{ account_id: number; address: string }>(
       "SELECT account_id, address FROM disposable_addresses WHERE user_id = ? AND status = 'active'", [uid(req)]);
-    const accounts = (await q<any>('SELECT id, name, email, aliases FROM accounts WHERE user_id = ? AND enabled = true', [uid(req)])).map((a) => ({
+    const accounts = (await q<any>('SELECT id, name, email, aliases FROM accounts WHERE user_id = ? AND enabled = true AND catchall = false', [uid(req)])).map((a) => ({
       accountId: a.id, email: a.email, name: a.name,
       aliases: [...JSON.parse(a.aliases), ...disposables.filter((d) => d.account_id === a.id).map((d) => d.address)] as string[],
     }));

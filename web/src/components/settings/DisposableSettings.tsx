@@ -4,6 +4,7 @@ import type { ApiDisposable } from '@seamless/shared';
 import { api } from '../../api/client.ts';
 import { toast, undoToast } from '../../toast.ts';
 import { navigate } from '../../router.ts';
+import CatchAllPanel from './CatchAllPanel.tsx';
 
 interface Domain { accountId: number; domain: string }
 interface Listing { addresses: ApiDisposable[]; domains: Domain[] }
@@ -39,7 +40,7 @@ export function NewAddressForm({ domains, onCreated, onCancel }: { domains: Doma
     } catch (e: any) { toast(e?.message ?? 'Could not create', 'error'); }
     setBusy(false);
   };
-  if (domains.length === 0) return <p className="settings-desc">Add a mailbox with “Own domain (Cloudflare Email Routing)” first — disposable addresses live on those domains.</p>;
+  if (domains.length === 0) return <p className="settings-desc">Add a catch-all domain (below) or a mailbox with “Own domain (Cloudflare Email Routing)” first — disposable addresses live on those domains.</p>;
   return (
     <div className="dns-panel">
       <div className="field"><label>Domain</label>
@@ -118,6 +119,7 @@ export default function DisposableSettings() {
           </tbody>
         </table>
       )}
+      <CatchAllPanel onCreated={() => void load()} />
     </div>
   );
 }

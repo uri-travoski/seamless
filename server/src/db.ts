@@ -1590,6 +1590,55 @@ CREATE TABLE mobile_devices (
 CREATE INDEX mobile_devices_user ON mobile_devices(user_id);
 `,
   },
+  {
+    id: 51,
+    // T10.1: catch-all mailbox for disposable addresses. A normal IMAP/POP3 account can be flagged `catchall`:
+    // it stops being listed and is only fetched and routed into a local destination account (a push inbox that
+    // lists the catch-all domains). Unknown addresses can be quarantined (kept a week, then purged).
+    sql: `
+ALTER TABLE accounts ADD COLUMN catchall BOOLEAN NOT NULL DEFAULT false;
+ALTER TABLE accounts ADD COLUMN catchall_after TEXT NOT NULL DEFAULT 'move' CHECK (catchall_after IN ('move','delete','leave'));
+ALTER TABLE accounts ADD COLUMN catchall_clean_days INTEGER NOT NULL DEFAULT 14;
+ALTER TABLE accounts ADD COLUMN catchall_dest_account_id INTEGER REFERENCES accounts(id) ON DELETE SET NULL;
+ALTER TABLE push_inboxes DROP CONSTRAINT IF EXISTS push_inboxes_unknown_policy_check;
+ALTER TABLE push_inboxes ADD CONSTRAINT push_inboxes_unknown_policy_check CHECK (unknown_policy IN ('deliver','reject','drop','quarantine'));
+ALTER TABLE push_inboxes ADD COLUMN domain_policies JSONB NOT NULL DEFAULT '{}';
+ALTER TABLE push_inboxes ADD COLUMN source_account_id INTEGER REFERENCES accounts(id) ON DELETE CASCADE;
+CREATE TABLE catchall_seen (
+  account_id INTEGER NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
+  source_key TEXT NOT NULL,
+  handled BOOLEAN NOT NULL DEFAULT false,
+  outcome TEXT NOT NULL DEFAULT '',
+  created_at BIGINT NOT NULL,
+  PRIMARY KEY (account_id, source_key)
+);
+CREATE TABLE unknown_addresses (
+  id SERIAL PRIMARY KEY,
+  user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  account_id INTEGER NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
+  domain TEXT NOT NULL,
+  address TEXT NOT NULL,
+  status TEXT NOT NULL DEFAULT 'quarantine' CHECK (status IN ('quarantine','blocked')),
+  received_count INTEGER NOT NULL DEFAULT 0,
+  dropped_count INTEGER NOT NULL DEFAULT 0,
+  last_from TEXT NOT NULL DEFAULT '',
+  last_subject TEXT NOT NULL DEFAULT '',
+  first_at BIGINT NOT NULL,
+  last_at BIGINT NOT NULL,
+  UNIQUE (account_id, address)
+);
+CREATE TABLE quarantined_mail (
+  id SERIAL PRIMARY KEY,
+  user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  unknown_id INTEGER NOT NULL REFERENCES unknown_addresses(id) ON DELETE CASCADE,
+  s3_key TEXT NOT NULL,
+  from_addr TEXT NOT NULL DEFAULT '',
+  subject TEXT NOT NULL DEFAULT '',
+  received_at BIGINT NOT NULL
+);
+CREATE INDEX quarantined_mail_unknown ON quarantined_mail(unknown_id);
+`,
+  },
 ];
 
 /** Run `fn` in one transaction. Events emitted through the client are only turned into

@@ -103,3 +103,10 @@ Scheduled (send-later) mail is not delayed. More: [Composing & sending](04-compo
 (The same steps are available through the API: `/api/archives`, `/api/archives/preview`, `/api/archives/schedule`.)
 
 See [Backup and restore](11-backup-restore.md) for what is included and what is left out.
+
+## Disposable addresses on a catch-all mailbox
+1. At your email provider, set the domain's catch-all to deliver to one dedicated mailbox (MX records pointing at the provider).
+2. Settings → Mailboxes → add that mailbox (IMAP or POP3) and run the test.
+3. Settings → Disposable → **+ Add a catch-all domain** → choose provider, mailbox, domain, and what happens to each message after saving.
+4. On the mailbox card press **Send a test mail** and wait for “Works”.
+5. **+ New address** to create your first disposable address. Details in [Disposable addresses](16-disposable.md).

@@ -21,6 +21,7 @@ export interface AccountRow {
   inbound_kind?: string;
   pop3_host?: string; pop3_port?: number; pop3_secure?: boolean; pop3_user?: string; pop3_pass_enc?: string;
   pop3_interval_min?: number; pop3_leave_on_server?: boolean; pop3_delete_after_days?: number | null;
+  catchall?: boolean; catchall_after?: 'move' | 'delete' | 'leave'; catchall_clean_days?: number; catchall_dest_account_id?: number | null;
 }
 
 export interface NewMailEvent {
@@ -383,6 +384,10 @@ class SyncManager extends EventEmitter {
   startAccount(acct: AccountRow): void {
     this.stopAccount(acct.id);
     if (isViewing()) return;
+    if (acct.catchall) {   // T10.1: a catch-all mailbox is fetched and routed, never listed as-is
+      this.drivers.get('catchall')?.start(acct);
+      return;
+    }
     if (acct.inbound_kind && acct.inbound_kind !== 'imap') {
       this.drivers.get(acct.inbound_kind)?.start(acct); // POP3 has its own poller; push has none
       return;

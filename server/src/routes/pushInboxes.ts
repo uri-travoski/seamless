@@ -15,7 +15,7 @@ const DOMAIN_RE = /^(?=.{1,253}$)([a-z0-9]([a-z0-9-]*[a-z0-9])?\.)+[a-z]{2,}$/;
 function view(r: PushInboxRow & { email: string; name: string }) {
   return {
     token: r.token, accountId: r.account_id, email: r.email, name: r.name, domains: r.domains,
-    catchAll: r.catch_all, unknownPolicy: r.unknown_policy, createdAt: Number(r.created_at),
+    catchAll: r.catch_all, unknownPolicy: r.unknown_policy, domainPolicies: r.domain_policies ?? {}, viaCatchAllMailbox: r.source_account_id != null, createdAt: Number(r.created_at),
     endpoint: `${config.publicUrl}/api/ingest/${r.token}`,
   };
 }
@@ -61,9 +61,22 @@ export function register(app: FastifyInstance): void {
   app.put('/api/push-inboxes/:token', async (req, reply) => {
     const row = await mine(uid(req), String((req.params as any).token));
     if (!row) return reply.code(404).send({ error: 'not found' });
-    const policy = (req.body as any)?.unknownPolicy;
-    if (policy !== 'deliver' && policy !== 'reject') return reply.code(400).send({ error: 'unknownPolicy must be deliver or reject' });
-    await run('UPDATE push_inboxes SET unknown_policy = ? WHERE token = ?', [policy, row.token]);
+    const b = (req.body ?? {}) as { unknownPolicy?: string; domainPolicies?: Record<string, string> };
+    const ok = ['deliver', 'reject', 'drop', 'quarantine'];
+    if (b.unknownPolicy === undefined && b.domainPolicies === undefined) return reply.code(400).send({ error: 'unknownPolicy or domainPolicies required' });
+    if (b.unknownPolicy !== undefined) {
+      if (!ok.includes(b.unknownPolicy)) return reply.code(400).send({ error: 'unknownPolicy must be quarantine, deliver or drop' });
+      await run('UPDATE push_inboxes SET unknown_policy = ? WHERE token = ?', [b.unknownPolicy, row.token]);
+    }
+    if (b.domainPolicies !== undefined) {
+      const next: Record<string, string> = { ...(row.domain_policies ?? {}) };
+      for (const [d, p] of Object.entries(b.domainPolicies)) {
+        if (!row.domains.includes(d)) return reply.code(400).send({ error: `${d} is not one of this inbox's domains` });
+        if (!ok.includes(p)) return reply.code(400).send({ error: 'policy must be quarantine, deliver or drop' });
+        next[d] = p;
+      }
+      await run('UPDATE push_inboxes SET domain_policies = ? WHERE token = ?', [JSON.stringify(next), row.token]);
+    }
     return view((await mine(uid(req), row.token))!);
   });
 

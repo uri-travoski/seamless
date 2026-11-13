@@ -25,6 +25,7 @@ export function register(app: FastifyInstance): void {
     const rcpt = (Array.isArray(rcptHeader) ? rcptHeader[0] : rcptHeader)?.trim() || null;
     const out = await ingestPush(inbox, body, rcpt);
     if ('dropped' in out) return reply.code(200).send({ dropped: true, reason: out.reason });
+    if ('quarantined' in out) return reply.code(200).send({ quarantined: true });
     if (out.status === 202) return reply.code(202).send({ id: out.id });
     if (out.status === 200) return reply.code(200).send({ id: out.id, duplicate: true });
     return reply.code(500).send({ error: out.error });

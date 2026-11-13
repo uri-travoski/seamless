@@ -39,6 +39,7 @@ import { register as transports } from './transports.ts';
 import { register as ingest } from './ingest.ts';
 import { register as pushInboxes } from './pushInboxes.ts';
 import { register as disposable } from './disposable.ts';
+import { register as catchall } from './catchall.ts';
 import { register as storage } from './storage.ts';
 import { register as exportRoutes } from './export.ts';
 import { register as businesses } from './businesses.ts';
@@ -192,6 +193,7 @@ export function registerRoutes(app: FastifyInstance): void {
   ingest(app);
   pushInboxes(app);
   disposable(app);
+  catchall(app);
   storage(app);
   exportRoutes(app);
   businesses(app);

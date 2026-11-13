@@ -99,6 +99,13 @@ Your server must be reachable from the internet at `PUBLIC_URL`.
 Prefer to host the mail server yourself? Run [Stalwart](https://stalw.art) (or any IMAP server), create the
 mailboxes there, and add it in Seamless as an ordinary **IMAP / SMTP account**. No extra code is needed.
 
+## A catch-all mailbox for disposable addresses
+Any IMAP or POP3 mailbox can be the **catch-all** for a domain: your provider delivers every address of the domain into it and
+Seamless routes each message to the matching [disposable address](16-disposable.md). Add the mailbox here as usual, then turn it
+into a catch-all in **Settings → Disposable → Add a catch-all domain**. A catch-all mailbox is not listed in the mailbox switcher and is
+not a From address; its mail appears in the Inbox of a small *Disposable* mailbox that Seamless creates for you. IMAP is watched
+continuously; POP3 is checked every 2 minutes and remembers what it has fetched. The Cloudflare route above keeps working as before.
+
 ## Managing accounts
 
 Edit an account any time, disable it to pause syncing, or remove it. Removing an account stops its sync and deletes its rows from Seamless (your mail stays on the origin server).

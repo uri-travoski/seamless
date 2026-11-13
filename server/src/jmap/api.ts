@@ -26,7 +26,7 @@ export async function jmapSession() {
 
 export async function listIdentities(userId: number): Promise<ApiIdentity[]> {
   const accounts = await q<{ id: number; name: string; email: string }>(
-    'SELECT id, name, email FROM accounts WHERE user_id = ? AND enabled = true ORDER BY id', [userId]);
+    'SELECT id, name, email FROM accounts WHERE user_id = ? AND enabled = true AND catchall = false ORDER BY id', [userId]);
   const rows = await q<any>('SELECT * FROM identities WHERE user_id = ? ORDER BY is_default DESC, id', [userId]);
   const out: ApiIdentity[] = [];
   for (const a of accounts) {
