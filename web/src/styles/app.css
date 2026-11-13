@@ -1648,3 +1648,5 @@ mark[data-ai-pending], mark[data-unknown-var] { outline: 1px dashed var(--md-bor
 .list-toolbar.bulk .sep { width: 1px; height: 18px; background: var(--color-border-strong, var(--md-border-strong)); opacity: .6; margin: 0 6px; flex: 0 0 auto; }
 /* more room (x2) between "N selected" and the first toolbar icon */
 .list-toolbar.bulk .bulk-count { margin-right: 20px; }
+/* text colour swatch another 10% smaller (18px -> 16.2px) */
+.editor-toolbar input[type="color"] { width: 16.2px; height: 16.2px; }
