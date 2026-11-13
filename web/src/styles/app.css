@@ -647,7 +647,7 @@ svg { flex: 0 0 auto; vertical-align: middle; }
   box-shadow: 0 20px 25px -5px rgba(7,14,26,.35), 0 8px 10px -6px rgba(7,14,26,.25); }
 .login-card .brand { display: flex; align-items: center; justify-content: center; gap: 10px; color: #1b3252; font-size: 22px; margin-bottom: 10px; }
 .login-card .brand .app-name { font-weight: 700; letter-spacing: -0.02em; }
-.login-card .brand img { width: 34px; }
+.login-card .brand img { width: auto; }
 .login-card > p { text-align: center; font-size: 15px !important; color: #475569 !important; margin: 0 0 28px !important; }
 .login-card .field { margin-bottom: 18px; display: flex; flex-direction: column; gap: 6px; }
 .login-card .field label { font-size: 13px; font-weight: 600; color: #475569; }
