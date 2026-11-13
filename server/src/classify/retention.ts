@@ -2,6 +2,7 @@ import { q, one, run, bumpState } from '../db.ts';
 import { moveEmail, destroyEmail } from '../mail/store.ts';
 import { getUserSetting, plog, pruneLogs } from './settings.ts';
 import { retentionCandidates } from '../mail/newsletters.ts';
+import { cleanupStopped } from '../mail/disposable.ts';
 
 const TICK_MS = 60 * 60 * 1000; // hourly
 
@@ -53,6 +54,20 @@ export async function sweepRetention(now = Date.now()): Promise<{ trashed: numbe
       }
     }
 
+    // one-week rule (T10.2): mail on a disposable address goes to the Bin at its delete_at unless kept. Not dry-run gated:
+    // the user set the rule on the address itself. Kept mail has no delete_at.
+    const expired = await q<{ id: number; subject: string; from_addr: string }>(`
+      SELECT m.id, m.subject, m.from_addr FROM messages m JOIN mailboxes mb ON mb.id = m.mailbox_id
+      WHERE m.user_id = ? AND m.disposable_id IS NOT NULL AND m.delete_at IS NOT NULL AND m.delete_at < ? AND m.keep_reason IS NULL
+        AND (mb.role IS NULL OR mb.role IN ('inbox','archive')) ORDER BY m.delete_at LIMIT 500`, [u.id, now]);
+    for (const c of expired) {
+      await moveEmail(u.id, `m${c.id}`, 'u:trash');
+      await run('UPDATE messages SET trashed_at = ?, delete_at = NULL WHERE id = ?', [now, c.id]);
+      stats.trashed++;
+      await plog(u.id, 'retention', `disposable mail expired, moved to Bin: "${c.subject}" from ${c.from_addr}`, { emailId: c.id });
+    }
+    if (expired.length) broadcastChange(u.id);
+
     // Read later (T6.3): "delete after N days unless starred" — a default rule the user can change; VIP / snoozed never move
     const stale = await retentionCandidates(u.id, now);
     for (const c of stale) {
@@ -94,6 +109,7 @@ export async function sweepRetention(now = Date.now()): Promise<{ trashed: numbe
     if (candidates.length || purgeable.length || stale.length) broadcastChange(u.id);
   }
 
+  await cleanupStopped(now).catch((e) => console.error('[disposable] cleanup failed:', e?.message ?? e));   // addresses stopped > 6 months
   await pruneLogs();
   if (stats.trashed || stats.purged) await bumpState();
   return stats;

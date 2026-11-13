@@ -47,8 +47,8 @@ requests is why the filter exists: whether or not they stop, you stop seeing it.
 ## Disposable addresses
 
 If you own a domain set up through *Own domain (Cloudflare Email Routing)*, give each sign-up its own address under
-**Settings → Disposable → + New address**. If one starts getting junk, **Dispose** it: mail to it stops reaching your
-Inbox, with **Undo** if you change your mind. See [Disposable addresses](16-disposable.md).
+**Settings → Disposable → + New address**. If one starts getting junk, **Stop** it: new mail goes to the Bin for a while (15 days / 100 mails) and is then deleted on arrival,
+with **Undo** if you change your mind. See [Disposable addresses](16-disposable.md).
 
 ## What can't be stopped
 

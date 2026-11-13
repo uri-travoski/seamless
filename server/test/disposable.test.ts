@@ -69,38 +69,38 @@ describe('create / receive', () => {
     expect((await queryEmails(TEST_USER, { filter: { text: `disposable:${d.id + 1}` }, position: 0, limit: 10 })).ids).toEqual([]);
   });
 
-  it('dispose → next message dropped at the endpoint (counted), no newMail; undo restores', async () => {
+  it('stop → mail goes to the Bin (read, no newMail, no Inbox); start delivers again and restores nothing', async () => {
     const d = (await create({ label: 'x' })).json();
     expect((await post(mail(d.address), d.address)).statusCode).toBe(202);
-    expect((await act(d.id, 'dispose')).json().status).toBe('disposed');
+    const stopped = (await act(d.id, 'stop')).json();
+    expect(stopped).toMatchObject({ status: 'stopped', stoppedStored: 0 });
+    expect(stopped.stoppedAt).toBeGreaterThan(0);
     const seen: any[] = [];
     syncManager.on('newMail', (e) => seen.push(e));
     const r = await post(mail(d.address, 'a@b.test', 'second'), d.address);
-    expect(r.statusCode).toBe(200);
-    expect(r.json()).toEqual({ dropped: true, reason: 'disposed' });
-    expect(seen).toHaveLength(0);
-    expect((await q('SELECT 1 FROM messages WHERE subject = ?', ['second']))).toHaveLength(0);
-    expect((await one<any>('SELECT dropped_count, received_count FROM disposable_addresses WHERE id = ?', [d.id]))).toMatchObject({ dropped_count: 1, received_count: 1 });
-    // undo within 30 days; not after
-    expect((await act(d.id, 'undispose')).json().status).toBe('active');
-    await act(d.id, 'dispose');
-    await run('UPDATE disposable_addresses SET disposed_at = ? WHERE id = ?', [Date.now() - 31 * 86_400_000, d.id]);
-    expect((await act(d.id, 'undispose')).statusCode).toBe(409);
-  });
-
-  it('paused → stored, read, out of the Inbox, no newMail; resume delivers again', async () => {
-    const d = (await create()).json();
-    await act(d.id, 'pause');
-    const seen: any[] = [];
-    syncManager.on('newMail', (e) => seen.push(e));
-    const r = await post(mail(d.address), d.address);
     expect(r.statusCode).toBe(202);
-    const row = await one<any>('SELECT m.unread, mb.role FROM messages m JOIN mailboxes mb ON mb.id = m.mailbox_id WHERE m.id = ?', [r.json().id]);
-    expect(row).toMatchObject({ unread: false, role: 'archive' });
+    const row = await one<any>('SELECT m.unread, m.trashed_at, m.delete_at, mb.role FROM messages m JOIN mailboxes mb ON mb.id = m.mailbox_id WHERE m.id = ?', [r.json().id]);
+    expect(row).toMatchObject({ unread: false, role: 'trash' });
+    expect(Number(row.trashed_at)).toBeGreaterThan(0);
+    expect(row.delete_at).toBeNull();
     expect(seen).toHaveLength(0);
-    await act(d.id, 'resume');
+    expect(await q("SELECT 1 FROM events WHERE type = 'disposable.received'")).toHaveLength(0);
+    expect((await one<any>('SELECT stopped_stored, received_count FROM disposable_addresses WHERE id = ?', [d.id]))).toMatchObject({ stopped_stored: 1, received_count: 2 });
+    // is:stopped finds it
+    const { queryEmails } = await import('../src/mail/store.ts');
+    expect((await queryEmails(TEST_USER, { filter: { text: 'is:stopped in:bin' }, position: 0, limit: 10 })).ids).toContain(`m${r.json().id}`);
+    // start: delivery resumes, the old Bin mail stays where it is, the window is cleared
+    const started = (await act(d.id, 'start')).json();
+    expect(started).toMatchObject({ status: 'active', stoppedAt: null, stoppedStored: 0 });
     await post(mail(d.address, 'a@b.test', 'again'), d.address);
     expect(seen).toHaveLength(1);
+    expect((await one<any>('SELECT mb.role FROM messages m JOIN mailboxes mb ON mb.id = m.mailbox_id WHERE m.id = ?', [r.json().id])).role).toBe('trash');
+  });
+
+  it('the old pause / dispose endpoints are gone (410)', async () => {
+    const d = (await create()).json();
+    for (const a of ['pause', 'resume', 'dispose', 'undispose']) expect((await act(d.id, a)).statusCode).toBe(410);
+    expect((await one<any>('SELECT status FROM disposable_addresses WHERE id = ?', [d.id])).status).toBe('active');
   });
 
   it('unknown address on the catch-all follows unknown_policy', async () => {
@@ -115,29 +115,28 @@ describe('create / receive', () => {
 });
 
 describe('expiry', () => {
-  it('the disposable.expire job disposes once the time has come (idempotent)', async () => {
+  it('the disposable.expire job stops the address once the time has come (idempotent)', async () => {
     const d = (await create({ expiresInDays: 1 })).json();
     expect(await q("SELECT 1 FROM jobs WHERE kind = 'disposable.expire'")).toHaveLength(1);
     await run('UPDATE disposable_addresses SET expires_at = ? WHERE id = ?', [Date.now() - 1000, d.id]);
     await run("UPDATE jobs SET run_at = ? WHERE kind = 'disposable.expire'", [Date.now() - 1000]);
     await runDueJobs();
-    expect((await one<any>('SELECT status, disposed_at FROM disposable_addresses WHERE id = ?', [d.id])).status).toBe('disposed');
+    expect((await one<any>('SELECT status, stopped_at FROM disposable_addresses WHERE id = ?', [d.id])).status).toBe('stopped');
     const { expireDue } = await import('../src/mail/disposable.ts');
     expect(await expireDue(d.id)).toBe(false);
   });
 });
 
 describe('reply + leak', () => {
-  it('active disposable addresses are identities of their account and win reply matching', async () => {
+  it('disposable addresses are not identities; a reply to disposable mail uses a normal identity and says so', async () => {
     const d = (await create()).json();
     const ids = (await app.inject({ method: 'GET', url: '/api/identities', headers: { cookie } })).json();
-    expect(ids).toContainEqual({ accountId: inbox.accountId, email: d.address, name: 'Push', isAlias: true });
+    expect(ids.find((i: any) => i.email === d.address)).toBeUndefined();
     const r = await post(mail(d.address), d.address);
     const m = (await app.inject({ method: 'POST', url: '/api/identity/match', headers: { cookie }, payload: { emailId: `m${r.json().id}` } })).json();
-    expect(m).toMatchObject({ accountId: inbox.accountId, email: d.address, isAlias: true });
-    await act(d.id, 'dispose');
-    const ids2 = (await app.inject({ method: 'GET', url: '/api/identities', headers: { cookie } })).json();
-    expect(ids2.find((i: any) => i.email === d.address)).toBeUndefined();
+    expect(m.email).not.toBe(d.address);
+    expect(m.email).toBe('me@push.test');
+    expect(m.viaDisposable).toBe(d.address);
     expect(matchReplyIdentity).toBeTypeOf('function');
   });
 
@@ -160,12 +159,14 @@ describe('reply + leak', () => {
 });
 
 describe('Worker disposed list', () => {
-  it('GET /disposed is signed; the Worker rejects disposed recipients and caches 5 min', async () => {
+  it('GET /disposed is signed, lists stopped addresses only when the domain rejects them at the door; the Worker rejects them and caches 5 min', async () => {
     const d = (await create()).json();
-    await act(d.id, 'dispose');
+    await act(d.id, 'stop');
     const ts = String(Date.now());
     const get = (sig: string) => app.inject({ method: 'GET', url: `/api/ingest/${inbox.token}/disposed`, headers: { 'x-seamless-timestamp': ts, 'x-seamless-signature': sig } });
     expect((await get('sha256=bad')).statusCode).toBe(401);
+    expect((await get(sign(inbox.secret, ts, Buffer.alloc(0)))).json()).toEqual({ addresses: [] });   // default: off, stopped mail goes to the Bin
+    await app.inject({ method: 'PUT', url: `/api/push-inboxes/${inbox.token}`, headers: { cookie }, payload: { rejectStopped: true } });
     expect((await get(sign(inbox.secret, ts, Buffer.alloc(0)))).json()).toEqual({ addresses: [d.address] });
 
     const env: Env = { SEAMLESS_URL: 'https://mail.example.com', ROUTES: JSON.stringify({ 'push.test': 'TOK1' }), SECRETS: JSON.stringify({ TOK1: 's1' }) };
@@ -185,22 +186,23 @@ describe('Worker disposed list', () => {
 });
 
 describe('isolation', () => {
-  it('user B cannot see, change or dispose user A’s addresses; bulk ignores foreign ids', async () => {
+  it('user B cannot see, stop, keep or read user A’s addresses; bulk ignores foreign ids', async () => {
     const d = (await create()).json();
     await makeUser('b@local');
     const cookieB = await login(app, 'b@local');
     expect((await app.inject({ method: 'GET', url: '/api/disposable', headers: { cookie: cookieB } })).json()).toEqual({ addresses: [], domains: [] });
-    expect((await act(d.id, 'dispose', cookieB)).statusCode).toBe(404);
+    expect((await act(d.id, 'stop', cookieB)).statusCode).toBe(404);
+    expect((await act(d.id, 'keep-all', cookieB)).statusCode).toBe(404);
     expect((await app.inject({ method: 'GET', url: `/api/disposable/${d.id}/stats`, headers: { cookie: cookieB } })).statusCode).toBe(404);
     expect((await create({}, cookieB)).statusCode).toBe(400);   // B has no push domains
-    const bulk = await app.inject({ method: 'POST', url: '/api/disposable/bulk', headers: { cookie: cookieB }, payload: { ids: [d.id], action: 'dispose' } });
+    const bulk = await app.inject({ method: 'POST', url: '/api/disposable/bulk', headers: { cookie: cookieB }, payload: { ids: [d.id], action: 'stop' } });
     expect(bulk.json()).toEqual({ updated: 0 });
     expect((await one<any>('SELECT status FROM disposable_addresses WHERE id = ?', [d.id])).status).toBe('active');
   });
 
-  it('bulk dispose works on own addresses', async () => {
+  it('bulk stop works on own addresses', async () => {
     const a = (await create()).json(); const b = (await create()).json();
-    const r = await app.inject({ method: 'POST', url: '/api/disposable/bulk', headers: { cookie }, payload: { ids: [a.id, b.id], action: 'dispose' } });
+    const r = await app.inject({ method: 'POST', url: '/api/disposable/bulk', headers: { cookie }, payload: { ids: [a.id, b.id], action: 'stop' } });
     expect(r.json()).toEqual({ updated: 2 });
   });
 });

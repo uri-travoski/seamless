@@ -1639,6 +1639,21 @@ CREATE TABLE quarantined_mail (
 CREATE INDEX quarantined_mail_unknown ON quarantined_mail(unknown_id);
 `,
   },
+  {
+    id: 52,
+    // T10.2: paused + disposed become one status, `stopped`. Counters are kept; stopped_at/stopped_stored drive the
+    // Bin window (15 days / 100 mails) and the 6-month automatic cleanup. keep_all = "keep everything from this address".
+    sql: `
+ALTER TABLE disposable_addresses DROP CONSTRAINT IF EXISTS disposable_addresses_status_check;
+UPDATE disposable_addresses SET status = 'stopped' WHERE status IN ('paused','disposed');
+ALTER TABLE disposable_addresses ADD CONSTRAINT disposable_addresses_status_check CHECK (status IN ('active','stopped'));
+ALTER TABLE disposable_addresses ADD COLUMN stopped_at BIGINT;
+ALTER TABLE disposable_addresses ADD COLUMN stopped_stored INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE disposable_addresses ADD COLUMN keep_all BOOLEAN NOT NULL DEFAULT false;
+UPDATE disposable_addresses SET stopped_at = COALESCE(disposed_at, (extract(epoch from now()) * 1000)::bigint) WHERE status = 'stopped';
+ALTER TABLE push_inboxes ADD COLUMN reject_stopped BOOLEAN NOT NULL DEFAULT false;
+`,
+  },
 ];
 
 /** Run `fn` in one transaction. Events emitted through the client are only turned into

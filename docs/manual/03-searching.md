@@ -79,7 +79,7 @@ and **Attachments 5 MB+** (`has:attachment size>5mb`). Edit or delete them like 
 | **VIPs** | `is:vip` | The sender is on **your** VIP list (**Settings → Notifications → VIPs**). |
 | **High risk** | `risk:high` | The phishing checks flagged it ([Phishing](14-phishing.md)). |
 | **Unpaid invoices** | `label:Invoices is:unread` | Needs a label called **Invoices**; "unpaid" only means *unread*. |
-| **Disposable address mail** | `is:disposable` | Delivered to a [disposable address](16-disposable.md). |
+| **Disposable address mail** | `is:disposable` | Delivered to a [disposable address](16-disposable.md). Also `is:stopped` (the address is stopped) and `disposable:<part of the address>`. |
 
 ### Make your own
 

@@ -6,6 +6,7 @@ import { actions } from '../state/actions.ts';
 import { SnoozeList } from './SnoozeMenu.tsx';
 import { FollowupChoices } from './FollowupMenu.tsx';
 import { api } from '../api/client.ts';
+import { keepMessage, stopWithUndo } from './settings/DisposableSettings.tsx';
 import {
   ReplyIcon, ReplyAllIcon, ForwardIcon, EnvelopeIcon, EnvelopeOpenIcon, StarIcon, TagIcon, FolderIcon, JunkIcon,
   TrashIcon, ArchiveIcon, CaretRightIcon, CheckIcon, FilterIcon, SourceIcon, DownloadIcon, PrinterIcon, BlockIcon,
@@ -51,6 +52,8 @@ export function EmailMenuItems({ email, close }: { email: ApiEmail; close: () =>
       </>}
       {item(unread ? 'Mark as read' : 'Mark as unread', unread ? EnvelopeOpenIcon : EnvelopeIcon, () => actions.markRead(email.id, unread))}
       {item(starred ? 'Remove star' : 'Star', StarIcon, () => actions.star(email.id))}
+      {email.disposable && !email.disposable.kept && email.disposable.deleteAt && item('Keep (do not delete)', CheckIcon, () => void keepMessage(email.id, () => { void useMail.getState().refreshCurrent(); }))}
+      {email.disposable?.status === 'active' && item('Stop this address', BlockIcon, () => void stopWithUndo(email.disposable!.id, () => { void useMail.getState().refreshCurrent(); }))}
       {email.mailboxRole === 'inbox' && email.snoozeAllowed !== false && (
         <Sub label="Snooze" Icon={SnoozeIcon}>
           <SnoozeList onPick={(at) => { close(); void actions.snooze(email.id, at); }} />

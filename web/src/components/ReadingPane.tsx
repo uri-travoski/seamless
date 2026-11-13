@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { disposeWithUndo } from './settings/DisposableSettings.tsx';
+import { stopWithUndo, keepMessage, keepAllFrom } from './settings/DisposableSettings.tsx';
 import type { ApiEmail, ApiEmailBody } from '@seamless/shared';
 import { useMail } from '../state/mail.ts';
 import { AttachmentMatch } from './AttachmentMatch.tsx';
@@ -86,16 +86,26 @@ function HtmlBody({ html, fontSize, fontFamily, blockLinks = false }: { html: st
   return <iframe ref={ref} sandbox={blockLinks ? 'allow-same-origin' : 'allow-same-origin allow-popups'} srcDoc={doc} style={{ height }} title="Message" />;
 }
 
-/** Which disposable address this mail came in on, with a one-click Dispose (undo for 30 days). */
+/** Which disposable address this mail came in on: Stop / Start, and the one-week countdown with Keep. */
 function DisposableChip({ email }: { email: ApiEmail }) {
   const refreshCurrent = useMail((s) => s.refreshCurrent);
   const d = email.disposable;
   if (!d) return null;
+  const after = () => { void refreshCurrent(); };
+  const days = d.deleteAt ? Math.max(0, Math.ceil((d.deleteAt - Date.now()) / 86_400_000)) : null;
   return (
     <div className="disposable-chip" title={d.address}>
       <span className="chip">{d.label || d.address}</span>
-      <span className="dim"> {d.status === 'active' ? d.address : `${d.address} (${d.status})`}</span>{' '}
-      {d.status !== 'disposed' && <button className="btn ghost danger" onClick={() => void disposeWithUndo(d.id, () => { void refreshCurrent(); })}>Dispose</button>}
+      <span className="dim"> {d.status === 'active' ? d.address : `${d.address} (stopped)`}</span>{' '}
+      {d.status === 'active'
+        ? <button className="btn ghost danger" onClick={() => void stopWithUndo(d.id, after)}>Stop this address</button>
+        : <button className="btn ghost" onClick={() => void api.post(`/api/disposable/${d.id}/start`).then(after)}>Start</button>}
+      {days !== null && !d.kept && <>
+        {' '}<span className="dim">Deleted in {days === 0 ? 'less than a day' : `${days} day${days === 1 ? '' : 's'}`}</span>{' '}
+        <button className="btn ghost" onClick={() => void keepMessage(email.id, after)}>Keep</button>
+        <button className="btn ghost" onClick={() => void keepAllFrom(d.id, after)}>Keep all from this address</button>
+      </>}
+      {d.kept && <span className="dim"> Kept</span>}
     </div>
   );
 }

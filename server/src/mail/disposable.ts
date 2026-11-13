@@ -1,6 +1,7 @@
 /**
- * Disposable addresses (T3 F-25): aliases on a push-inbound / catch-all domain that can be paused,
- * disposed (mail dropped), expired and watched for leaks. Mail is matched by delivered-to / To.
+ * Disposable addresses (T3 F-25, reworked in T10.2): aliases on a push-inbound / catch-all domain that can be
+ * Stopped (mail goes to the Bin for 15 days / 100 mails, then is deleted on arrival) and Started again, whose mail
+ * is deleted after a week unless Kept, and that are watched for leaks. Mail is matched by delivered-to / To.
  */
 import { randomInt } from 'node:crypto';
 import { q, one, run, insertId, bumpState } from '../db.ts';
@@ -8,9 +9,10 @@ import { registerJob, enqueueJob } from '../jobs/runner.ts';
 import { emitEvent } from '../events/emit.ts';
 import { broadcast } from '../ws.ts';
 import { domainOf, registrable } from './risk.ts';
+import { getUserSetting } from '../classify/settings.ts';
 
-export const UNDO_WINDOW_MS = 30 * 86_400_000;
-export type DisposableStatus = 'active' | 'paused' | 'disposed';
+const DAY = 86_400_000;
+export type DisposableStatus = 'active' | 'stopped';
 export type Generator = 'random' | 'words' | 'prefix';
 
 export interface DisposableRow {
@@ -18,6 +20,7 @@ export interface DisposableRow {
   status: DisposableStatus; expires_at: string | null; forward_to_category: number | null; notify: boolean;
   received_count: number; dropped_count: number; last_received_at: string | null; last_sender: string;
   signup_domain: string | null; leak_domains: string[]; disposed_at: string | null; created_at: string;
+  stopped_at: string | null; stopped_stored: number; keep_all: boolean;
 }
 
 const WORDS = (
@@ -111,26 +114,46 @@ export async function updateDisposable(userId: number, id: number, p: { label?: 
   return getDisposable(userId, id);
 }
 
-export async function setStatus(userId: number, id: number, status: DisposableStatus): Promise<DisposableRow | null | undefined> {
+/** Stop: new mail goes to the Bin for `stop_bin_days` / `stop_cap`, then is deleted on arrival. Starts a fresh window. */
+export async function stopAddress(userId: number, id: number): Promise<DisposableRow | null | undefined> {
   const row = await getDisposable(userId, id);
   if (!row) return null;
-  if (status === 'disposed') {
-    if (row.status !== 'disposed') await run("UPDATE disposable_addresses SET status = 'disposed', disposed_at = ? WHERE id = ?", [Date.now(), id]);
-  } else if (row.status === 'disposed') {
-    // undispose: only within the undo window
-    if (!row.disposed_at || Date.now() - Number(row.disposed_at) > UNDO_WINDOW_MS) throw new Error('Too late to undo: addresses can be restored for 30 days');
-    await run("UPDATE disposable_addresses SET status = ?, disposed_at = NULL, expires_at = CASE WHEN expires_at < ? THEN NULL ELSE expires_at END WHERE id = ?", [status, Date.now(), id]);
-  } else {
-    await run('UPDATE disposable_addresses SET status = ? WHERE id = ?', [status, id]);
+  if (row.status !== 'stopped') {
+    await run("UPDATE disposable_addresses SET status = 'stopped', stopped_at = ?, stopped_stored = 0 WHERE id = ?", [Date.now(), id]);
   }
   await changed(userId);
   return getDisposable(userId, id);
 }
 
-export const pause = (u: number, id: number) => setStatus(u, id, 'paused');
-export const resume = (u: number, id: number) => setStatus(u, id, 'active');
-export const dispose = (u: number, id: number) => setStatus(u, id, 'disposed');
-export const undispose = (u: number, id: number) => setStatus(u, id, 'active');
+/** Start: back to normal delivery. Old Bin mail is not restored; stop again later = a new window and cap. */
+export async function startAddress(userId: number, id: number): Promise<DisposableRow | null | undefined> {
+  const row = await getDisposable(userId, id);
+  if (!row) return null;
+  if (row.status !== 'active') {
+    await run("UPDATE disposable_addresses SET status = 'active', stopped_at = NULL, stopped_stored = 0, disposed_at = NULL, expires_at = CASE WHEN expires_at < ? THEN NULL ELSE expires_at END WHERE id = ?", [Date.now(), id]);
+  }
+  await changed(userId);
+  return getDisposable(userId, id);
+}
+
+/** Keep one message from the one-week deletion (sets the protection, clears the countdown). */
+export async function keepMessage(userId: number, rowId: number): Promise<boolean> {
+  const r = await one<{ id: number }>(
+    "UPDATE messages SET keep_reason = 'kept by user', delete_at = NULL WHERE id = ? AND user_id = ? AND disposable_id IS NOT NULL RETURNING id", [rowId, userId]);
+  if (r) await changed(userId);
+  return !!r;
+}
+
+/** Keep everything from this address, including mail that arrives later. */
+export async function keepAllFrom(userId: number, id: number): Promise<number | null> {
+  const row = await getDisposable(userId, id);
+  if (!row) return null;
+  await run('UPDATE disposable_addresses SET keep_all = true WHERE id = ?', [id]);
+  const kept = await q<{ id: number }>(
+    "UPDATE messages SET keep_reason = 'kept by user', delete_at = NULL WHERE user_id = ? AND disposable_id = ? AND keep_reason IS NULL RETURNING id", [userId, id]);
+  await changed(userId);
+  return kept.length;
+}
 
 export async function stats(userId: number, id: number) {
   const row = await getDisposable(userId, id);
@@ -138,13 +161,15 @@ export async function stats(userId: number, id: number) {
   const senders = await q<{ domain: string; c: number }>(
     `SELECT lower(split_part(from_addr, '@', 2)) AS domain, COUNT(*)::int AS c FROM messages
      WHERE user_id = ? AND disposable_id = ? GROUP BY 1 ORDER BY c DESC LIMIT 10`, [userId, id]);
-  return { received: row.received_count, dropped: row.dropped_count, lastReceivedAt: row.last_received_at ? Number(row.last_received_at) : null,
+  return { received: row.received_count, lastReceivedAt: row.last_received_at ? Number(row.last_received_at) : null,
     signupDomain: row.signup_domain, leakDomains: row.leak_domains, senderDomains: senders };
 }
 
-/** Addresses the Worker should reject (signed GET). */
+/** Stopped addresses the Worker should reject at the door — only when the domain opted in ("Reject stopped addresses at the door"). */
 export async function disposedAddressesFor(accountId: number): Promise<string[]> {
-  return (await q<{ address: string }>("SELECT address FROM disposable_addresses WHERE account_id = ? AND status = 'disposed' ORDER BY address", [accountId])).map((r) => r.address);
+  const on = await one<{ reject_stopped: boolean }>('SELECT bool_or(reject_stopped) AS reject_stopped FROM push_inboxes WHERE account_id = ?', [accountId]);
+  if (!on?.reject_stopped) return [];
+  return (await q<{ address: string }>("SELECT address FROM disposable_addresses WHERE account_id = ? AND status = 'stopped' ORDER BY address", [accountId])).map((r) => r.address);
 }
 
 /** Find the disposable address (of this account) a message was sent to, trying candidates in order. */
@@ -156,12 +181,22 @@ export async function matchAddress(accountId: number, candidates: (string | null
   return null;
 }
 
-/** Endpoint pre-check for push mail: a disposed address is dropped before anything is stored. */
-export async function dropIfDisposed(accountId: number, candidates: (string | null | undefined)[]): Promise<boolean> {
+/**
+ * Endpoint pre-check for push mail to a stopped address. Returns true = delete on arrival (nothing stored, no counter,
+ * no event, no audit row): the Bin window (`stop_bin_days`) or cap (`stop_cap`) is used up. Otherwise the stored
+ * counter is reserved atomically and the mail continues into the Bin.
+ */
+export async function dropIfStopped(accountId: number, candidates: (string | null | undefined)[]): Promise<boolean> {
   const d = await matchAddress(accountId, candidates);
-  if (!d || d.status !== 'disposed') return false;
-  await run('UPDATE disposable_addresses SET dropped_count = dropped_count + 1 WHERE id = ?', [d.id]);
-  return true;
+  if (!d || d.status !== 'stopped') return false;
+  const days = Math.max(0, Number(await getUserSetting(d.user_id, 'stop_bin_days')) || 15);
+  const cap = Math.max(0, Number(await getUserSetting(d.user_id, 'stop_cap')) || 100);
+  const now = Date.now();
+  const ok = await one<{ id: number }>(
+    `UPDATE disposable_addresses SET stopped_stored = stopped_stored + 1
+     WHERE id = ? AND status = 'stopped' AND stopped_stored < ? AND COALESCE(stopped_at, 0) + ? > ? RETURNING id`,
+    [d.id, cap, days * DAY, now]);
+  return !ok;
 }
 
 /**
@@ -181,12 +216,11 @@ export async function applyOnIngest(args: {
              signup_domain = COALESCE(signup_domain, ?) WHERE id = ?`, [now, sender, registrable(domainOf(sender)) || null, d.id]);
   if (!args.isInbox) return { disposableId: d.id, quiet: true };
 
-  if (d.status !== 'active') {
-    const role = d.status === 'disposed' ? 'trash' : 'archive';
-    const target = await one<{ id: number }>('SELECT id FROM mailboxes WHERE account_id = ? AND role = ? ORDER BY id LIMIT 1', [args.accountId, role]);
+  if (d.status === 'stopped') {
+    // stopped: into the Bin, read, no notification; normal Trash retention applies
+    const target = await one<{ id: number }>("SELECT id FROM mailboxes WHERE account_id = ? AND role = 'trash' ORDER BY id LIMIT 1", [args.accountId]);
     if (target) {
-      await run('UPDATE messages SET mailbox_id = ?, uid = ?, unread = false WHERE id = ?', [target.id, -args.rowId, args.rowId]);
-      if (role === 'trash') await run('UPDATE messages SET trashed_at = ? WHERE id = ?', [now, args.rowId]);
+      await run('UPDATE messages SET mailbox_id = ?, uid = ?, unread = false, trashed_at = ? WHERE id = ?', [target.id, -args.rowId, now, args.rowId]);
       if (args.uid > 0) {
         const { enqueueOp } = await import('../imap/sync.ts');
         await enqueueOp(args.accountId, 'move', { mailboxId: args.mailboxId, uid: args.uid, targetMailboxId: target.id });
@@ -196,6 +230,11 @@ export async function applyOnIngest(args: {
     }
     return { disposableId: d.id, quiet: true };
   }
+
+  // one-week rule: the sweep moves it to the Bin at delete_at, unless the user keeps it
+  const expireDays = Math.min(90, Math.max(1, Number(await getUserSetting(args.userId, 'disposable_expire_days')) || 7));
+  if (d.keep_all) await run("UPDATE messages SET keep_reason = 'kept by user' WHERE id = ?", [args.rowId]);
+  else await run('UPDATE messages SET delete_at = ? WHERE id = ?', [now + expireDays * DAY, args.rowId]);
 
   // leak detection: mail from a registrable domain other than the one that first wrote to this address
   const reg = registrable(domainOf(sender));
@@ -212,13 +251,37 @@ export async function applyOnIngest(args: {
   return { disposableId: d.id, quiet: false };
 }
 
-/** Mark a stored address as expired now (idempotent): used by the job and tests. */
+/** Stop an address whose expiry time has come (idempotent): used by the job and tests. */
 export async function expireDue(id: number): Promise<boolean> {
   const row = await one<DisposableRow>('SELECT * FROM disposable_addresses WHERE id = ?', [id]);
-  if (!row || row.status === 'disposed' || !row.expires_at || Number(row.expires_at) > Date.now()) return false;
-  await run("UPDATE disposable_addresses SET status = 'disposed', disposed_at = ? WHERE id = ?", [Date.now(), id]);
+  if (!row || row.status === 'stopped' || !row.expires_at || Number(row.expires_at) > Date.now()) return false;
+  await run("UPDATE disposable_addresses SET status = 'stopped', stopped_at = ?, stopped_stored = 0 WHERE id = ?", [Date.now(), id]);
   await changed(row.user_id);
   return true;
 }
 
 registerJob('disposable.expire', async (job) => { await expireDue(Number(job.payload?.id)); });
+
+/**
+ * Automatic cleanup (no manual delete button): addresses stopped for more than `stopped_delete_days` (default 183,
+ * 0 = never) are removed with their leftover Bin mail. A deleted address that gets mail again is an unknown address.
+ */
+export async function cleanupStopped(now = Date.now()): Promise<number> {
+  let removed = 0;
+  for (const u of await q<{ id: number }>('SELECT id FROM users')) {
+    const days = Number(await getUserSetting(u.id, 'stopped_delete_days'));
+    if (!(days > 0)) continue;
+    const old = await q<{ id: number }>("SELECT id FROM disposable_addresses WHERE user_id = ? AND status = 'stopped' AND stopped_at IS NOT NULL AND stopped_at < ?", [u.id, now - days * DAY]);
+    if (old.length === 0) continue;
+    const { destroyEmail } = await import('./store.ts');
+    for (const a of old) {
+      const bin = await q<{ id: number }>(
+        "SELECT m.id FROM messages m JOIN mailboxes mb ON mb.id = m.mailbox_id WHERE m.disposable_id = ? AND mb.role = 'trash'", [a.id]);
+      for (const m of bin) await destroyEmail(u.id, `m${m.id}`).catch((e) => console.error('[disposable] cleanup:', e?.message ?? e));
+      await run('DELETE FROM disposable_addresses WHERE id = ?', [a.id]);
+      removed++;
+    }
+    await changed(u.id);
+  }
+  return removed;
+}

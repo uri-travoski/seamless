@@ -8,6 +8,10 @@ export const SETTING_DEFAULTS: Record<string, string> = {
   undo_send_seconds: '10',      // T2 F-17: hold a sent message this long so it can be undone
   snooze_wake_on_reply: 'true', // T2 F-18
   vip_bypass_quiet: 'true',     // T4 F-35: VIP mail notifies even in quiet hours
+  stop_bin_days: '15',          // T10.2: a stopped address keeps its mail in the Bin this long …
+  stop_cap: '100',              // … or until this many mails, whichever comes first; then mail is deleted on arrival
+  disposable_expire_days: '7',  // T10.2: mail on a disposable address is deleted after this many days unless kept
+  stopped_delete_days: '183',   // T10.2: addresses stopped this long are removed automatically (0 = never)
   log_retention_days: '90',     // auto-clear processing logs
 };
 

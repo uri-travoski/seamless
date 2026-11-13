@@ -1,4 +1,4 @@
-/** Settings → Disposable (T3 F-25): aliases on your own domain that you can pause, dispose or let expire. */
+/** Settings → Disposable (T3 F-25, T10.2): aliases on your own domain that you can Stop / Start; their mail is deleted after a week unless kept. */
 import { useCallback, useEffect, useState } from 'react';
 import type { ApiDisposable } from '@seamless/shared';
 import { api } from '../../api/client.ts';
@@ -13,13 +13,21 @@ export async function createDisposableAddress(o: { domain: string; generator?: s
   return api.post<ApiDisposable>('/api/disposable', o);
 }
 
-/** Dispose with a toast that undoes it (works for 30 days from the table too). */
-export async function disposeWithUndo(id: number, after?: () => void): Promise<void> {
+/** Stop with a toast whose Undo starts the address again. */
+export async function stopWithUndo(id: number, after?: () => void): Promise<void> {
   try {
-    await api.post(`/api/disposable/${id}/dispose`);
+    await api.post(`/api/disposable/${id}/stop`);
     after?.();
-    undoToast('Address disposed — new mail to it is dropped', () => { void api.post(`/api/disposable/${id}/undispose`).then(() => { toast('Address restored'); after?.(); }, () => toast('Could not restore', 'error')); });
-  } catch (e: any) { toast(e?.message ?? 'Could not dispose', 'error'); }
+    undoToast('Address stopped — new mail goes to the Bin for a while, then is deleted', () => { void api.post(`/api/disposable/${id}/start`).then(() => { toast('Address started'); after?.(); }, () => toast('Could not start it again', 'error')); });
+  } catch (e: any) { toast(e?.message ?? 'Could not stop', 'error'); }
+}
+
+/** Keep one message (or all mail from an address) so the one-week rule leaves it alone. */
+export async function keepMessage(id: number | string, after?: () => void): Promise<void> {
+  try { await api.post(`/api/messages/${id.toString().replace(/^m/, '')}/keep`); toast('Kept — it will not be deleted'); after?.(); } catch (e: any) { toast(e?.message ?? 'Could not keep it', 'error'); }
+}
+export async function keepAllFrom(id: number, after?: () => void): Promise<void> {
+  try { const r = await api.post<{ kept: number }>(`/api/disposable/${id}/keep-all`); toast(`Kept ${r.kept} message${r.kept === 1 ? '' : 's'}, and everything new from this address`); after?.(); } catch (e: any) { toast(e?.message ?? 'Could not keep', 'error'); }
 }
 
 export function NewAddressForm({ domains, onCreated, onCancel }: { domains: Domain[]; onCreated: (d: ApiDisposable) => void; onCancel?: () => void }) {
@@ -64,6 +72,30 @@ export function NewAddressForm({ domains, onCreated, onCancel }: { domains: Doma
 
 const when = (t: number | null) => (t ? new Date(t).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' }) : '—');
 
+interface Rules { stopBinDays: number; stopCap: number; expireDays: number; stoppedDeleteDays: number }
+
+function RulesCard() {
+  const [r, setR] = useState<Rules | null>(null);
+  useEffect(() => { void api.get<Rules>('/api/disposable/settings').then(setR).catch(() => {}); }, []);
+  const save = async (patch: Partial<Rules>) => {
+    try { setR(await api.put<Rules>('/api/disposable/settings', patch)); toast('Saved'); } catch (e: any) { toast(e?.message ?? 'Could not save', 'error'); }
+  };
+  if (!r) return null;
+  const num = (k: keyof Rules, min: number, max: number) => (
+    <input className="text-input" type="number" min={min} max={max} style={{ width: 70 }} defaultValue={r[k]} key={`${k}${r[k]}`}
+      onBlur={(e) => { const v = Number(e.target.value); if (v !== r[k]) void save({ [k]: v }); }} />
+  );
+  return (
+    <div className="dns-panel" style={{ marginBottom: 12 }}>
+      <p className="settings-desc" style={{ margin: 0 }}>
+        Mail on a disposable address is deleted after {num('expireDays', 1, 90)} days unless you press <b>Keep</b>. A stopped address keeps new mail in the Bin
+        for {num('stopBinDays', 1, 365)} days or {num('stopCap', 1, 10000)} mails (whichever comes first), then deletes it on arrival.
+        Addresses stopped for more than {num('stoppedDeleteDays', 0, 3650)} days are removed automatically (0 = never).
+      </p>
+    </div>
+  );
+}
+
 export default function DisposableSettings() {
   const [data, setData] = useState<Listing | null>(null);
   const [adding, setAdding] = useState(false);
@@ -83,13 +115,13 @@ export default function DisposableSettings() {
   return (
     <div>
       <h2>Disposable addresses</h2>
-      <p className="settings-desc">Give each sign-up its own address on your domain. Pause it to hold mail quietly, dispose it to stop it for good (you can undo for 30 days). If a different company starts writing to an address, you get a leak alert.</p>
+      <p className="settings-desc">Give each sign-up its own address on your domain. Mail to it is deleted after a week unless you keep it. Stop an address when you are done with it; start it again any time. If a different company starts writing to an address, you get a leak alert. Replies are always sent from your normal address.</p>
+      <RulesCard />
       <div className="row" style={{ gap: 8, marginBottom: 12 }}>
         <button className="btn primary" onClick={() => setAdding(true)}>+ New address</button>
         {sel.size > 0 && <>
-          <button className="btn" onClick={() => void bulk('dispose')}>Dispose {sel.size}</button>
-          <button className="btn ghost" onClick={() => void bulk('pause')}>Pause</button>
-          <button className="btn ghost" onClick={() => void bulk('resume')}>Resume</button>
+          <button className="btn" onClick={() => void bulk('stop')}>Stop {sel.size}</button>
+          <button className="btn ghost" onClick={() => void bulk('start')}>Start</button>
         </>}
       </div>
       {adding && data && <NewAddressForm domains={data.domains} onCancel={() => setAdding(false)} onCreated={() => { setAdding(false); void load(); }} />}
@@ -103,16 +135,16 @@ export default function DisposableSettings() {
                 <td><input type="checkbox" checked={sel.has(a.id)} onChange={() => toggle(a.id)} aria-label={`Select ${a.address}`} /></td>
                 <td><code>{a.address}</code></td>
                 <td>{a.label || '—'}{a.leakDomains.length > 0 && <span title={`Also written to by ${a.leakDomains.join(', ')}`}> ⚠ leaked?</span>}</td>
-                <td>{a.status}</td>
-                <td title={`${a.droppedCount} dropped`}>{a.receivedCount}</td>
+                <td title={a.status === 'stopped' ? `${a.stoppedStored} mail${a.stoppedStored === 1 ? '' : 's'} in the Bin since it was stopped` : undefined}>{a.status === 'stopped' ? `stopped ${when(a.stoppedAt)}` : 'active'}</td>
+                <td>{a.receivedCount}</td>
                 <td>{a.lastSender || '—'}</td>
-                <td>{a.status === 'disposed' ? `disposed ${when(a.disposedAt)}` : when(a.expiresAt)}</td>
+                <td>{when(a.expiresAt)}</td>
                 <td style={{ whiteSpace: 'nowrap' }}>
                   <button className="btn ghost" onClick={() => navigate({ page: 'mail', scope: 'unified', folder: 'inbox', q: `disposable:${a.id}` })}>Mail</button>
-                  {a.status === 'active' && <button className="btn ghost" onClick={() => void act(a.id, 'pause')}>Pause</button>}
-                  {a.status === 'paused' && <button className="btn ghost" onClick={() => void act(a.id, 'resume')}>Resume</button>}
-                  {a.status !== 'disposed' && <button className="btn ghost danger" onClick={() => void disposeWithUndo(a.id, load)}>Dispose</button>}
-                  {a.canUndo && <button className="btn ghost" onClick={() => void act(a.id, 'undispose')}>Undo</button>}
+                  {a.status === 'active'
+                    ? <button className="btn ghost danger" onClick={() => void stopWithUndo(a.id, load)}>Stop</button>
+                    : <button className="btn ghost" onClick={() => void act(a.id, 'start')}>Start</button>}
+                  <button className="btn ghost" title="Never delete mail from this address" disabled={a.keepAll} onClick={() => void keepAllFrom(a.id, load)}>{a.keepAll ? 'Keeping all' : 'Keep all'}</button>
                 </td>
               </tr>
             ))}

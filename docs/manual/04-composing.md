@@ -5,7 +5,7 @@ Click **Compose** (or **Reply** / **Forward** on an open message). Compose windo
 ## From, recipients, subject
 
 - **From** — pick which account and identity to send as. If the account has **aliases**, they appear here too.
-- When you **reply**, Seamless automatically picks the identity the message was delivered to (Delivered-To, then To/Cc), so you answer from the right address.
+- When you **reply**, Seamless automatically picks the identity the message was delivered to (Delivered-To, then To/Cc), so you answer from the right address. Mail that arrived on a [disposable address](16-disposable.md) is answered from your normal identity, with a one-line warning ("This reply will come from …, not the disposable one"); disposable addresses are not in the From list.
 - **To / Cc / Bcc** — start typing to autocomplete from your addressbook: names, emails and organisations match, ranked by how often and how recently you have contacted someone. Press Tab, Enter or comma to take a suggestion, paste a whole list (`Name <a@b.com>, c@d.com`), or type a group name to add everyone in it. An address you have never used that looks like a known contact's (a typo) turns amber. People you send to are saved to your contacts automatically, with an Undo — see [Contacts](32-contacts.md). Click **Cc / Bcc** to reveal those fields.
 
 ## The editor

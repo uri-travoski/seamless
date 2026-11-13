@@ -68,9 +68,13 @@ export const AUDITED_ROUTES: Record<string, RouteAudit> = {
   'PUT /api/accounts/:id/shares': r('share.grant', 'account'),
   'DELETE /api/accounts/:id/shares/:userId': r('share.revoke', 'account'),
   // disposable addresses
-  'POST /api/disposable/:id/dispose': r('disposable.dispose', 'disposable'),
-  'POST /api/disposable/:id/undispose': r('disposable.undispose', 'disposable'),
+  'POST /api/catchall/unknown/:id/block': r('disposable.block', 'unknown_address'),
+  'POST /api/disposable/:id/stop': r('disposable.stop', 'disposable'),
+  'POST /api/disposable/:id/start': r('disposable.start', 'disposable'),
+  'POST /api/disposable/:id/keep-all': r('disposable.keep_all', 'disposable'),
   'POST /api/disposable/bulk': r('disposable.bulk', 'disposable'),
+  'POST /api/messages/:id/keep': r('message.keep', 'message'),
+  'POST /api/messages/keep': r('message.keep_bulk', 'message'),
   // keys + certificates, newsletters, indexing
   'POST /api/pgp/keys/generate': r('pgp.key_generate', 'pgp_key'),
   'POST /api/pgp/keys/import': r('pgp.key_import', 'pgp_key'),

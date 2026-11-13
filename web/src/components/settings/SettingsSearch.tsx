@@ -14,7 +14,7 @@ const ENTRIES: Omit<SettingsEntry, 'tabName'>[] = [
   { label: 'Mailbox "Send through" provider', tab: 'mailboxes', words: 'smtp relay outgoing' },
   { label: 'Share a mailbox', tab: 'mailboxes', words: 'shared inbox team role' },
   { label: 'Businesses, identities, signatures', tab: 'businesses', words: 'brand logo disclaimer from address' },
-  { label: 'Disposable addresses', tab: 'disposable', words: 'alias burner dispose leak' },
+  { label: 'Disposable addresses', tab: 'disposable', words: 'alias burner disposable stop start keep catch-all catchall leak expire week unknown address' },
   { label: 'Sending providers (SendGrid, Brevo, SES, Mailgun, Postmark)', tab: 'sending', words: 'smtp api bounce dns spf dkim dmarc' },
   { label: 'Labels and colours', tab: 'labels', words: 'tags categories' },
   { label: 'Templates / quick replies', tab: 'templates', words: 'canned replies snippets' },

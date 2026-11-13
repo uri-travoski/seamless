@@ -42,7 +42,7 @@ export function register(app: FastifyInstance): void {
       `SELECT p.*, a.email FROM push_inboxes p JOIN accounts a ON a.id = p.account_id WHERE a.user_id = ? ORDER BY p.created_at`, [userId]);
     const domains = inboxes.flatMap((p) => p.domains.map((d) => ({
       domain: d, token: p.token, via: p.source_account_id != null ? 'catchall' : 'cloudflare',
-      policy: normalizePolicy(p.domain_policies?.[d] ?? p.unknown_policy),
+      policy: normalizePolicy(p.domain_policies?.[d] ?? p.unknown_policy), rejectStopped: !!p.reject_stopped,
     })));
     const unknown = (await listUnknown(userId)).map((u) => ({
       id: u.id, address: u.address, domain: u.domain, status: u.status, receivedCount: u.received_count, droppedCount: u.dropped_count,

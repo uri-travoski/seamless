@@ -154,7 +154,7 @@ export interface ApiEmail {
   /** T6.2: set client-side from the query response ('Matched in invoice.pdf: …'). */
   attachmentMatch?: { filename: string; snippet: string } | null;
   bounced: { recipient: string; status: string; diagnostic: string }[] | null; // T3 F-22: delivery failed for these
-  disposable: { id: number; address: string; label: string; status: 'active' | 'paused' | 'disposed' } | null; // T3 F-25
+  disposable: { id: number; address: string; label: string; status: 'active' | 'stopped'; kept: boolean; deleteAt: number | null } | null; // T3 F-25
 }
 
 export interface ApiAttachmentMeta {
@@ -585,10 +585,10 @@ export interface TransportTestResult {
 // ---- disposable addresses (T3 F-25) ----
 export interface ApiDisposable {
   id: number; accountId: number; address: string; label: string; purpose: string;
-  status: 'active' | 'paused' | 'disposed'; expiresAt: number | null; notify: boolean;
-  receivedCount: number; droppedCount: number; lastReceivedAt: number | null; lastSender: string;
-  signupDomain: string | null; leakDomains: string[]; disposedAt: number | null; createdAt: number;
-  canUndo: boolean;
+  status: 'active' | 'stopped'; expiresAt: number | null; notify: boolean;
+  receivedCount: number; lastReceivedAt: number | null; lastSender: string;
+  signupDomain: string | null; leakDomains: string[]; createdAt: number;
+  stoppedAt: number | null; stoppedStored: number; keepAll: boolean;
 }
 
 // ---- shared inbox workflow (T4 F-32) ----

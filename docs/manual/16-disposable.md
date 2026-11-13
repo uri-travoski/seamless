@@ -39,29 +39,48 @@ Each domain has a policy (Settings → Disposable → *Where disposable mail arr
 - **Settings → Disposable → + New address**, or **Disposable addresses… + New address** at the bottom of the top-right mailbox switcher.
 - Pick the domain, a style (random `k7f2q9`, two words `quiet.river`, or your own prefix `bunnings.x7`), a label, and an expiry
   (1 day / 7 days / 30 days / never). The address is copied for you.
-- In **Compose**, *Use a disposable address* next to From creates one and sends from it.
+- Disposable addresses are for **receiving only**. There is no "send from a disposable address" any more (see *Replying*).
 
 ## What happens to mail
 | Status | Mail sent to it |
 | --- | --- |
-| Active | Delivered to the Inbox with a chip showing the label; counted. You get a "mail to a disposable address" notification (switch it off per type in Settings → Notifications). |
-| Paused | Stored, marked read and filed in Archive. No notification. *Resume* turns delivery back on. |
-| Disposed | Dropped (the Cloudflare Worker refuses it at SMTP time; Seamless also drops it on arrival). Only a counter is kept. |
+| Active | Delivered to the Inbox with a chip showing the label; counted. You get a "mail to a disposable address" notification (switch it off per type in Settings → Notifications). **Deleted after a week** unless you keep it (below). |
+| Stopped | Goes to the **Bin**, marked read, with no notification and no Inbox entry — but only while **both** limits hold: fewer than **100** mails stored and less than **15 days** since you pressed Stop. Whichever comes first ends it; from then on mail is **deleted on arrival** (nothing stored, nothing counted, nothing logged). Bin mail is emptied by the normal [Trash retention](27-trash-retention.md). |
 
-Find an address's mail with the search `disposable:<id>` (the **Mail** button in the table), or all of it with `is:disposable`.
+Stop and Start replace the old Pause, Resume, Dispose and Undo. **Start** delivers to the Inbox again but does not bring old Bin mail back by
+itself (restore it from the Bin if you want it). **Stop** again later begins a fresh 15 days and a fresh 100. If the domain is on the Cloudflare route
+you can tick **Reject at the door** (Settings → Disposable → *Where disposable mail arrives*): the Worker then refuses mail to a stopped address at SMTP
+time and nothing is stored at all (off by default).
 
-## Dispose and undo
-Open a message that came in on a disposable address and press **Dispose** next to its chip. An *Undo* toast appears, and you can
-restore the address from the table for **30 days**. Tick several rows to dispose, pause or resume in bulk. An address with an
-expiry is disposed automatically when the time comes.
+Find an address's mail with the search `disposable:<address or part of it>` (or `disposable:<id>`; the **Mail** button in the table), all of it with
+`is:disposable`, and mail that came to a stopped address with `is:stopped`.
+
+## Stop and Start
+- In the reading pane, next to the address chip: **Stop this address** (an *Undo* toast starts it again). A stopped address shows **Start**.
+- Right-click a message in the list (or ⋮ → More): **Stop this address**.
+- **Settings → Disposable**: a Stop / Start button per row; tick several rows to stop or start in bulk. An address with an expiry is stopped automatically
+  when the time comes.
+
+## The one-week rule and Keep
+Every message that arrives on an active disposable address is **deleted after 7 days** (change it in Settings → Disposable, 1–90 days): the daily
+sweep moves it to the Bin, and the Bin empties as usual. The message shows **Deleted in 3 days** with a **Keep** button, in the reading pane and in the
+list row; right-click → **Keep** works too. **Keep** protects that one message for good. **Keep all from this address** (reading pane, or the table) keeps everything
+already received and everything that arrives later. This rule is not affected by *Dry run* in the Trash settings. There is no digest or reminder
+email about expiring mail — only the countdown on the message.
+
+## Automatic cleanup
+There is no "Delete address" button. Addresses that have been **stopped for more than 6 months** (183 days; change it or enter 0 for never) are removed
+automatically, together with the mail of theirs that is still in the Bin and their leak-alert state. If mail arrives for a deleted address later, it is
+handled as an unknown address (see below). Settings → Disposable shows this rule in one line.
 
 ## Leak alerts
 The first sender's domain is remembered as the one you signed up with. When mail arrives from a **different** company's domain you get
-a "may have been leaked" notification, once per domain. The table shows ⚠ next to such addresses.
+a "may have been leaked" notification, once per domain. The table shows ⚠ next to such addresses. Leak alerts only read incoming mail, so they are unaffected by Stop.
 
 ## Replying
-An active disposable address is one of your From identities. Replying to mail sent to it uses the disposable address as From and
-goes out through the mailbox's sending provider, so your real address is never shown.
+Seamless never sends *from* a disposable address. If you reply to mail that arrived on one, the reply uses your normal identity (your default mailbox) and a one-line
+warning shows above the message: "This reply will come from <your address>, not the disposable one". Use the From picker if you want a different identity.
+Stop, Start, Keep and Block are written to the [audit log](22-audit-log.md).
 
 ## Unknown addresses
 See *Mail to an address you have not created* above. The policy used to be settable only through the API (`PUT /api/push-inboxes/<token>`); it now has a screen, and `reject` is shown as *Drop it*.

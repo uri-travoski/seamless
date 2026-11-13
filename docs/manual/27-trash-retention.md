@@ -60,3 +60,8 @@ The [audit log](22-audit-log.md) is kept for **730 days** (two years) by default
 - Logs: the sweep's decisions are in **Settings → Logs** until they age out.
 - Opening a message and choosing **keep** (or starring it) cancels its countdown.
 - There is no separate "Empty Bin" button: select the messages in the Bin and delete them, or wait for the grace period.
+
+## Disposable-address mail (T10.2)
+Mail on a [disposable address](16-disposable.md) has its own clock: it is moved to the Bin 7 days after arrival (setting in Settings → Disposable) unless you press **Keep**.
+This move ignores *Dry run*, because you chose the rule on the address itself. Mail to a **stopped** address is filed straight into the Bin (up to 100 mails or 15 days
+after Stop); it is then emptied by the normal *Empty Trash after* rule above, which *is* held back by Dry run.

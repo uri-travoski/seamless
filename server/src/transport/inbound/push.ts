@@ -8,7 +8,7 @@ import { one, run } from '../../db.ts';
 import { encrypt, decrypt, randomToken, sha256 } from '../../crypto.ts';
 import { ingestLocal } from '../../mail/localbox.ts';
 import { syncManager, type NewMailEvent } from '../../imap/sync.ts';
-import { dropIfDisposed, matchAddress, clean } from '../../mail/disposable.ts';
+import { dropIfStopped, matchAddress, clean } from '../../mail/disposable.ts';
 import { simpleParser } from 'mailparser';
 import { normalizePolicy, isBlockedAddress, countDropped, quarantineMail, NO_ADDRESS } from '../../mail/unknown.ts';
 
@@ -29,7 +29,7 @@ export function signatureValid(secret: string, timestamp: string, signature: str
 
 export interface PushInboxRow {
   token: string; account_id: number; secret_enc: string; domains: string[]; catch_all: boolean;
-  unknown_policy: string; domain_policies: Record<string, string>; source_account_id: number | null; created_at: string;
+  unknown_policy: string; reject_stopped?: boolean; domain_policies: Record<string, string>; source_account_id: number | null; created_at: string;
 }
 
 export const getInbox = (token: string) => one<PushInboxRow>('SELECT * FROM push_inboxes WHERE token = ?', [token]);
@@ -55,14 +55,14 @@ export type IngestOutcome = { status: 202; id: number } | { status: 200; dropped
 /** Store one pushed message (already authenticated). Duplicate = same Message-ID + same bytes. */
 export async function ingestPush(inbox: PushInboxRow, raw: Buffer, rcpt: string | null): Promise<IngestOutcome> {
   assertLive('receiving mail');   // nothing is stored in Viewing mode
-  // disposable addresses: a disposed one is dropped (and counted) before anything is stored
+  // disposable addresses: a stopped one past its Bin window / cap is deleted on arrival (nothing stored, nothing counted)
   const candidates = [rcpt];
   if (!rcpt) {
     const p = await simpleParser(raw.subarray(0, 65536)).catch(() => null);
     const h = (n: string) => { const v = p?.headers.get(n) as any; return typeof v === 'string' ? v : v?.text ?? null; };
     candidates.push(h('delivered-to'), h('x-original-to'), ...((Array.isArray(p?.to) ? p!.to : p?.to ? [p.to] : []).flatMap((a: any) => a.value.map((v: any) => v.address))));
   }
-  if (await dropIfDisposed(inbox.account_id, candidates)) return { status: 200, dropped: true, reason: 'disposed' };
+  if (await dropIfStopped(inbox.account_id, candidates)) return { status: 200, dropped: true, reason: 'disposed' };
   // an address on one of this inbox's domains that is neither the mailbox nor a disposable address: per-domain policy
   const viaCatchAll = inbox.source_account_id != null;
   const addr = rcpt ? clean(rcpt) : '';

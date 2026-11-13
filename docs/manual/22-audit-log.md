@@ -14,7 +14,7 @@ everyone else sees only their own.
 | Automation | rule and filter created / changed / deleted / run, suggestions accepted |
 | Integrations | webhook created / changed / deleted / secret rotated, allow-list changes, API token created / deleted |
 | Sharing | mailbox share granted / revoked |
-| Mail | bulk delete of more than 50 messages, disposable address disposed |
+| Mail | bulk delete of more than 50 messages, disposable address stopped / started / kept / blocked |
 | Encryption | PGP key generated / imported / deleted, S/MIME certificate imported / deleted |
 | Other | newsletter unsubscribe, attachment re-index started, audit export, retention change |
 | API | one `api.call` entry per REST v1 call (route and status, never the data) |

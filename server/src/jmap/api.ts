@@ -37,9 +37,6 @@ export async function listIdentities(userId: number): Promise<ApiIdentity[]> {
         replyTo: r.reply_to, bccSelf: r.bcc_self, transportId: r.transport_id,
       });
     }
-    for (const d of await q<{ address: string }>("SELECT address FROM disposable_addresses WHERE account_id = ? AND status = 'active' ORDER BY id", [a.id])) {
-      out.push({ accountId: a.id, email: d.address, name: a.name, isAlias: true });
-    }
   }
   return out;
 }

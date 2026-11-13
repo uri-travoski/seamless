@@ -15,7 +15,7 @@ const DOMAIN_RE = /^(?=.{1,253}$)([a-z0-9]([a-z0-9-]*[a-z0-9])?\.)+[a-z]{2,}$/;
 function view(r: PushInboxRow & { email: string; name: string }) {
   return {
     token: r.token, accountId: r.account_id, email: r.email, name: r.name, domains: r.domains,
-    catchAll: r.catch_all, unknownPolicy: r.unknown_policy, domainPolicies: r.domain_policies ?? {}, viaCatchAllMailbox: r.source_account_id != null, createdAt: Number(r.created_at),
+    catchAll: r.catch_all, unknownPolicy: r.unknown_policy, rejectStopped: !!r.reject_stopped, domainPolicies: r.domain_policies ?? {}, viaCatchAllMailbox: r.source_account_id != null, createdAt: Number(r.created_at),
     endpoint: `${config.publicUrl}/api/ingest/${r.token}`,
   };
 }
@@ -61,9 +61,10 @@ export function register(app: FastifyInstance): void {
   app.put('/api/push-inboxes/:token', async (req, reply) => {
     const row = await mine(uid(req), String((req.params as any).token));
     if (!row) return reply.code(404).send({ error: 'not found' });
-    const b = (req.body ?? {}) as { unknownPolicy?: string; domainPolicies?: Record<string, string> };
+    const b = (req.body ?? {}) as { unknownPolicy?: string; domainPolicies?: Record<string, string>; rejectStopped?: boolean };
     const ok = ['deliver', 'reject', 'drop', 'quarantine'];
-    if (b.unknownPolicy === undefined && b.domainPolicies === undefined) return reply.code(400).send({ error: 'unknownPolicy or domainPolicies required' });
+    if (b.unknownPolicy === undefined && b.domainPolicies === undefined && b.rejectStopped === undefined) return reply.code(400).send({ error: 'unknownPolicy, domainPolicies or rejectStopped required' });
+    if (b.rejectStopped !== undefined) await run('UPDATE push_inboxes SET reject_stopped = ? WHERE token = ?', [!!b.rejectStopped, row.token]);
     if (b.unknownPolicy !== undefined) {
       if (!ok.includes(b.unknownPolicy)) return reply.code(400).send({ error: 'unknownPolicy must be quarantine, deliver or drop' });
       await run('UPDATE push_inboxes SET unknown_policy = ? WHERE token = ?', [b.unknownPolicy, row.token]);

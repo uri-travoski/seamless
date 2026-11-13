@@ -19,6 +19,7 @@ export interface Draft {
   attachments: { id: string; filename: string; size: number }[];
   track: boolean;
   perRecipientTracking: boolean;
+  replyNotice?: string;        // T10.2: the mail came to a disposable address; the reply comes from the real identity
   followupDays?: number;       // T2 F-19: remind me if no reply in N days
   pgpSign?: boolean;           // T6.4 F-39
   pgpEncrypt?: boolean;
@@ -155,7 +156,8 @@ export const useCompose = create<ComposeState>((set, get) => ({
 
   openReply: async (email, mode, template) => {
     let identity: ApiIdentity | null = null;
-    try { identity = await matchIdentity(email.id); } catch { identity = get().identities[0] ?? null; }
+    let viaDisposable: string | undefined;
+    try { const m = await matchIdentity(email.id); identity = m; viaDisposable = m.viaDisposable; } catch { identity = get().identities[0] ?? null; }
     const own = new Set<string>();
     for (const i of get().identities) own.add(i.email.toLowerCase());
 
@@ -215,6 +217,7 @@ export const useCompose = create<ComposeState>((set, get) => ({
         initialHtml: html,
         inReplyTo: mode === 'forward' ? undefined : email.messageId ?? undefined,
         replyToEmailId: mode === 'forward' ? undefined : email.id,
+        replyNotice: viaDisposable && identity ? `This reply will come from ${identity.email}, not the disposable one (${viaDisposable}). Pick another identity above if you prefer.` : undefined,
         attachments: [],
         track: useSession.getState().settings.trackByDefault,
         perRecipientTracking: useSession.getState().settings.perRecipientTracking,

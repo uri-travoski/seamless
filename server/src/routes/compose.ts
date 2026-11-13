@@ -102,24 +102,30 @@ export function register(app: FastifyInstance): void {
     const { emailId } = req.body as { emailId: string };
     const row = await getMsgRow(uid(req), emailId);
     if (!row) return reply.code(404).send({ error: 'not found' });
-    const disposables = await q<{ account_id: number; address: string }>(
-      "SELECT account_id, address FROM disposable_addresses WHERE user_id = ? AND status = 'active'", [uid(req)]);
     const accounts = (await q<any>('SELECT id, name, email, aliases FROM accounts WHERE user_id = ? AND enabled = true AND catchall = false', [uid(req)])).map((a) => ({
       accountId: a.id, email: a.email, name: a.name,
-      aliases: [...JSON.parse(a.aliases), ...disposables.filter((d) => d.account_id === a.id).map((d) => d.address)] as string[],
+      aliases: JSON.parse(a.aliases) as string[],
     }));
     if (accounts.length === 0) return reply.code(400).send({ error: 'no accounts' });
+    // mail that arrived on a disposable address is answered from a normal identity (nothing is sent from a disposable address)
+    const viaDisposable = row.disposable_id ? await one<{ address: string }>('SELECT address FROM disposable_addresses WHERE id = ? AND user_id = ?', [row.disposable_id, uid(req)]) : null;
+    if (viaDisposable) {   // the hidden catch-all destination mailbox can't send: reply from one of the user's real mailboxes
+      const dest = new Set((await q<{ account_id: number }>('SELECT account_id FROM push_inboxes WHERE source_account_id IS NOT NULL')).map((r) => r.account_id));
+      const real = accounts.filter((a) => !dest.has(a.accountId));
+      if (real.length) accounts.splice(0, accounts.length, ...real);
+    }
     const match = matchReplyIdentity({
-      deliveredTo: row.delivered_to,
-      to: JSON.parse(row.to_json),
-      cc: JSON.parse(row.cc_json),
+      deliveredTo: viaDisposable ? null : row.delivered_to,
+      to: viaDisposable ? [] : JSON.parse(row.to_json),
+      cc: viaDisposable ? [] : JSON.parse(row.cc_json),
       owningAccountId: row.account_id,
       accounts,
     });
-    // attach the identity record (business, signature, reply-to …); disposable addresses have none
+    // attach the identity record (business, signature, reply-to …)
     const ident = await one<any>('SELECT * FROM identities WHERE user_id = ? AND account_id = ? AND lower(email) = lower(?)', [uid(req), match.accountId, match.email]);
-    if (!ident) return match;
-    return { ...match, name: ident.display_name, id: ident.id, businessId: ident.business_id, isDefault: ident.is_default,
+    const via = viaDisposable ? { viaDisposable: viaDisposable.address } : {};
+    if (!ident) return { ...match, ...via };
+    return { ...match, ...via, name: ident.display_name, id: ident.id, businessId: ident.business_id, isDefault: ident.is_default,
       signatureHtml: ident.signature_html, replyTo: ident.reply_to, bccSelf: ident.bcc_self, transportId: ident.transport_id };
   });
 

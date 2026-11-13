@@ -3,20 +3,24 @@ import type { FastifyInstance } from 'fastify';
 import type { ApiDisposable } from '@seamless/shared';
 import { uid } from './util.ts';
 import {
-  createDisposable, listDisposable, listDomains, getDisposable, updateDisposable, setStatus, stats, UNDO_WINDOW_MS,
+  createDisposable, listDisposable, listDomains, getDisposable, updateDisposable, stopAddress, startAddress, keepMessage, keepAllFrom, stats,
   type DisposableRow, type Generator,
 } from '../mail/disposable.ts';
+import { getUserSetting, setUserSetting } from '../classify/settings.ts';
 
 export function view(r: DisposableRow): ApiDisposable {
-  const disposedAt = r.disposed_at ? Number(r.disposed_at) : null;
   return {
     id: r.id, accountId: r.account_id, address: r.address, label: r.label, purpose: r.purpose, status: r.status,
     expiresAt: r.expires_at ? Number(r.expires_at) : null, notify: r.notify, receivedCount: r.received_count,
-    droppedCount: r.dropped_count, lastReceivedAt: r.last_received_at ? Number(r.last_received_at) : null,
-    lastSender: r.last_sender, signupDomain: r.signup_domain, leakDomains: r.leak_domains, disposedAt,
-    createdAt: Number(r.created_at), canUndo: r.status === 'disposed' && !!disposedAt && Date.now() - disposedAt <= UNDO_WINDOW_MS,
+    lastReceivedAt: r.last_received_at ? Number(r.last_received_at) : null,
+    lastSender: r.last_sender, signupDomain: r.signup_domain, leakDomains: r.leak_domains,
+    stoppedAt: r.stopped_at ? Number(r.stopped_at) : null, stoppedStored: r.stopped_stored, keepAll: r.keep_all,
+    createdAt: Number(r.created_at),
   };
 }
+
+const SETTING_KEYS = { stopBinDays: 'stop_bin_days', stopCap: 'stop_cap', expireDays: 'disposable_expire_days', stoppedDeleteDays: 'stopped_delete_days' } as const;
+const RANGES: Record<keyof typeof SETTING_KEYS, [number, number]> = { stopBinDays: [1, 365], stopCap: [1, 10000], expireDays: [1, 90], stoppedDeleteDays: [0, 3650] };
 
 export function register(app: FastifyInstance): void {
   app.get('/api/disposable', async (req) => ({
@@ -46,23 +50,59 @@ export function register(app: FastifyInstance): void {
     return row ? view(row) : reply.code(404).send({ error: 'not found' });
   });
 
-  for (const [action, status] of [['pause', 'paused'], ['resume', 'active'], ['dispose', 'disposed'], ['undispose', 'active']] as const) {
-    app.post(`/api/disposable/:id/${action}`, async (req, reply) => {
-      try {
-        const row = await setStatus(uid(req), Number((req.params as any).id), status);
-        return row ? view(row) : reply.code(404).send({ error: 'not found' });
-      } catch (err: any) { return reply.code(409).send({ error: err?.message ?? 'failed' }); }
-    });
+  app.post('/api/disposable/:id/stop', async (req, reply) => {
+    const row = await stopAddress(uid(req), Number((req.params as any).id));
+    return row ? view(row) : reply.code(404).send({ error: 'not found' });
+  });
+  app.post('/api/disposable/:id/start', async (req, reply) => {
+    const row = await startAddress(uid(req), Number((req.params as any).id));
+    return row ? view(row) : reply.code(404).send({ error: 'not found' });
+  });
+  // the old Pause / Dispose actions are gone (T10.2): Stop / Start replace them
+  for (const old of ['pause', 'resume', 'dispose', 'undispose']) {
+    app.post(`/api/disposable/:id/${old}`, async (_req, reply) => reply.code(410).send({ error: `"${old}" was removed: use stop / start` }));
   }
 
-  /** Bulk dispose / pause / resume. Ids that aren't yours are ignored. */
+  /** Bulk stop / start. Ids that aren't yours are ignored. */
   app.post('/api/disposable/bulk', async (req, reply) => {
     const b = (req.body ?? {}) as { ids?: number[]; action?: string };
-    const status = ({ dispose: 'disposed', pause: 'paused', resume: 'active' } as Record<string, 'disposed' | 'paused' | 'active'>)[String(b.action)];
-    if (!status || !Array.isArray(b.ids)) return reply.code(400).send({ error: 'ids and action (dispose|pause|resume) required' });
+    const fn = b.action === 'stop' ? stopAddress : b.action === 'start' ? startAddress : null;
+    if (!fn || !Array.isArray(b.ids)) return reply.code(400).send({ error: 'ids and action (stop|start) required' });
     let n = 0;
-    for (const id of b.ids.slice(0, 500)) { if (await setStatus(uid(req), Number(id), status).catch(() => null)) n++; }
+    for (const id of b.ids.slice(0, 500)) { if (await fn(uid(req), Number(id)).catch(() => null)) n++; }
     return { updated: n };
+  });
+
+  app.post('/api/disposable/:id/keep-all', async (req, reply) => {
+    const n = await keepAllFrom(uid(req), Number((req.params as any).id));
+    return n === null ? reply.code(404).send({ error: 'not found' }) : { kept: n };
+  });
+  app.post('/api/messages/:id/keep', async (req, reply) =>
+    (await keepMessage(uid(req), Number((req.params as any).id))) ? { kept: 1 } : reply.code(404).send({ error: 'not found' }));
+  app.post('/api/messages/keep', async (req, reply) => {
+    const b = (req.body ?? {}) as { ids?: number[] };
+    if (!Array.isArray(b.ids)) return reply.code(400).send({ error: 'ids required' });
+    let n = 0;
+    for (const id of b.ids.slice(0, 500)) { if (await keepMessage(uid(req), Number(id))) n++; }
+    return { kept: n };
+  });
+
+  app.get('/api/disposable/settings', async (req) => {
+    const out: Record<string, number> = {};
+    for (const [k, key] of Object.entries(SETTING_KEYS)) out[k] = Number(await getUserSetting(uid(req), key));
+    return out;
+  });
+  app.put('/api/disposable/settings', async (req, reply) => {
+    const b = (req.body ?? {}) as Record<string, unknown>;
+    for (const [k, key] of Object.entries(SETTING_KEYS) as [keyof typeof SETTING_KEYS, string][]) {
+      if (b[k] === undefined) continue;
+      const n = Number(b[k]); const [lo, hi] = RANGES[k];
+      if (!Number.isInteger(n) || n < lo || n > hi) return reply.code(400).send({ error: `${k} must be ${lo}–${hi}` });
+      await setUserSetting(uid(req), key, String(n));
+    }
+    const out: Record<string, number> = {};
+    for (const [k, key] of Object.entries(SETTING_KEYS)) out[k] = Number(await getUserSetting(uid(req), key));
+    return out;
   });
 
   app.get('/api/disposable/:id/stats', async (req, reply) => {

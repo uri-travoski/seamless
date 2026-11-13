@@ -385,6 +385,7 @@ export default function ComposeWindow({ draft }: { draft: Draft }) {
           {!showCc && <button className="cc-toggle" onClick={() => setShowCc(true)}>Cc</button>}
           {!showBcc && <button className="cc-toggle" onClick={() => setShowBcc(true)}>Bcc</button>}
         </div>
+        {draft.replyNotice && <div className="compose-notice dim" role="note">{draft.replyNotice}</div>}
         <AddressFieldWrapper draft={draft} field="to" label="To" autoFocus={!draft.replyToEmailId} />
         {showCc && <AddressFieldWrapper draft={draft} field="cc" label="Cc" />}
         {showBcc && <AddressFieldWrapper draft={draft} field="bcc" label="Bcc" />}

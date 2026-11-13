@@ -4,7 +4,7 @@ import { api } from '../../api/client.ts';
 import { toast } from '../../toast.ts';
 
 type Policy = 'quarantine' | 'deliver' | 'drop';
-interface Domain { domain: string; token: string; via: 'catchall' | 'cloudflare'; policy: Policy }
+interface Domain { domain: string; token: string; via: 'catchall' | 'cloudflare'; policy: Policy; rejectStopped?: boolean }
 interface Mailbox {
   accountId: number; email: string; kind: 'imap' | 'pop3'; after: 'move' | 'delete' | 'leave'; cleanDays: number;
   domains: { domain: string; policy: Policy }[]; state: string; lastSyncAt: number | null; lastError: string; failures: number;
@@ -152,11 +152,14 @@ export default function CatchAllPanel({ onCreated }: { onCreated?: () => void })
         ? <p className="dim">No domain yet. Add a catch-all domain below, or an “Own domain (Cloudflare Email Routing)” mailbox in Settings → Mailboxes.</p>
         : (
           <table className="settings-table">
-            <thead><tr><th>Domain</th><th>Delivered by</th><th>Mail to an address you have not created</th></tr></thead>
+            <thead><tr><th>Domain</th><th>Delivered by</th><th>Mail to an address you have not created</th><th>Stopped addresses</th></tr></thead>
             <tbody>{data.domains.map((d) => (
               <tr key={d.domain}><td><code>{d.domain}</code></td><td>{d.via === 'catchall' ? 'Catch-all mailbox' : 'Cloudflare route'}</td>
                 <td><select aria-label={`Unknown address policy for ${d.domain}`} value={d.policy} onChange={(e) => void setPolicy(d, e.target.value as Policy)}>
-                  {(Object.keys(POLICY_TEXT) as Policy[]).map((p) => <option key={p} value={p}>{POLICY_TEXT[p]}</option>)}</select></td></tr>
+                  {(Object.keys(POLICY_TEXT) as Policy[]).map((p) => <option key={p} value={p}>{POLICY_TEXT[p]}</option>)}</select></td>
+                <td>{d.via === 'cloudflare'
+                  ? <label title="The Cloudflare Worker refuses mail to a stopped address at SMTP time, so nothing is stored"><input type="checkbox" checked={!!d.rejectStopped} onChange={(e) => void api.put(`/api/push-inboxes/${d.token}`, { rejectStopped: e.target.checked }).then(load, () => toast('Failed', 'error'))} /> Reject at the door</label>
+                  : <span className="dim">Bin, then deleted</span>}</td></tr>
             ))}</tbody>
           </table>
         )}

@@ -7,6 +7,7 @@ import { AssigneeChip } from './SharedThread.tsx';
 import { useMail, PAGE, PAGINATE_AT, BULK_MAX } from '../state/mail.ts';
 import { actions, runBulk } from '../state/actions.ts';
 import { useCompose } from '../state/compose.ts';
+import { keepMessage } from './settings/DisposableSettings.tsx';
 import LabelPicker from './LabelPicker.tsx';
 import { readableTextOn } from './LabelColorPicker.tsx';
 import { ContextMenu, type MenuPos } from './EmailMenu.tsx';
@@ -41,6 +42,16 @@ function dateCell(email: ApiEmail): React.ReactNode {
 
 /** Countdown chip for mail the retention sweep will trash ("3d" = three days left). */
 function TtlBadge({ email }: { email: ApiEmail }) {
+  const dd = email.disposable;
+  if (dd && !dd.kept && dd.deleteAt) {   // T10.2: one-week rule on a disposable address, with a Keep button
+    const left = Math.max(0, Math.ceil((dd.deleteAt - Date.now()) / 86_400_000));
+    return (
+      <span className={`ttl-badge ${left <= 1 ? 'due' : ''}`} title={`Deleted ${new Date(dd.deleteAt).toLocaleDateString()} unless you keep it`}>
+        <TrashIcon size={14} />{left}d{' '}
+        <button className="btn ghost" onClick={(e) => { e.stopPropagation(); void keepMessage(email.id, () => { void useMail.getState().refreshCurrent(); }); }}>Keep</button>
+      </span>
+    );
+  }
   if (email.disposition !== 'delete' || !email.deleteAt) return null;
   const days = Math.ceil((new Date(email.deleteAt).getTime() - Date.now()) / 86_400_000);
   return (

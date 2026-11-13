@@ -86,7 +86,7 @@ export const fetchBody = (id: string, remote: boolean, pgpPassphrase?: string) =
 export const fetchTracking = (id: string) => api.get<TrackingInfo>(`/api/message/${id}/tracking`);
 
 export const saveNote = (emailId: string, body: string) => api.put<{ ok: boolean }>(`/api/message/${emailId}/note`, { body });
-export const matchIdentity = (emailId: string) => api.post<ApiIdentity>('/api/identity/match', { emailId });
+export const matchIdentity = (emailId: string) => api.post<ApiIdentity & { viaDisposable?: string }>('/api/identity/match', { emailId });
 export const fetchIdentitySignature = (id: number) => api.get<{ html: string }>(`/api/identities/${id}/signature`);
 export interface BusinessWarning { domain: string; message: string; usualBusiness: string; switchIdentityId: number | null }
 export const checkCompose = (p: { identityId?: number; to: { email: string }[]; cc: { email: string }[]; bcc: { email: string }[] }) =>

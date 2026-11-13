@@ -92,14 +92,14 @@ describe('catch-all over IMAP (GreenMail)', () => {
     expect(await inboxCount(destAccountId)).toBe(1);
   });
 
-  it('stopped (disposed) address: mail does not reach the Inbox', async () => {
+  it('stopped address: mail goes to the Bin, not the Inbox', async () => {
     const { destAccountId } = await setup();
     const a = await createAddr('old.aa@burn.test');
-    await app.inject({ method: 'POST', url: `/api/disposable/${a.id}/dispose`, headers: { cookie } });
+    await app.inject({ method: 'POST', url: `/api/disposable/${a.id}/stop`, headers: { cookie } });
     await putOnProvider([mail('old.aa@burn.test', 'late mail')]);
     expect(await checkNow(src)).toMatchObject({ routed: 1, error: null });
     expect(await inboxCount(destAccountId)).toBe(0);
-    expect((await one<any>('SELECT dropped_count FROM disposable_addresses WHERE id = ?', [a.id])).dropped_count).toBe(1);
+    expect((await one<any>('SELECT stopped_stored FROM disposable_addresses WHERE id = ?', [a.id])).stopped_stored).toBe(1);
   });
 
   it('per-domain policy: deliver puts unknown mail in the Inbox, drop discards it, quarantine keeps it', async () => {
