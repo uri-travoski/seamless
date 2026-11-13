@@ -1607,3 +1607,7 @@ mark[data-ai-pending], mark[data-unknown-var] { outline: 1px dashed var(--md-bor
 /* Shared Mailbox submenu in the top-right menu */
 .app-menu .menu-sub { margin: 2px 0 4px 18px; padding-left: 6px; border-left: 2px solid var(--color-border, rgba(128,128,128,.3)); }
 .app-menu .menu-sub .side-item { padding: 8px 12px; font-size: 13.5px; }
+
+/* label text +0.5px everywhere labels are shown (list rows, reading pane); sidebar done above */
+.chip, .msg-row .chip { font-size: 11.5px; }
+.disposable-chip .chip { font-size: 11px; }
