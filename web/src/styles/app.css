@@ -1650,3 +1650,9 @@ mark[data-ai-pending], mark[data-unknown-var] { outline: 1px dashed var(--md-bor
 .list-toolbar.bulk .bulk-count { margin-right: 20px; }
 /* text colour swatch another 10% smaller (18px -> 16.2px) */
 .editor-toolbar input[type="color"] { width: 16.2px; height: 16.2px; }
+
+/* reading toolbar: more air between icons and clear groups; menus open to the right of left-side buttons so they are never cut off */
+.read-toolbar { gap: 6px; padding: 0 14px; }
+.read-toolbar .tb-sep { width: 1px; height: 20px; background: var(--color-border-strong, var(--md-border-strong)); opacity: .6; margin: 0 8px; flex: 0 0 auto; }
+.read-toolbar .label-menu:not(.more-menu) .dropdown { left: 0; right: auto; min-width: 250px; max-width: min(340px, 80vw); transform-origin: top left; }
+.read-toolbar .label-menu.more-menu .dropdown { right: 0; left: auto; }

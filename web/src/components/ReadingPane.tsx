@@ -489,7 +489,7 @@ function ToolbarMore({ email }: { email: ApiEmail }) {
     return () => window.removeEventListener('mousedown', onDown);
   }, [open]);
   return (
-    <div className="label-menu" ref={ref}>
+    <div className="label-menu more-menu" ref={ref}>
       <button className={`icon-btn ${open ? 'active' : ''}`} title="More actions" aria-haspopup="menu" onClick={() => setOpen((v) => !v)}><KebabIcon /></button>
       {open && <div className="dropdown" role="menu"><EmailMenuItems email={email} close={() => setOpen(false)} /></div>}
     </div>
@@ -604,23 +604,25 @@ export default function ReadingPane() {
       <div className="read-toolbar">
         <button className="icon-btn" title="Back to list (u)" onClick={() => void select(null)}><BackIcon /></button>
         <span className="tb-sep" />
-        <button className="icon-btn" title="Mark unread (Shift+U)" onClick={() => { markRead(selected.id, false); void select(null); }}><EnvelopeIcon /></button>
-        <button className={`icon-btn ${selected.keywords.$flagged ? 'active' : ''}`} title="Star (s)" onClick={() => actions.star(selected.id)}><StarIcon weight={selected.keywords.$flagged ? 'fill' : 'regular'} /></button>
-        <LabelPicker value={selected.labelIds} accountId={selected.accountId} onChange={(ids) => applyLabels(selected.id, ids)} />
-        {selected.mailboxRole === 'inbox' && selected.snoozeAllowed === false && <button className="icon-btn" disabled title="Snoozing is off for this shared mailbox" aria-label="Snoozing is off for this shared mailbox"><SnoozeIcon /></button>}
-        {selected.mailboxRole === 'inbox' && selected.snoozeAllowed !== false && <SnoozeButton onPick={(at) => void actions.snooze(selected.id, at)} />}
-        {selected.snoozedUntil && selected.snoozedBy && <span className="dim" style={{ fontSize: 12 }}>Snoozed by {selected.snoozedBy} until {new Date(selected.snoozedUntil).toLocaleString()}</span>}
         {inBin
           ? <button className="icon-btn" title={selected.mailboxRole === 'junk' ? 'Not spam' : 'Restore to Inbox'} onClick={() => (selected.mailboxRole === 'junk' ? actions.notSpam(selected.id) : actions.restore(selected.id))}><RestoreMailIcon /></button>
           : <button className="icon-btn" title="Archive (e)" onClick={() => actions.archive(selected.id)}><ArchiveIcon /></button>}
         {selected.mailboxRole !== 'junk' && <button className="icon-btn" title="Report spam (!)" onClick={() => actions.spam(selected.id)}><JunkIcon /></button>}
         <button className="icon-btn" title={inBin ? 'Delete forever' : 'Delete (#)'} onClick={() => actions.trash(selected.id)}><TrashIcon /></button>
         <span className="tb-sep" />
+        <button className="icon-btn" title="Mark unread (Shift+U)" onClick={() => { markRead(selected.id, false); void select(null); }}><EnvelopeIcon /></button>
+        <button className={`icon-btn ${selected.keywords.$flagged ? 'active' : ''}`} title="Star (s)" onClick={() => actions.star(selected.id)}><StarIcon weight={selected.keywords.$flagged ? 'fill' : 'regular'} /></button>
+        <LabelPicker value={selected.labelIds} accountId={selected.accountId} onChange={(ids) => applyLabels(selected.id, ids)} />
+        {selected.mailboxRole === 'inbox' && selected.snoozeAllowed === false && <button className="icon-btn" disabled title="Snoozing is off for this shared mailbox" aria-label="Snoozing is off for this shared mailbox"><SnoozeIcon /></button>}
+        {selected.mailboxRole === 'inbox' && selected.snoozeAllowed !== false && <SnoozeButton onPick={(at) => void actions.snooze(selected.id, at)} />}
+        {selected.snoozedUntil && selected.snoozedBy && <span className="dim" style={{ fontSize: 12 }}>Snoozed by {selected.snoozedBy} until {new Date(selected.snoozedUntil).toLocaleString()}</span>}
+        <span className="tb-sep" />
         {!selected.keywords.$draft && <>
           <button className="icon-btn" title="Reply (r)" onClick={() => actions.reply(selected.id)}><ReplyIcon /></button>
           <button className="icon-btn" title="Reply all (a)" onClick={() => actions.replyAll(selected.id)}><ReplyAllIcon /></button>
           <button className="icon-btn" title="Forward (f)" onClick={() => actions.forward(selected.id)}><ForwardIcon /></button>
         </>}
+        <span className="tb-sep" />
         <ToolbarMore email={selected} />
         <button className={`icon-btn ${teachOpen ? 'active' : ''}`} title="Teach the AI about emails like this" onClick={() => setTeachOpen((v) => !v)}><SparkleIcon /></button>
         <div style={{ flex: 1 }} />
