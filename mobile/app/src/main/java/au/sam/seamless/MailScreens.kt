@@ -1,5 +1,11 @@
 package au.sam.seamless
 
+import androidx.compose.material3.SwipeToDismissBoxState
+
+import androidx.compose.ui.layout.onSizeChanged
+
+import androidx.compose.runtime.mutableFloatStateOf
+
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
@@ -426,13 +432,23 @@ private fun EmailRow(e: ApiEmail, mail: MailViewModel, showDot: Boolean, labelBy
     val rowNow by rememberUpdatedState(e)
     val rightNow by rememberUpdatedState(right)
     val leftNow by rememberUpdatedState(left)
-    val dismiss = rememberSwipeToDismissBoxState(confirmValueChange = { v ->
-        val a = when (v) { SwipeToDismissBoxValue.StartToEnd -> rightNow; SwipeToDismissBoxValue.EndToStart -> leftNow; else -> SwipeAction.None }
-        val bulk = a.bulkFor(rowNow)
-        if (bulk != null) mail.act(bulk, setOf(rowNow.id))
-        bulk != null && a.removesRow // read/star keep the row, so it springs back
-    })
+    // an action only fires when the row was dragged at least halfway across, so a light touch or flick never archives/deletes by accident
+    var rowWidth by remember { mutableFloatStateOf(0f) }
+    var stateRef by remember { mutableStateOf<SwipeToDismissBoxState?>(null) }
+    val dismiss = rememberSwipeToDismissBoxState(
+        confirmValueChange = { v ->
+            val dragged = runCatching { kotlin.math.abs(stateRef?.requireOffset() ?: 0f) }.getOrDefault(0f)
+            if (v == SwipeToDismissBoxValue.Settled || rowWidth <= 0f || dragged < rowWidth * SWIPE_FRACTION) return@rememberSwipeToDismissBoxState false
+            val a = when (v) { SwipeToDismissBoxValue.StartToEnd -> rightNow; SwipeToDismissBoxValue.EndToStart -> leftNow; else -> SwipeAction.None }
+            val bulk = a.bulkFor(rowNow)
+            if (bulk != null) mail.act(bulk, setOf(rowNow.id))
+            bulk != null && a.removesRow // read/star keep the row, so it springs back
+        },
+        positionalThreshold = { total -> total * SWIPE_FRACTION },
+    )
+    stateRef = dismiss
     SwipeToDismissBox(
+        modifier = Modifier.onSizeChanged { rowWidth = it.width.toFloat() },
         state = dismiss,
         enableDismissFromStartToEnd = !selecting && right != SwipeAction.None,
         enableDismissFromEndToStart = !selecting && left != SwipeAction.None,
@@ -627,3 +643,6 @@ private fun SearchOptionsSheet(mail: MailViewModel) {
 @Composable
 private fun OptField(label: String, value: String, onChange: (String) -> Unit) =
     OutlinedTextField(value, onChange, label = { Text(label) }, singleLine = true, modifier = Modifier.fillMaxWidth())
+
+/** Fraction of the row width a swipe must cover before it counts. */
+private const val SWIPE_FRACTION = 0.5f

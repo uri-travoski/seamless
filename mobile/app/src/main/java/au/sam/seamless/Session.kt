@@ -61,6 +61,10 @@ class Session(private val store: KeyValueStore, val jar: PersistentCookieJar) {
     var theme: String
         get() = store.get("theme") ?: "system"
         set(v) = store.put("theme", v)
+    /** Text size change in steps of 1 (about 1 px at the usual 14 px body text); 0 = the phone's own size. */
+    var textDelta: Int
+        get() = (store.get("textDelta")?.toIntOrNull() ?: 0).coerceIn(TEXT_DELTA_MIN, TEXT_DELTA_MAX)
+        set(v) = store.put("textDelta", v.coerceIn(TEXT_DELTA_MIN, TEXT_DELTA_MAX).toString())
     /** Email of the identity new messages start from; empty = follow the mailbox being viewed. */
     var defaultFrom: String
         get() = store.get("defaultFrom").orEmpty()
@@ -124,3 +128,7 @@ class Session(private val store: KeyValueStore, val jar: PersistentCookieJar) {
         }
     }
 }
+
+const val TEXT_DELTA_MIN = -4
+const val TEXT_DELTA_MAX = 10
+const val TEXT_BASE_PX = 14f

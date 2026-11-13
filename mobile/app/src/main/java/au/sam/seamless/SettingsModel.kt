@@ -20,11 +20,13 @@ class SettingsModel(
     private val onSignedOut: () -> Unit,
     private val onMessage: (String) -> Unit,
     private val onTheme: (String) -> Unit,
+    private val onTextSize: (Int) -> Unit = {},
     private val onPushPrefs: () -> Unit = {},
 ) {
     private val base get() = session.serverUrl
 
     var theme by mutableStateOf(session.theme); private set
+    var textDelta by mutableStateOf(session.textDelta); private set
     var swipeRight by mutableStateOf(SwipeAction.of(session.swipeRight, SwipeAction.Archive)); private set
     var swipeLeft by mutableStateOf(SwipeAction.of(session.swipeLeft, SwipeAction.Delete)); private set
     var conversationView by mutableStateOf(session.conversationView); private set
@@ -72,6 +74,22 @@ class SettingsModel(
                 r.newMail + r.newAlerts == 0 -> onMessage("Nothing new.")
                 else -> onMessage(listOfNotNull(r.newMail.takeIf { it > 0 }?.let { "$it new message${if (it == 1) "" else "s"}" }, r.newAlerts.takeIf { it > 0 }?.let { "$it alert${if (it == 1) "" else "s"}" }).joinToString(" and ") + ".")
             }
+        }
+    }
+
+    /** Bigger/smaller text, 1 step (about 1 px) at a time. */
+    fun changeTextSize(step: Int) { setTextSize(textDelta + step) }
+    fun setTextSize(v: Int) { val n = v.coerceIn(TEXT_DELTA_MIN, TEXT_DELTA_MAX); textDelta = n; session.textDelta = n; onTextSize(n) }
+
+    // ---- check for a new version on GitHub (sideloaded builds only) ----
+    var update by mutableStateOf<UpdateResult?>(null); private set
+    var checkingUpdate by mutableStateOf(false); private set
+    fun checkForUpdate() {
+        if (checkingUpdate) return
+        checkingUpdate = true; update = null
+        scope.launch {
+            update = withContext(Dispatchers.IO) { UpdateChecker.check(BuildConfig.VERSION_NAME) }
+            checkingUpdate = false
         }
     }
 

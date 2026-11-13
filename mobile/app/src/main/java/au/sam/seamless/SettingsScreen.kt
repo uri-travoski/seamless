@@ -18,6 +18,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -82,11 +84,25 @@ fun SettingsScreen(vm: AppViewModel, mail: MailViewModel, onBack: () -> Unit) {
 
             Header("Appearance")
             ClickRow("Theme", ThemeChoice.of(st.theme).title) { dialog = "theme" }
+            TextSizeRow(st.textDelta, onSmaller = { st.changeTextSize(-1) }, onBigger = { st.changeTextSize(1) }, onReset = { st.setTextSize(0) })
 
             Header("About")
             InfoRow("App version", BuildConfig.VERSION_NAME)
             InfoRow("Server", vm.session.serverUrl)
             if (st.serverVersion.isNotEmpty()) InfoRow("Server version", st.serverVersion)
+            if (BuildConfig.GITHUB_UPDATES) {
+                ClickRow(if (st.checkingUpdate) "Checking for updates…" else "Check for updates", when (val u = st.update) {
+                    null -> "Looks for a newer version on GitHub"
+                    is UpdateResult.UpToDate -> "You have the latest version (${u.current})"
+                    is UpdateResult.Available -> "Version ${u.version} is available"
+                    is UpdateResult.Failed -> u.message
+                }) { st.checkForUpdate() }
+                (st.update as? UpdateResult.Available)?.let { u ->
+                    ClickRow("Download version ${u.version}", "Opens the download in your browser, then tap it to install") {
+                        ctx.startActivity(Intent(Intent.ACTION_VIEW, android.net.Uri.parse(u.url)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+                    }
+                }
+            }
             ClickRow("Open-source licences", null) { dialog = "licences" }
             if (BuildConfig.DEBUG) {
                 ClickRow("Simulate push: new mail", "Debug build only – shows a notification for the newest message in the list") {
@@ -124,6 +140,20 @@ fun SettingsScreen(vm: AppViewModel, mail: MailViewModel, onBack: () -> Unit) {
         confirmButton = { TextButton(onClick = { confirmSignOut = false; vm.logout() }) { Text("Sign out") } },
         dismissButton = { TextButton(onClick = { confirmSignOut = false }) { Text("Cancel") } },
     )
+}
+
+@Composable
+private fun TextSizeRow(delta: Int, onSmaller: () -> Unit, onBigger: () -> Unit, onReset: () -> Unit) {
+    Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+        Column(Modifier.weight(1f)) {
+            Text("Text size")
+            Text(if (delta == 0) "Default" else (if (delta > 0) "+$delta" else "$delta") + " px from default" , style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+        TextButton(onClick = onReset, enabled = delta != 0) { Text("Reset") }
+        OutlinedButton(onClick = onSmaller, enabled = delta > TEXT_DELTA_MIN, modifier = Modifier.semantics { contentDescription = "Smaller text" }) { Text("A−") }
+        Spacer(Modifier.width(8.dp))
+        OutlinedButton(onClick = onBigger, enabled = delta < TEXT_DELTA_MAX, modifier = Modifier.semantics { contentDescription = "Bigger text" }) { Text("A+") }
+    }
 }
 
 @Composable

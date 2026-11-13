@@ -22,7 +22,11 @@ class MainActivity : ComponentActivity() {
         if (savedInstanceState == null) handle(intent)
         setContent {
             val dark = when (vm.theme) { "dark" -> true; "light" -> false; else -> androidx.compose.foundation.isSystemInDarkTheme() }
-            SeamlessTheme(dark) { AppRoot(vm) }
+            val density = androidx.compose.ui.platform.LocalDensity.current
+            val scaled = androidx.compose.ui.unit.Density(density.density, density.fontScale * (TEXT_BASE_PX + vm.textDelta) / TEXT_BASE_PX)
+            androidx.compose.runtime.CompositionLocalProvider(androidx.compose.ui.platform.LocalDensity provides scaled) {
+                SeamlessTheme(dark) { AppRoot(vm) }
+            }
         }
     }
 

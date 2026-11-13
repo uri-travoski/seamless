@@ -37,6 +37,7 @@ class AppViewModel(private val app: SeamlessApp) : ViewModel() {
     var settings by mutableStateOf<SettingsModel?>(null); private set
     var overlay by mutableStateOf(Overlay.None)
     var theme by mutableStateOf(session.theme); private set
+    var textDelta by mutableStateOf(session.textDelta); private set
     val messages = kotlinx.coroutines.flow.MutableSharedFlow<String>(extraBufferCapacity = 4, onBufferOverflow = kotlinx.coroutines.channels.BufferOverflow.DROP_OLDEST)
 
     /** A mailto: link or a Share to Seamless that arrived before we were signed in. */
@@ -167,7 +168,7 @@ class AppViewModel(private val app: SeamlessApp) : ViewModel() {
         SyncScheduler.schedule(app)
         if (!session.notifyPromptShown && !Notifier.allowed(app)) askNotifications = true
         settings = SettingsModel(api, session, viewModelScope, onSignedOut = { signedOut("You were signed out. Sign in again to continue.") },
-            onMessage = { messages.tryEmit(it) }, onTheme = { theme = it }, onPushPrefs = ::pushPrefsChanged)
+            onMessage = { messages.tryEmit(it) }, onTheme = { theme = it }, onTextSize = { textDelta = it }, onPushPrefs = ::pushPrefsChanged)
         overlay = Overlay.None
         screen = Screen.Home
     }
