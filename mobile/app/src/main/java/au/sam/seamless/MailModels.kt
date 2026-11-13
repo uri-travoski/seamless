@@ -16,6 +16,9 @@ import kotlinx.serialization.Serializable
     val labelIds: List<Int> = emptyList(),
     val from: List<ApiAddress> = emptyList(),
     val to: List<ApiAddress> = emptyList(),
+    val cc: List<ApiAddress> = emptyList(),
+    val replyTo: List<ApiAddress> = emptyList(),
+    val messageId: String? = null,
     val subject: String = "",
     val preview: String = "",
     val receivedAt: String = "",
@@ -76,7 +79,7 @@ data class EmailPage(val total: Int, val emails: List<ApiEmail>)
 
 @Serializable data class ApiNotificationPrefs(val mutedAccountIds: List<Int> = emptyList())
 
-@Serializable data class ApiIdentity(val email: String = "", val name: String = "", val accountId: Int = 0, val isDefault: Boolean = false)
+@Serializable data class ApiIdentity(val email: String = "", val name: String = "", val accountId: Int = 0, val isDefault: Boolean = false, val isAlias: Boolean = false, val id: Int? = null, val bccSelf: Boolean = false)
 
 @Serializable data class ApiSavedView(val id: Int, val name: String = "", val query: String = "", val scope: String = "unified", val pinned: Boolean = false)
 

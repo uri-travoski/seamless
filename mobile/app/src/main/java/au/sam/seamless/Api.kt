@@ -9,6 +9,7 @@ import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
 import okhttp3.Response
 import java.io.IOException
+import okio.source
 import java.util.concurrent.TimeUnit
 
 /** Outcome of a call, with every failure already turned into words for the screen. */
@@ -223,6 +224,53 @@ class Api(
     } catch (_: Exception) { null }
 
     fun identities(baseUrl: String) = getJson(baseUrl, "/api/identities") { json.decodeFromString<List<ApiIdentity>>(it) }
+
+
+    // ---- compose (T9.6) ----
+
+    fun signature(baseUrl: String, identityId: Int) = getJson(baseUrl, "/api/identities/$identityId/signature") { json.decodeFromString<SignatureResponse>(it).html }
+
+    /** Which identity the server would reply from (the address the mail was delivered to). */
+    fun matchIdentity(baseUrl: String, emailId: String) =
+        call(baseUrl, "/api/identity/match", buildJsonObject { put("emailId", emailId) }.toString()) { json.parseToJsonElement(it).jsonObject }
+
+    fun send(baseUrl: String, payload: JsonObject): ApiResult<SendResult> = call(baseUrl, "/api/send", payload.toString()) { json.decodeFromString<SendResult>(it) }
+
+    /** Cancels a held send; the payload comes back so the compose screen can reopen exactly as it was. 409 = too late. */
+    fun undoSend(baseUrl: String, jobId: Long): ApiResult<JsonObject> =
+        call(baseUrl, "/api/send/undo", buildJsonObject { put("jobId", jobId) }.toString()) { json.parseToJsonElement(it).jsonObject["payload"]!!.jsonObject }
+
+    fun saveDraft(baseUrl: String, payload: JsonObject): ApiResult<Unit> = call(baseUrl, "/api/draft", payload.toString()) { }
+
+    fun schedule(baseUrl: String, payload: JsonObject, sendAt: Long): ApiResult<Unit> =
+        call(baseUrl, "/api/schedule", JsonObject(payload + ("sendAt" to JsonPrimitive(sendAt))).toString()) { }
+
+    /** Streams a phone file (SAF uri) to the server's temp store; the answer's id goes into the send payload. */
+    fun upload(baseUrl: String, filename: String, mime: String, size: Long, open: () -> java.io.InputStream?): ApiResult<ApiUpload> {
+        val body = object : okhttp3.RequestBody() {
+            override fun contentType() = mime.toMediaType()
+            override fun contentLength() = if (size > 0) size else -1
+            override fun writeTo(sink: okio.BufferedSink) { (open() ?: throw IOException("Can't read that file.")).use { sink.writeAll(it.source()) } }
+        }
+        val multi = okhttp3.MultipartBody.Builder().setType(okhttp3.MultipartBody.FORM).addFormDataPart("file", filename, body).build()
+        val req = Request.Builder().url("$baseUrl/api/upload").post(multi)
+            .header("X-Seamless-Client", "android/$appVersion").header("X-Seamless-Device", deviceName).header("Accept", "application/json").build()
+        return try {
+            client.newCall(req).execute().use { res ->
+                val text = res.body?.string().orEmpty()
+                when {
+                    res.isSuccessful -> try { ApiResult.Ok(json.decodeFromString<ApiUpload>(text)) } catch (_: Exception) { ApiResult.Network("The server's answer wasn't understood.") }
+                    res.code == 401 -> { jar.clear(); onUnauthorized(); ApiResult.Unauthorized }
+                    res.code == 413 -> ApiResult.Failed(413, "That file is too big for the server.")
+                    else -> ApiResult.Failed(res.code, errorMessage(res.code, text))
+                }
+            }
+        } catch (e: IOException) { ApiResult.Network(describe(e)) }
+    }
+
+    /** The draft's / message's own address lists live in the JMAP row; its body is fetched with [body]. */
+    fun draftsOf(baseUrl: String, accountId: Int): ApiResult<EmailPage> =
+        emailPage(baseUrl, MailQuery.filter("account:$accountId", "u:drafts", Quick.All), 0, 5)
 
     private fun <T> call(baseUrl: String, path: String, body: String?, isLogin: Boolean = false, method: String? = null, parse: (String) -> T): ApiResult<T> {
         val req = Request.Builder().url(baseUrl + path)

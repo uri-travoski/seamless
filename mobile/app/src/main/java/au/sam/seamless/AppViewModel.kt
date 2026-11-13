@@ -39,6 +39,15 @@ class AppViewModel(private val app: SeamlessApp) : ViewModel() {
     var theme by mutableStateOf(session.theme); private set
     val messages = kotlinx.coroutines.flow.MutableSharedFlow<String>(extraBufferCapacity = 4, onBufferOverflow = kotlinx.coroutines.channels.BufferOverflow.DROP_OLDEST)
 
+    /** A mailto: link or a Share to Seamless that arrived before we were signed in. */
+    private var pendingCompose: ComposeRequest? = null
+
+    fun openCompose(request: ComposeRequest) {
+        val m = mail
+        if (m != null && screen == Screen.Home) { overlay = Overlay.None; m.compose(request) }
+        else pendingCompose = request
+    }
+
     private var mfaToken = ""
     private var checkedUrl = ""
 
@@ -134,7 +143,8 @@ class AppViewModel(private val app: SeamlessApp) : ViewModel() {
     }
 
     private fun enterHome() {
-        mail = MailViewModel(api, session, viewModelScope, onSignedOut = { signedOut("You were signed out. Sign in again to continue.") }).also { it.start() }
+        mail = MailViewModel(api, session, viewModelScope, onSignedOut = { signedOut("You were signed out. Sign in again to continue.") }, files = ContentFiles(app)).also { it.start() }
+        pendingCompose?.let { pendingCompose = null; mail?.compose(it) }
         settings = SettingsModel(api, session, viewModelScope, onSignedOut = { signedOut("You were signed out. Sign in again to continue.") },
             onMessage = { messages.tryEmit(it) }, onTheme = { theme = it })
         overlay = Overlay.None

@@ -68,6 +68,8 @@ fun HomeScreen(vm: AppViewModel) {
         MailHome(mail, onMenu = { scope.launch { drawer.open() } })
     }
     mail.conversation?.let { conv -> ConversationScreen(mail, conv, vm.apiClient, vm.session) }
+    mail.composer?.let { ComposeScreen(it) }
+    PendingSendBar(mail, Modifier.align(Alignment.BottomCenter))
     }
     if (help) HelpDialog(vm.session.serverUrl) { help = false }
 }
@@ -92,6 +94,19 @@ fun MailHome(mail: MailViewModel, onMenu: () -> Unit) {
             snackbarHost = { SnackbarHost(snackbar, Modifier.navigationBarsPadding()) },
             containerColor = MaterialTheme.colorScheme.background,
             contentWindowInsets = WindowInsets(0),
+            floatingActionButton = {
+                if (!selecting && !mail.searchOpen) {
+                    val off = mail.viewingMode
+                    ExtendedFloatingActionButton(
+                        onClick = mail::composeNew,
+                        icon = { Icon(Icons.Filled.Edit, null) },
+                        text = { Text("Compose") },
+                        containerColor = if (off) MaterialTheme.colorScheme.surfaceContainerHighest else MaterialTheme.colorScheme.primaryContainer,
+                        contentColor = if (off) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.onPrimaryContainer,
+                        modifier = Modifier.navigationBarsPadding().semantics { contentDescription = if (off) "Compose (off in viewing mode)" else "Compose a new message" },
+                    )
+                }
+            },
         ) { pad ->
             Column(Modifier.fillMaxSize().padding(pad)) {
                 if (selecting) SelectionBar(mail, onSheet = { sheet = it })
@@ -193,7 +208,7 @@ private fun AlertBanner(a: ApiAlert, onClick: () -> Unit) {
 }
 
 @Composable
-private fun NoticeBanner(text: String) {
+fun NoticeBanner(text: String) {
     Row(Modifier.fillMaxWidth().background(MaterialTheme.colorScheme.secondaryContainer).padding(horizontal = 16.dp, vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
         Icon(Icons.Filled.Info, null, tint = MaterialTheme.colorScheme.onSecondaryContainer)
         Spacer(Modifier.width(12.dp))

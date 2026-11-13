@@ -91,6 +91,21 @@ Open it with the menu button or by swiping from the left edge. It shows, top to 
 
 When someone shares labels from their mailbox with you, a banner appears above the list: **Accept**, **Reject** or **Decide later**.
 
+## Writing mail
+
+Tap **Compose** on the list (it is greyed out, with a note, when the server is in Viewing mode). The message opens full screen:
+
+- **From** starts as your default address, or the mailbox you are looking at; tap it to pick another of your addresses. The identity's signature is added when you send.
+- **To / Cc / Bcc** become chips as you type a comma, press next, or tap a suggestion from your contacts. Tap the arrow to show Cc and Bcc.
+- The body is plain text with a small toolbar: **bold** (`**text**`), _italic_ (`_text_`) and bullet lists (`- item`); they are sent as formatted HTML.
+- **Attach** (paperclip) opens Android's file picker; files over the server's limit are refused with a message. **Schedule** (clock) sends at a date and time you choose.
+- **Send** holds the message for your undo-send delay. A bar shows "Sending… 8s" with **Undo**; Undo brings the message back into the editor.
+- Leaving with writing in progress asks **Save draft / Discard / Keep editing**. Drafts are also saved automatically when you leave the app or pause for a while, and open again when you tap them in Drafts.
+- **Reply, Reply all and Forward** (bar under a conversation) fill in the recipients, subject and quoted text, and reply from the address the message was sent to.
+- With no connection, Send shows "No connection" and keeps your message; nothing is queued behind your back.
+
+Other apps can open Seamless too: tapping an email address (`mailto:` link) or **Share → Seamless** starts a new message with the address, subject, text or files filled in.
+
 ## Settings on the phone
 
 - **Notifications:** new mail on/off, critical alerts on/off, hide message content, a switch per mailbox to mute it (kept on the server, so the web app agrees) and a shortcut to Android's own channel settings.

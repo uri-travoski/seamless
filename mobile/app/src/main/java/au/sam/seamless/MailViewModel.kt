@@ -16,6 +16,9 @@ import java.time.ZoneId
 import java.time.ZonedDateTime
 import java.time.temporal.TemporalAdjusters
 
+/** A message held by the server's undo-send countdown. */
+data class PendingSend(val jobId: Long, val releaseAtLocal: Long, val subject: String, val payload: kotlinx.serialization.json.JsonObject)
+
 data class Snack(val message: String, val undoLabel: String? = null, val onUndo: (() -> Unit)? = null)
 
 /** Everything the mailbox screen shows: the list, the scope/filter chips, search, selection and actions. */
@@ -24,6 +27,7 @@ class MailViewModel(
     private val session: Session,
     private val scope: CoroutineScope,
     private val onSignedOut: () -> Unit = {},
+    private val files: FileAccess = object : FileAccess { override fun describe(uri: String) = null; override fun open(uri: String) = null },
 ) {
     private val base get() = session.serverUrl
     private var rev by mutableIntStateOf(0)
@@ -167,13 +171,60 @@ class MailViewModel(
     var conversation by mutableStateOf<ConversationViewModel?>(null); private set
 
     fun open(e: ApiEmail) {
+        if (e.mailboxRole == "drafts" || e.keywords["\$draft"] == true) { compose(ComposeRequest.Draft(e)); return }
         val mine = (overview?.mailboxes?.map { it.email.lowercase() }.orEmpty() + listOf(session.email.lowercase())).toSet()
         conversation = ConversationViewModel(api, session, this, scope, e, close = { conversation = null }, myEmails = { mine }).also { it.start() }
     }
 
-    /** Reply / reply-all / forward: the compose screen arrives with T9.6. */
-    fun compose(@Suppress("UNUSED_PARAMETER") kind: String, @Suppress("UNUSED_PARAMETER") e: ApiEmail) {
-        snacks.tryEmit(Snack(if (viewingMode) "Viewing mode: sending is off on this server." else "Writing mail arrives in the next update."))
+    // ---- compose (T9.6) ----
+    var composer by mutableStateOf<ComposeViewModel?>(null); private set
+    var pendingSend by mutableStateOf<PendingSend?>(null); private set
+    private var sendTimer: kotlinx.coroutines.Job? = null
+
+    /** Opens the compose screen. Viewing mode keeps it shut (the server would refuse the send anyway). */
+    fun compose(request: ComposeRequest) {
+        if (viewingMode) { snacks.tryEmit(Snack("Viewing mode: this server is not sending mail, so you can't write a message.")); return }
+        if (composer != null) { snacks.tryEmit(Snack("Finish or close the message you're writing first.")); return }
+        composer = ComposeViewModel(api, session, scope, request, MailQuery.accountOf(scopeId), viewingMode, files,
+            onSent = ::sentOne, onScheduled = ::scheduledOne, onClose = { composer = null }, onSignedOut = onSignedOut).also { it.start() }
+    }
+
+    /** Reply / reply-all / forward from the conversation. */
+    fun compose(kind: String, e: ApiEmail) = compose(ComposeRequest.Reply(kind, e))
+
+    fun composeNew() = compose(ComposeRequest.New())
+
+    private fun sentOne(r: SendResult, payload: kotlinx.serialization.json.JsonObject, subject: String) {
+        conversation?.let { /* a reply was sent from here: stay in the conversation */ }
+        val job = r.jobId
+        if (!r.queued || job == null) { snacks.tryEmit(Snack("Message sent.")); refresh(); return }
+        val left = ((r.releaseAt ?: 0L) - System.currentTimeMillis()).let { if (it <= 0 || it > 65_000) 10_000L else it }
+        val p = PendingSend(job, System.currentTimeMillis() + left, subject, payload)
+        pendingSend = p
+        sendTimer?.cancel()
+        sendTimer = scope.launch {
+            kotlinx.coroutines.delay(left + 600)
+            if (pendingSend?.jobId == job) { pendingSend = null; snacks.tryEmit(Snack("Message sent.")); refresh() }
+        }
+    }
+
+    private fun scheduledOne(at: Long) {
+        val f = java.time.format.DateTimeFormatter.ofPattern("EEE d MMM, h:mm a", java.util.Locale.getDefault())
+        snacks.tryEmit(Snack("Scheduled for " + java.time.Instant.ofEpochMilli(at).atZone(java.time.ZoneId.systemDefault()).format(f) + "."))
+        refresh()
+    }
+
+    fun undoPendingSend() {
+        val p = pendingSend ?: return
+        pendingSend = null; sendTimer?.cancel()
+        scope.launch {
+            when (val r = withContext(Dispatchers.IO) { api.undoSend(base, p.jobId) }) {
+                is ApiResult.Ok -> compose(ComposeRequest.Restore(r.value))
+                is ApiResult.Failed -> snacks.tryEmit(Snack(if (r.status == 409) "Too late — that message has already been sent." else r.message))
+                is ApiResult.Network -> { pendingSend = p; snacks.tryEmit(Snack("No connection, so it couldn't be undone. " + r.message)) }
+                ApiResult.Unauthorized -> {}
+            }
+        }
     }
 
     // ---- labels (T9.4): same API as the web app ----
