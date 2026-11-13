@@ -377,6 +377,8 @@ export default function MessageList() {
     return () => window.removeEventListener('keydown', onKey);
   }, []);
 
+  // one read/unread button: "Mark read" while any selected message is unread, otherwise "Mark unread"
+  const anyUnreadSelected = useMail((st) => allMatching || [...st.checked].some((id) => st.emails[id]?.keywords.$seen !== true));
   const bulkTotal = Math.min(total, BULK_MAX);
   const selectedCount = allMatching ? bulkTotal : checkedCount;
   const pageAllChecked = loadedCount > 0 && checkedCount >= loadedCount;
@@ -392,12 +394,15 @@ export default function MessageList() {
           {inBin
             ? <button className="icon-btn" title={inSpam ? 'Not spam' : 'Restore to Inbox'} onClick={() => void runBulk('inbox')}><RestoreMailIcon /></button>
             : <button className="icon-btn" title="Archive" onClick={() => void runBulk('archive')}><ArchiveIcon /></button>}
-          {!inSpam && <button className="icon-btn" title="Report spam" onClick={() => void runBulk('spam')}><JunkIcon /></button>}
+          {!inSpam && <button className="icon-btn" title="Report spam" onClick={() => void runBulk('spam')}><JunkIcon weight="fill" /></button>}
           <button className="icon-btn" title={inBin ? 'Delete forever' : 'Delete'} onClick={() => void runBulk('delete')}><TrashIcon /></button>
-          <button className="icon-btn" title="Mark read" onClick={() => void runBulk('read')}><EnvelopeOpenIcon /></button>
-          <button className="icon-btn" title="Mark unread" onClick={() => void runBulk('unread')}><EnvelopeIcon /></button>
+          <span className="sep" />
+          {anyUnreadSelected
+            ? <button className="icon-btn" title="Mark read" onClick={() => void runBulk('read')}><EnvelopeOpenIcon /></button>
+            : <button className="icon-btn" title="Mark unread" onClick={() => void runBulk('unread')}><EnvelopeIcon /></button>}
           <button className="icon-btn" title="Star" onClick={() => void runBulk('star')}><StarIcon /></button>
           <LabelPicker value={[]} onChange={(ids2) => ids2.forEach((id) => void runBulk('label', id))} />
+          <span className="sep" />
           <MoveMenu onPick={(target) => void runBulk('move', target)} />
           <SnoozeButton title="Snooze" onPick={(at) => void runBulk('snooze', at)} />
           <div style={{ flex: 1 }} />

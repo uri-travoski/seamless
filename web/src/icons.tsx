@@ -41,7 +41,7 @@ export {
   PaperPlaneRight as SentIcon,
   Clock as ScheduledIcon,
   Archive as ArchiveIcon,
-  Prohibit as JunkIcon,
+  WarningOctagon as JunkIcon,
   Trash as TrashIcon,
   Folder as FolderIcon,
   CaretDown as CaretDownIcon,
