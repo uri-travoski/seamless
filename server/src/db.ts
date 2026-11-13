@@ -1567,6 +1567,29 @@ CREATE TABLE contact_suppressed (
 );
 `,
   },
+  {
+    id: 50,
+    // T9.1: Android app. Sessions remember which client made them (90 days renewed on use for the app);
+    // mobile_devices holds the FCM token per signed-in phone and goes away with its session.
+    sql: `
+ALTER TABLE sessions ADD COLUMN client TEXT NOT NULL DEFAULT '';
+CREATE TABLE mobile_devices (
+  id SERIAL PRIMARY KEY,
+  user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  session_id TEXT REFERENCES sessions(token) ON DELETE CASCADE,
+  fcm_token TEXT NOT NULL UNIQUE,
+  platform TEXT NOT NULL DEFAULT 'android',
+  device_name TEXT NOT NULL DEFAULT '',
+  app_version TEXT NOT NULL DEFAULT '',
+  notify_mail BOOLEAN NOT NULL DEFAULT true,
+  notify_alerts BOOLEAN NOT NULL DEFAULT true,
+  hide_content BOOLEAN NOT NULL DEFAULT false,
+  last_seen_at BIGINT NOT NULL,
+  created_at BIGINT NOT NULL
+);
+CREATE INDEX mobile_devices_user ON mobile_devices(user_id);
+`,
+  },
 ];
 
 /** Run `fn` in one transaction. Events emitted through the client are only turned into

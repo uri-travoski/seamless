@@ -16,6 +16,9 @@ export const httpsInstance = config.publicUrl.startsWith('https://');
 /** `__Host-` requires Secure + Path=/ + no Domain, which is exactly what we set on HTTPS. */
 export const SESSION_COOKIE = httpsInstance ? '__Host-smsession' : 'smsession';
 
+/** The Android app sends `X-Seamless-Client: android/<version>` and `X-Seamless-Device: <name>` at login. */
+export const isMobileClient = (client: string | null | undefined): boolean => /^android\//i.test(client ?? '');
+
 export interface SessionUser { userId: number; role: 'admin' | 'member'; token: string; mustChangePassword?: boolean }
 
 export function sessionToken(req: FastifyRequest): string | undefined {
@@ -25,27 +28,31 @@ export function sessionToken(req: FastifyRequest): string | undefined {
 /** Resolve a token to its user, enforcing expiry and sliding the idle window forward. */
 export async function sessionUser(token: string | undefined, now = Date.now()): Promise<SessionUser | null> {
   if (!token) return null;
-  const row = await one<{ user_id: number; role: 'admin' | 'member'; must_change_password: boolean; created_at: number; last_seen_at: number | null; expires_at: number | null }>(
-    `SELECT s.user_id, u.role, u.must_change_password, s.created_at, s.last_seen_at, s.expires_at
+  const row = await one<{ user_id: number; role: 'admin' | 'member'; must_change_password: boolean; created_at: number; last_seen_at: number | null; expires_at: number | null; client: string }>(
+    `SELECT s.user_id, u.role, u.must_change_password, s.created_at, s.last_seen_at, s.expires_at, s.client
      FROM sessions s JOIN users u ON u.id = s.user_id WHERE s.token = ? AND u.disabled = false`, [token]);
   if (!row) return null;
+  // the phone app stays signed in for 90 days after its last use (renewed on use); browsers keep the 90-day cap from sign-in
+  const mobile = isMobileClient(row.client);
   const expires = row.expires_at ?? row.created_at + IDLE_MS;
-  if (now >= expires || now >= row.created_at + ABSOLUTE_MS) {
+  if (now >= expires || (!mobile && now >= row.created_at + ABSOLUTE_MS)) {
     await run('DELETE FROM sessions WHERE token = ?', [token]);
     return null;
   }
   if (!row.last_seen_at || now - row.last_seen_at > TOUCH_EVERY_MS) {
     await run('UPDATE sessions SET last_seen_at = ?, expires_at = ? WHERE token = ?',
-      [now, Math.min(row.created_at + ABSOLUTE_MS, now + IDLE_MS), token]);
+      [now, mobile ? now + ABSOLUTE_MS : Math.min(row.created_at + ABSOLUTE_MS, now + IDLE_MS), token]);
   }
   return { userId: row.user_id, role: row.role, token, mustChangePassword: row.must_change_password };
 }
 
-export async function createSession(userId: number, meta: { ip?: string; userAgent?: string } = {}, now = Date.now()): Promise<string> {
+export async function createSession(userId: number, meta: { ip?: string; userAgent?: string; client?: string; device?: string } = {}, now = Date.now()): Promise<string> {
   const token = randomToken(24);
-  await run(`INSERT INTO sessions(token, user_id, created_at, last_seen_at, expires_at, ip, user_agent)
-             VALUES (?,?,?,?,?,?,?)`,
-    [token, userId, now, now, now + IDLE_MS, meta.ip ?? '', (meta.userAgent ?? '').slice(0, 300)]);
+  const mobile = isMobileClient(meta.client);
+  const label = mobile ? `Seamless for Android — ${(meta.device ?? '').trim().slice(0, 80) || 'phone'}` : '';
+  await run(`INSERT INTO sessions(token, user_id, created_at, last_seen_at, expires_at, ip, user_agent, client, label)
+             VALUES (?,?,?,?,?,?,?,?,?)`,
+    [token, userId, now, now, now + (mobile ? ABSOLUTE_MS : IDLE_MS), meta.ip ?? '', (meta.userAgent ?? '').slice(0, 300), mobile ? String(meta.client).slice(0, 60) : '', label]);
   return token;
 }
 
@@ -63,7 +70,10 @@ export function clearSessionCookie(reply: FastifyReply): void {
 }
 
 export async function makeSession(req: FastifyRequest, reply: FastifyReply, userId: number): Promise<void> {
-  const token = await createSession(userId, { ip: req.ip, userAgent: String(req.headers['user-agent'] ?? '') });
+  const token = await createSession(userId, {
+    ip: req.ip, userAgent: String(req.headers['user-agent'] ?? ''),
+    client: String(req.headers['x-seamless-client'] ?? ''), device: String(req.headers['x-seamless-device'] ?? ''),
+  });
   await run('UPDATE users SET last_login_at = ? WHERE id = ?', [Date.now(), userId]);
   setSessionCookie(reply, token);
 }
@@ -73,6 +83,8 @@ export interface SessionInfo {
   current: boolean;
   ip: string;
   userAgent: string;
+  /** e.g. "Seamless for Android — Pixel 9"; empty for browsers */
+  label: string;
   createdAt: number;
   lastSeenAt: number | null;
   expiresAt: number | null;
@@ -85,13 +97,13 @@ async function handleOf(token: string): Promise<string> {
 }
 
 export async function listSessions(userId: number, currentToken: string | undefined): Promise<SessionInfo[]> {
-  const rows = await q<any>('SELECT token, ip, user_agent, created_at, last_seen_at, expires_at FROM sessions WHERE user_id = ? ORDER BY COALESCE(last_seen_at, created_at) DESC', [userId]);
+  const rows = await q<any>('SELECT token, ip, user_agent, label, created_at, last_seen_at, expires_at, client FROM sessions WHERE user_id = ? ORDER BY COALESCE(last_seen_at, created_at) DESC', [userId]);
   const now = Date.now();
   const out: SessionInfo[] = [];
   for (const r of rows) {
-    if ((r.expires_at && r.expires_at <= now) || r.created_at + ABSOLUTE_MS <= now) continue;
+    if ((r.expires_at && r.expires_at <= now) || (!isMobileClient(r.client) && r.created_at + ABSOLUTE_MS <= now)) continue;
     out.push({
-      id: await handleOf(r.token), current: r.token === currentToken, ip: r.ip, userAgent: r.user_agent,
+      id: await handleOf(r.token), current: r.token === currentToken, ip: r.ip, userAgent: r.user_agent, label: r.label ?? '',
       createdAt: r.created_at, lastSeenAt: r.last_seen_at, expiresAt: r.expires_at,
     });
   }
@@ -115,5 +127,5 @@ export async function revokeOtherSessions(userId: number, keepToken: string | un
 }
 
 export async function pruneExpiredSessions(now = Date.now()): Promise<number> {
-  return run('DELETE FROM sessions WHERE expires_at <= ? OR created_at <= ?', [now, now - ABSOLUTE_MS]);
+  return run("DELETE FROM sessions WHERE expires_at <= ? OR (created_at <= ? AND client = '')", [now, now - ABSOLUTE_MS]);
 }

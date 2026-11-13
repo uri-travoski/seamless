@@ -222,6 +222,51 @@ function Allowlist() {
   );
 }
 
+/** Mobile push (T9.1): the Firebase key that lets the Android app get push notifications. Admin only; the key is never shown again. */
+function MobilePush() {
+  const [st, setSt] = useState<{ configured: boolean; projectId: string | null; clientEmail: string | null } | null>(null);
+  const [text, setText] = useState('');
+  const load = () => api.get<typeof st>('/api/mobile/fcm').then(setSt).catch(() => {});
+  useEffect(() => { void load(); }, []);
+  const save = async () => {
+    try { setSt(await api.put('/api/mobile/fcm', { serviceAccount: text })); setText(''); toast('Mobile push is on'); }
+    catch (e: any) { toast(e?.message ?? 'Could not save the key', 'error'); }
+  };
+  const test = async () => {
+    try {
+      const r = await api.post<{ devices: number; sent: number }>('/api/mobile/test-push');
+      toast(r.sent ? `Test push sent to ${r.sent} phone${r.sent === 1 ? '' : 's'}` : 'Google did not accept the test push — check the key and the app', r.sent ? undefined : 'error');
+    } catch (e: any) { toast(e?.message ?? 'Test failed', 'error'); }
+  };
+  if (!st) return null;
+  return (
+    <>
+      <h3>Mobile push (Firebase)</h3>
+      <p className="settings-desc">Lets the Seamless Android app get new-mail and critical-alert notifications instantly. Without it the app checks for new mail about every 15 minutes instead.</p>
+      <details>
+        <summary>How to set it up</summary>
+        <ol className="dim">
+          <li>Go to the Firebase console (console.firebase.google.com) and create a project (Analytics is not needed).</li>
+          <li>Add an Android app with package name <code>au.sam.seamless</code>, download <code>google-services.json</code> and give it to whoever builds the app.</li>
+          <li>Project settings → Service accounts → <strong>Generate new private key</strong>. This downloads a <code>.json</code> file.</li>
+          <li>Open that file in a text editor, copy everything and paste it below. Seamless keeps it encrypted and never shows it again.</li>
+        </ol>
+      </details>
+      {st.configured && (
+        <div className="dns-panel" role="status">
+          <strong>On</strong> · project <code>{st.projectId}</code><div className="dim">{st.clientEmail}</div>
+          <button className="btn" onClick={() => void test()}>Send test push to my phone</button>{' '}
+          <button className="btn ghost" onClick={() => { if (confirm('Turn mobile push off? Phones fall back to checking every 15 minutes.')) void api.del('/api/mobile/fcm').then(() => load()); }}>Turn off</button>
+        </div>
+      )}
+      <div className="field"><label>{st.configured ? 'Replace the service-account key' : 'Service-account key (JSON)'}</label>
+        <textarea className="text-input" rows={4} value={text} onChange={(e) => setText(e.target.value)} placeholder='{ "type": "service_account", … }' spellCheck={false} />
+      </div>
+      <button className="btn primary" disabled={!text.trim()} onClick={() => void save()}>Save key</button>
+    </>
+  );
+}
+
 export default function IntegrationsSettings() {
   const isAdmin = useSession((s) => s.user?.role === 'admin');
   const [listing, setListing] = useState<Listing | null>(null);
@@ -274,6 +319,7 @@ export default function IntegrationsSettings() {
           : <><button className="btn" onClick={() => setEditing('new')}>Add webhook</button>{' '}<button className="btn" onClick={() => setEditing('new-app')}>Connect an app (DMS, BizBooks, tasks)</button></>}
       <ApiTokens />
       {isAdmin && <Allowlist />}
+      {isAdmin && <MobilePush />}
     </>
   );
 }

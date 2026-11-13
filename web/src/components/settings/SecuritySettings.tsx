@@ -6,7 +6,7 @@ import { useSession } from '../../state/session.ts';
 import { ShieldIcon, CopyIcon, DevicesIcon } from '../../icons.tsx';
 
 interface Status { totp: boolean; totpSince: number | null; recoveryCodesLeft: number; required: boolean }
-interface Session { id: string; current: boolean; ip: string; userAgent: string; createdAt: number; lastSeenAt: number | null; expiresAt: number | null }
+interface Session { id: string; current: boolean; ip: string; userAgent: string; label?: string; createdAt: number; lastSeenAt: number | null; expiresAt: number | null }
 
 function device(ua: string): string {
   if (!ua) return 'Unknown device';
@@ -118,7 +118,7 @@ export default function SecuritySettings() {
           <div key={s.id} className="security-row">
             <DevicesIcon size={20} />
             <div style={{ flex: 1 }}>
-              <strong>{device(s.userAgent)}</strong>{s.current && <span className="tag ok">this device</span>}
+              <strong>{s.label || device(s.userAgent)}</strong>{s.current && <span className="tag ok">this device</span>}
               <div className="dim">{s.ip || 'unknown IP'} · signed in {new Date(s.createdAt).toLocaleDateString()} · last active {s.lastSeenAt ? new Date(s.lastSeenAt).toLocaleString() : '—'}</div>
             </div>
             {!s.current && <button className="btn ghost" onClick={async () => { await api.del(`/api/sessions/${s.id}`); load(); }}>Sign out</button>}

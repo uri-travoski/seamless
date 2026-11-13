@@ -7,6 +7,7 @@ import type { EventType, ApiNotificationPref } from '@seamless/shared';
 import { q, one, run } from '../db.ts';
 import { broadcast } from '../ws.ts';
 import { notifyUser } from '../push.ts';
+import { pushNewMail } from '../push/mobile.ts';
 import { bypassQuiet } from '../mail/vip.ts';
 
 export interface EventRow {
@@ -221,6 +222,10 @@ export async function notifyFromEvent(ev: EventRow): Promise<number | null> {
   }
   if (pref.push && ((vip && (await bypassQuiet(ev.user_id))) || !(await inQuietHours(ev.user_id, Date.now())))) {
     void notifyUser(ev.user_id, r.title, r.body, r.groupKey ?? `${ev.type}-${ev.id}`).catch(() => {});
+    // the Android app hears about new mail too (same rules: notify pref / VIP / quiet hours / mailbox mute all passed above)
+    if (ev.type === 'mail.received' && typeof ev.payload?.messageId === 'number') {
+      void pushNewMail(ev.user_id, { messageId: ev.payload.messageId, accountId: r.accountId, from: displayName(String(ev.payload.from ?? '')), subject: String(ev.payload.subject ?? '') }).catch(() => {});
+    }
   }
   return id;
 }

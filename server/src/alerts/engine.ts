@@ -8,6 +8,7 @@
  * A failed channel never blocks the others; failed sends are retried with backoff; one message per alert, then a
  * reminder every N hours while it is still open and unread. Quiet hours do not apply.
  */
+import { pushAlert } from '../push/mobile.ts';
 import { q, one, run, getSetting, setSetting, bumpState } from '../db.ts';
 import { broadcast } from '../ws.ts';
 import { isViewing } from '../mode.ts';
@@ -150,6 +151,8 @@ export async function raiseAlert(userId: number, kind: string, source: AlertSour
   }
   const a = (await load(ins[0].id))!;
   await afterChange(userId);
+  // critical alerts always reach the user's phones, whether or not an outside channel is set up
+  void pushAlert(userId, { id: a.id, title: a.title, body: a.body, accountId: a.account_id }).catch(() => {});
   await sendOpen(a, now);
   return { alert: (await load(a.id))!, created: true };
 }

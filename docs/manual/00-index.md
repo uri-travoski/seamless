@@ -45,6 +45,7 @@ In Settings, the **?** at the top right of each tab opens the matching page.
 - [Health](15-health.md)
 - [Contacts](32-contacts.md) — auto-save and its switch, autocomplete, groups, merge duplicates, import/export (Google, Outlook, iPhone, Android)
 - [Critical alerts](31-alerts.md) — be told by SMS, Telegram or email when a mailbox stops working; red pinned notifications
+- [Seamless for Android](33-android-app.md) — the phone app: install, sign in, mailbox selector, notifications, Firebase set-up for the administrator
 - [Troubleshooting](10-troubleshooting.md)
 
 ## Integrations
